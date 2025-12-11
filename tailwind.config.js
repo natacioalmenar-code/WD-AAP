@@ -1,18 +1,20 @@
-/** @type {import('tailwindcss').Config} */
+// tailwind.config.js
 export default {
   content: [
     "./index.html",
-    "./**/*.{js,ts,jsx,tsx}",
+    "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
     extend: {
       colors: {
-        // Podem personalitzar colors aquí si calgués
+        wdYellow: "#ffd800",
+        wdNavy: "#02152d",
+        wdDark: "#020812",
       },
       fontFamily: {
-        sans: ['Inter', 'sans-serif'],
-      }
+        sans: ["Inter", "system-ui", "sans-serif"],
+      },
     },
   },
   plugins: [],
-}
+};
