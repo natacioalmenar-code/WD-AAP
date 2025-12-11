@@ -1,13 +1,45 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import {
-  User,
-  UserRole,
-  UserStatus,
-  Trip,
-  Course,
-} from '../types'; // ajusta el path si cal
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from 'react';
 
-// Estat global de l'app
+export type Role = 'admin' | 'instructor' | 'member' | 'pending';
+export type Status = 'pending' | 'active';
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  status: Status;
+}
+
+export interface Trip {
+  id: string;
+  title: string;
+  date: string;
+  location: string;
+  levelRequired: string;
+  maxSpots: number;
+  createdBy: string; // user id
+  participants: string[];
+}
+
+export interface Course {
+  id: string;
+  title: string;
+  date: string;
+  schedule: string;
+  description: string;
+  price: string;
+  levelRequired: string;
+  createdBy: string;
+  participants: string[];
+}
+
 interface AppState {
   users: User[];
   trips: Trip[];
@@ -16,51 +48,50 @@ interface AppState {
 }
 
 interface AppContextValue extends AppState {
-  // auth bàsic
-  loginAsAdmin: () => void;
-  loginAsUser: (email: string) => void;
+  // auth
+  loginAsDemoAdmin: () => void;
+  loginWithEmail: (email: string) => void;
   logout: () => void;
 
-  // usuaris
-  registerUser: (data: Omit<User, 'id' | 'status' | 'role' | 'diveCount' | 'gear'>) => void;
+  // alta i gestió d'usuaris
+  registerUser: (data: { name: string; email: string }) => void;
   approveUser: (userId: string) => void;
-  setUserRole: (userId: string, role: UserRole) => void;
+  setUserRole: (userId: string, role: Role) => void;
 
   // sortides / cursos
-  createTrip: (trip: Omit<Trip, 'id' | 'participants'>) => void;
-  createCourse: (course: Omit<Course, 'id' | 'participants'>) => void;
-
+  createTrip: (data: Omit<Trip, 'id' | 'createdBy' | 'participants'>) => void;
+  createCourse: (data: Omit<Course, 'id' | 'createdBy' | 'participants'>) => void;
   joinTrip: (tripId: string) => void;
   joinCourse: (courseId: string) => void;
 }
 
+const STORAGE_KEY = 'westdivers-app-state-v1';
+
 const AppContext = createContext<AppContextValue | undefined>(undefined);
 
-const STORAGE_KEY = 'wd-app-state-v1';
-
-// Dades inicials de demo
-const initialAdminUser: User = {
+const initialAdmin: User = {
   id: 'admin-1',
   name: 'Administrador West Divers',
-  email: 'admin@westdivers.test',
-  level: UserRole.ADMIN as any, // ajustarem si cal
-  role: UserRole.ADMIN,
-  status: UserStatus.ACTIVE,
-  diveCount: 0,
-  gear: [],
+  email: 'admin@westdivers.local',
+  role: 'admin',
+  status: 'active',
 };
 
 const initialState: AppState = {
-  users: [initialAdminUser],
+  users: [initialAdmin],
   trips: [],
   courses: [],
-  currentUser: initialAdminUser,
+  currentUser: initialAdmin,
 };
 
-export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+function createId() {
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [state, setState] = useState<AppState>(initialState);
 
-  // Carregar de localStorage
+  // carregar de localStorage
   useEffect(() => {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
@@ -68,73 +99,66 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const parsed = JSON.parse(raw) as AppState;
         setState(parsed);
       } catch {
-        // si falla, mantenim initialState
+        // ignorem errors i usem initialState
       }
     }
   }, []);
 
-  // Desar a localStorage cada vegada que canviï
+  // desar sempre que canviï
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
 
-  const loginAsAdmin = () => {
-    setState((prev) => ({
-      ...prev,
-      currentUser: initialAdminUser,
-    }));
+  const loginAsDemoAdmin = () => {
+    setState((prev) => ({ ...prev, currentUser: initialAdmin }));
   };
 
-  const loginAsUser = (email: string) => {
+  const loginWithEmail = (email: string) => {
+    const trimmed = email.trim().toLowerCase();
     setState((prev) => {
-      const user = prev.users.find((u) => u.email === email);
+      const user = prev.users.find((u) => u.email.toLowerCase() === trimmed);
       if (!user) {
         alert('No hi ha cap usuari amb aquest correu.');
         return prev;
       }
-      if (user.status !== UserStatus.ACTIVE) {
-        alert('Aquest usuari encara no ha estat aprovat per un administrador.');
+      if (user.status !== 'active') {
+        alert('Encara no s’ha aprovat aquest compte.');
         return prev;
       }
-      return {
-        ...prev,
-        currentUser: user,
-      };
+      return { ...prev, currentUser: user };
     });
   };
 
   const logout = () => {
-    setState((prev) => ({
-      ...prev,
-      currentUser: null,
-    }));
+    setState((prev) => ({ ...prev, currentUser: null }));
   };
 
-  const registerUser: AppContextValue['registerUser'] = (data) => {
-    setState((prev) => ({
-      ...prev,
-      users: [
-        ...prev.users,
-        {
-          ...data,
-          id: crypto.randomUUID(),
-          role: UserRole.MEMBER,
-          status: UserStatus.PENDING,
-          diveCount: 0,
-          gear: [],
-        },
-      ],
-    }));
-    alert(
-      'T’has registrat correctament. Un administrador haurà d’aprovar el teu compte.'
-    );
+  const registerUser: AppContextValue['registerUser'] = ({ name, email }) => {
+    setState((prev) => {
+      const trimmed = email.trim().toLowerCase();
+      if (prev.users.some((u) => u.email.toLowerCase() === trimmed)) {
+        alert('Ja existeix un usuari amb aquest correu.');
+        return prev;
+      }
+      const user: User = {
+        id: createId(),
+        name: name.trim(),
+        email: trimmed,
+        role: 'pending',
+        status: 'pending',
+      };
+      alert(
+        'Sol·licitud enviada. Un administrador revisarà i aprovarà el teu accés.'
+      );
+      return { ...prev, users: [...prev.users, user] };
+    });
   };
 
   const approveUser: AppContextValue['approveUser'] = (userId) => {
     setState((prev) => ({
       ...prev,
       users: prev.users.map((u) =>
-        u.id === userId ? { ...u, status: UserStatus.ACTIVE } : u
+        u.id === userId ? { ...u, status: 'active', role: 'member' } : u
       ),
     }));
   };
@@ -148,52 +172,66 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
   };
 
-  const createTrip: AppContextValue['createTrip'] = (tripData) => {
+  const ensureCanCreate = () => {
     if (!state.currentUser) {
-      alert('Has d’estar identificat per crear sortides');
-      return;
+      alert('Has d’iniciar sessió.');
+      return false;
     }
+    if (
+      state.currentUser.role !== 'admin' &&
+      state.currentUser.role !== 'instructor'
+    ) {
+      alert('Només administradors o instructors poden crear això.');
+      return false;
+    }
+    return true;
+  };
+
+  const createTrip: AppContextValue['createTrip'] = (data) => {
+    if (!ensureCanCreate()) return;
     setState((prev) => ({
       ...prev,
       trips: [
         ...prev.trips,
         {
-          ...tripData,
-          id: crypto.randomUUID(),
+          ...data,
+          id: createId(),
+          createdBy: prev.currentUser!.id,
           participants: [],
         },
       ],
     }));
   };
 
-  const createCourse: AppContextValue['createCourse'] = (courseData) => {
-    if (!state.currentUser) {
-      alert('Has d’estar identificat per crear cursos');
-      return;
-    }
+  const createCourse: AppContextValue['createCourse'] = (data) => {
+    if (!ensureCanCreate()) return;
     setState((prev) => ({
       ...prev,
       courses: [
         ...prev.courses,
-        {
-          ...courseData,
-          id: crypto.randomUUID(),
-          participants: [],
-        },
+          {
+            ...data,
+            id: createId(),
+            createdBy: prev.currentUser!.id,
+            participants: [],
+          },
       ],
     }));
   };
 
   const joinTrip: AppContextValue['joinTrip'] = (tripId) => {
     if (!state.currentUser) {
-      alert('Has d’iniciar sessió per apuntar-te a una sortida');
+      alert('Has d’iniciar sessió per apuntar-te.');
       return;
     }
     setState((prev) => ({
       ...prev,
       trips: prev.trips.map((t) =>
-        t.id === tripId && !t.participants.includes(state.currentUser!.id)
-          ? { ...t, participants: [...t.participants, state.currentUser!.id] }
+        t.id === tripId && !t.participants.includes(prev.currentUser!.id)
+          ? {
+              ...t,
+              participants: [...t.participants, prev.currentUser!.id],
+            }
           : t
       ),
     }));
@@ -201,14 +239,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const joinCourse: AppContextValue['joinCourse'] = (courseId) => {
     if (!state.currentUser) {
-      alert('Has d’iniciar sessió per apuntar-te a un curs');
+      alert('Has d’iniciar sessió per apuntar-te.');
       return;
     }
     setState((prev) => ({
       ...prev,
       courses: prev.courses.map((c) =>
-        c.id === courseId && !c.participants.includes(state.currentUser!.id)
-          ? { ...c, participants: [...c.participants, state.currentUser!.id] }
+        c.id === courseId && !c.participants.includes(prev.currentUser!.id)
+          ? {
+              ...c,
+              participants: [...c.participants, prev.currentUser!.id],
+            }
           : c
       ),
     }));
@@ -216,8 +257,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const value: AppContextValue = {
     ...state,
-    loginAsAdmin,
-    loginAsUser,
+    loginAsDemoAdmin,
+    loginWithEmail,
     logout,
     registerUser,
     approveUser,
