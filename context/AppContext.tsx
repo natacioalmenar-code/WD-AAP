@@ -196,14 +196,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return prev;
       }
       const user: User = {
-        id: createId(),
-        name: name.trim(),
-        email: trimmed,
-        role: "pending",
-        status: "pending",
-        level: "PENDENT",
-        avatarUrl: "https://i.pravatar.cc/150?img=5",
-      };
+  id: createId(),
+  name: name.trim(),
+  email: trimmed,
+  role: "pending",
+  status: "pending",
+  level: "PENDENT",
+  avatarUrl: "",              // ✅ buit
+  certification: certification.trim(), // ✅ guarda titulació
+};
       alert(
         "Sol·licitud enviada. Un/a administrador/a revisarà i aprovarà el teu accés."
       );
