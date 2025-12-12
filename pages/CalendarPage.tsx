@@ -1,152 +1,244 @@
+import React, { useMemo, useState } from "react";
+import { useApp } from "../context/AppContext";
+import { CalendarDays, MapPin, GraduationCap, Users } from "lucide-react";
 
-import React, { useState } from 'react';
-import { useApp } from '../context/AppContext';
-import { ChevronLeft, ChevronRight, Circle } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+type CalendarItem =
+  | {
+      kind: "trip";
+      id: string;
+      title: string;
+      date: string;
+      location?: string;
+      levelRequired?: string;
+      participants: string[];
+    }
+  | {
+      kind: "course";
+      id: string;
+      title: string;
+      date: string;
+      schedule?: string;
+      levelRequired?: string;
+      participants: string[];
+    };
 
 export const CalendarPage: React.FC = () => {
-  const { trips, courses, events } = useApp();
-  const navigate = useNavigate();
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const { currentUser, trips, courses, users } = useApp();
+  const [filter, setFilter] = useState<"all" | "trips" | "courses">("all");
 
-  const getDaysInMonth = (date: Date) => {
-    const year = date.getFullYear();
-    const month = date.getMonth();
-    const days = new Date(year, month + 1, 0).getDate();
-    return Array.from({ length: days }, (_, i) => i + 1);
-  };
+  if (!currentUser) return null;
 
-  const getFirstDayOfMonth = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
-  };
+  const nameFromId = (id: string) =>
+    users.find((u) => u.id === id)?.name || "Persona desconeguda";
 
-  const monthNames = [
-    "Gener", "Febrer", "Març", "Abril", "Maig", "Juny",
-    "Juliol", "Agost", "Setembre", "Octubre", "Novembre", "Desembre"
-  ];
+  const items = useMemo<CalendarItem[]>(() => {
+    const tripItems: CalendarItem[] = trips.map((t) => ({
+      kind: "trip",
+      id: t.id,
+      title: t.title,
+      date: t.date,
+      location: t.location,
+      levelRequired: t.levelRequired,
+      participants: t.participants ?? [],
+    }));
 
-  const daysInMonth = getDaysInMonth(currentDate);
-  const firstDay = getFirstDayOfMonth(currentDate);
-  // Adjust for Monday start (0=Sun -> 0=Mon conversion needed usually, but JS getDay 0 is Sun)
-  // Let's make Monday index 0 for UI: Mon=0, Tue=1 ... Sun=6
-  const startOffset = firstDay === 0 ? 6 : firstDay - 1; 
+    const courseItems: CalendarItem[] = courses.map((c) => ({
+      kind: "course",
+      id: c.id,
+      title: c.title,
+      date: c.date,
+      schedule: c.schedule,
+      levelRequired: c.levelRequired,
+      participants: c.participants ?? [],
+    }));
 
-  const prevMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
-  };
+    const merged = [...tripItems, ...courseItems];
 
-  const nextMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
-  };
+    merged.sort((a, b) => {
+      const da = new Date(a.date).getTime();
+      const db = new Date(b.date).getTime();
+      return da - db;
+    });
 
-  // Helper to format date string YYYY-MM-DD for comparison
-  const formatDateKey = (day: number) => {
-    const y = currentDate.getFullYear();
-    const m = String(currentDate.getMonth() + 1).padStart(2, '0');
-    const d = String(day).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  };
+    return merged;
+  }, [trips, courses]);
 
-  const getEventsForDay = (day: number) => {
-    const dateKey = formatDateKey(day);
-    const dayTrips = trips.filter(t => t.date === dateKey).map(t => ({ ...t, cat: 'trip' }));
-    const dayCourses = courses.filter(c => c.date === dateKey).map(c => ({ ...c, cat: 'course' }));
-    
-    // Split events into 'events' (talks/workshops) and 'gatherings' (dinners/parties)
-    const dayTalks = events.filter(e => e.date === dateKey && e.type !== 'gathering').map(e => ({ ...e, cat: 'talk' }));
-    const daySocial = events.filter(e => e.date === dateKey && e.type === 'gathering').map(e => ({ ...e, cat: 'gathering' }));
-    
-    return [...dayTrips, ...dayCourses, ...dayTalks, ...daySocial];
+  const filtered = useMemo(() => {
+    if (filter === "trips") return items.filter((i) => i.kind === "trip");
+    if (filter === "courses") return items.filter((i) => i.kind === "course");
+    return items;
+  }, [items, filter]);
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, CalendarItem[]>();
+    for (const item of filtered) {
+      const key = item.date;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(item);
+    }
+    return Array.from(map.entries()).sort(
+      (a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime()
+    );
+  }, [filtered]);
+
+  const niceDate = (isoOrText: string) => {
+    // si ja tens dates en format text, no ho trenquem
+    const d = new Date(isoOrText);
+    if (Number.isNaN(d.getTime())) return isoOrText;
+    return d.toLocaleDateString("ca-ES", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
   };
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-        <h1 className="text-3xl font-bold text-gray-900">Calendari d'Activitats</h1>
-        <div className="flex items-center gap-4 bg-white p-2 rounded-lg shadow-sm">
-          <button onClick={prevMonth} className="p-2 hover:bg-gray-100 rounded-full"><ChevronLeft /></button>
-          <span className="text-xl font-semibold w-40 text-center">
-            {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
-          </span>
-          <button onClick={nextMonth} className="p-2 hover:bg-gray-100 rounded-full"><ChevronRight /></button>
+      <div className="mb-6 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold text-slate-900 uppercase tracking-tight">
+            Calendari
+          </h1>
+          <p className="text-gray-600 mt-2">
+            Agenda de sortides i cursos del club.
+          </p>
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            onClick={() => setFilter("all")}
+            className={`px-4 py-2 rounded-lg text-sm font-bold border transition-colors ${
+              filter === "all"
+                ? "bg-slate-900 text-yellow-400 border-slate-900"
+                : "bg-white text-slate-700 border-gray-200 hover:bg-gray-50"
+            }`}
+          >
+            Tot
+          </button>
+          <button
+            onClick={() => setFilter("trips")}
+            className={`px-4 py-2 rounded-lg text-sm font-bold border transition-colors ${
+              filter === "trips"
+                ? "bg-slate-900 text-yellow-400 border-slate-900"
+                : "bg-white text-slate-700 border-gray-200 hover:bg-gray-50"
+            }`}
+          >
+            Sortides
+          </button>
+          <button
+            onClick={() => setFilter("courses")}
+            className={`px-4 py-2 rounded-lg text-sm font-bold border transition-colors ${
+              filter === "courses"
+                ? "bg-slate-900 text-yellow-400 border-slate-900"
+                : "bg-white text-slate-700 border-gray-200 hover:bg-gray-50"
+            }`}
+          >
+            Cursos
+          </button>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-        {/* Days Header */}
-        <div className="grid grid-cols-7 bg-slate-900 border-b border-gray-200">
-          {['Dl', 'Dt', 'Dc', 'Dj', 'Dv', 'Ds', 'Dg'].map(d => (
-            <div key={d} className="py-3 text-center font-bold text-yellow-400">{d}</div>
-          ))}
+      {filtered.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center text-gray-600">
+          Encara no hi ha cap activitat al calendari.
         </div>
-
-        {/* Calendar Grid */}
-        <div className="grid grid-cols-7 auto-rows-fr bg-gray-200 gap-px">
-          {/* Empty cells for start offset */}
-          {Array.from({ length: startOffset }).map((_, i) => (
-            <div key={`empty-${i}`} className="bg-gray-50 min-h-[100px]" />
-          ))}
-
-          {/* Days */}
-          {daysInMonth.map(day => {
-            const dayEvents = getEventsForDay(day);
-            return (
-              <div key={day} className="bg-white min-h-[120px] p-2 hover:bg-blue-50 transition-colors relative">
-                <span className={`text-sm font-semibold ${dayEvents.length > 0 ? 'text-slate-900' : 'text-gray-400'}`}>
-                  {day}
+      ) : (
+        <div className="space-y-8">
+          {grouped.map(([date, dayItems]) => (
+            <div key={date} className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+              <div className="px-6 py-4 bg-slate-900 text-yellow-400 flex items-center gap-2">
+                <CalendarDays size={18} />
+                <span className="font-extrabold capitalize">{niceDate(date)}</span>
+                <span className="ml-auto text-xs font-bold bg-yellow-400 text-black px-2 py-1 rounded-full">
+                  {dayItems.length} activitat(s)
                 </span>
-                
-                <div className="mt-1 space-y-1">
-                  {dayEvents.map((item: any) => (
-                    <div 
-                      key={item.id + item.cat}
-                      onClick={() => {
-                          if(item.cat === 'trip') navigate('/trips');
-                          if(item.cat === 'course') navigate('/courses-private');
-                          if(item.cat === 'talk' || item.cat === 'gathering') navigate('/social-events');
-                      }}
-                      className={`
-                        text-xs p-1 rounded cursor-pointer truncate font-medium
-                        ${item.cat === 'trip' ? 'bg-blue-100 text-blue-800 border-l-4 border-blue-600' : ''}
-                        ${item.cat === 'course' ? 'bg-orange-100 text-orange-800 border-l-4 border-orange-600' : ''}
-                        ${item.cat === 'talk' ? 'bg-green-100 text-green-800 border-l-4 border-green-600' : ''}
-                        ${item.cat === 'gathering' ? 'bg-purple-100 text-purple-800 border-l-4 border-purple-600' : ''}
-                      `}
-                      title={item.title}
-                    >
-                      {item.cat === 'trip' && '🤿 '}
-                      {item.cat === 'course' && '🎓 '}
-                      {item.cat === 'talk' && '🗣️ '}
-                      {item.cat === 'gathering' && '🎉 '}
-                      {item.time && <span className="opacity-75">{item.time} - </span>}
-                      {item.title}
-                    </div>
-                  ))}
-                </div>
               </div>
-            );
-          })}
-        </div>
-      </div>
 
-      <div className="mt-6 flex flex-wrap gap-6 justify-center bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-        <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-blue-600 rounded"></div>
-            <span className="text-sm font-bold text-gray-700">Sortides</span>
+              <div className="p-6 space-y-4">
+                {dayItems.map((item) => {
+                  const isTrip = item.kind === "trip";
+                  const badge =
+                    item.kind === "trip"
+                      ? "SORTIDA"
+                      : "CURS";
+
+                  return (
+                    <div
+                      key={`${item.kind}-${item.id}`}
+                      className="border border-gray-200 rounded-xl p-4 hover:shadow-sm transition-shadow"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`text-xs font-extrabold px-2 py-1 rounded-full ${
+                                isTrip
+                                  ? "bg-yellow-100 text-yellow-900"
+                                  : "bg-orange-100 text-orange-900"
+                              }`}
+                            >
+                              {badge}
+                            </span>
+                            {item.levelRequired && (
+                              <span className="text-xs font-bold text-slate-500">
+                                Requisit: {item.levelRequired}
+                              </span>
+                            )}
+                          </div>
+
+                          <h3 className="text-lg font-extrabold text-slate-900 mt-2">
+                            {item.title}
+                          </h3>
+
+                          <div className="mt-2 text-sm text-gray-600 flex flex-col md:flex-row md:items-center gap-2">
+                            {isTrip ? (
+                              item.location ? (
+                                <span className="flex items-center gap-2">
+                                  <MapPin size={16} className="text-yellow-500" />
+                                  {item.location}
+                                </span>
+                              ) : null
+                            ) : (
+                              (item as any).schedule ? (
+                                <span className="flex items-center gap-2">
+                                  <GraduationCap size={16} className="text-orange-500" />
+                                  {(item as any).schedule}
+                                </span>
+                              ) : null
+                            )}
+
+                            <span className="flex items-center gap-2">
+                              <Users size={16} className="text-slate-500" />
+                              {item.participants.length} apuntats/des
+                            </span>
+                          </div>
+
+                          {/* Llista de noms (visible per tothom dins) */}
+                          {item.participants.length > 0 && (
+                            <div className="mt-3 bg-slate-50 border border-slate-200 rounded-lg p-3">
+                              <p className="text-xs font-extrabold text-slate-700 uppercase tracking-wide mb-2">
+                                Apuntats/des
+                              </p>
+                              <ul className="space-y-1">
+                                {item.participants.map((uid) => (
+                                  <li key={uid} className="text-sm text-gray-700">
+                                    • {nameFromId(uid)}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
-        <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-orange-600 rounded"></div>
-            <span className="text-sm font-bold text-gray-700">Cursos</span>
-        </div>
-        <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-green-600 rounded"></div>
-            <span className="text-sm font-bold text-gray-700">Xarrades / Tallers</span>
-        </div>
-        <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-purple-600 rounded"></div>
-            <span className="text-sm font-bold text-gray-700">Social (Sopars, Festes)</span>
-        </div>
-      </div>
+      )}
     </div>
   );
 };
