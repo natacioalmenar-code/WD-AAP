@@ -81,17 +81,16 @@ interface AppContextValue extends AppState {
   approveUser: (userId: string) => void;
   setUserRole: (userId: string, role: Role) => void;
 
-  // permisos (Navbar)
+  // permisos
   canManageTrips: () => boolean;
   canManageSystem: () => boolean;
 
   // sortides / cursos
   createTrip: (data: Omit<Trip, "id" | "createdBy" | "participants">) => void;
-  createCourse: (data: Omit<Course, "id" | "createdBy" | "participants">) => void;
-
   joinTrip: (tripId: string) => void;
   leaveTrip: (tripId: string) => void;
 
+  createCourse: (data: Omit<Course, "id" | "createdBy" | "participants">) => void;
   joinCourse: (courseId: string) => void;
   leaveCourse: (courseId: string) => void;
 }
