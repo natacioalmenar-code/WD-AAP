@@ -354,19 +354,22 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const leaveCourse: AppContextValue["leaveCourse"] = (courseId) => {
-    if (!state.currentUser) {
-      alert("Has d’iniciar sessió per desapuntar-te.");
-      return;
-    }
-    setState((prev) => ({
-      ...prev,
-      courses: prev.courses.map((c) =>
-        c.id === courseId
-          ? { ...c, participants: c.participants.filter((uid) => uid !== prev.currentUser!.id) }
-          : c
-      ),
-    }));
-  };
+  if (!state.currentUser) return;
+
+  setState((prev) => ({
+    ...prev,
+    courses: prev.courses.map((c) =>
+      c.id === courseId
+        ? {
+            ...c,
+            participants: c.participants.filter(
+              (id) => id !== prev.currentUser!.id
+            ),
+          }
+        : c
+    ),
+  }));
+};
 
   const value: AppContextValue = {
     ...state,
