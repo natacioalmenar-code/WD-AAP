@@ -24,7 +24,7 @@ export const Home: React.FC = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link to="/login" className="bg-yellow-400 hover:bg-yellow-300 text-black font-bold py-3 px-8 rounded-full transition-all transform hover:scale-105 shadow-xl border-2 border-yellow-400">
-              Accés Socis
+              Accés Socis/es
             </Link>
             <a href="#contact" className="bg-transparent hover:bg-white/10 text-white border-2 border-white font-bold py-3 px-8 rounded-full transition-all">
               Contacta'ns
@@ -83,7 +83,7 @@ export const Home: React.FC = () => {
             <div className="md:w-1/2 space-y-6">
                 <h2 className="text-4xl font-bold text-gray-900">Tot el teu busseig, en una sola App</h2>
                 <p className="text-lg text-gray-600">
-                    Els socis de {clubSettings.heroTitle} tenen accés exclusiu a la nostra aplicació privada.
+                    Els socis i socies de {clubSettings.heroTitle} tenen accés exclusiu a la nostra aplicació privada.
                 </p>
                 <ul className="space-y-4">
                     <li className="flex items-center gap-3">
