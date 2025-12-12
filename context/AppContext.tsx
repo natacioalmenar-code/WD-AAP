@@ -372,22 +372,26 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 };
 
   const value: AppContextValue = {
-    ...state,
-    loginAsDemoAdmin,
-    loginWithEmail,
-    logout,
-    registerUser,
-    approveUser,
-    setUserRole,
-    canManageTrips,
-    canManageSystem,
-    createTrip,
-    createCourse,
-    joinTrip,
-    leaveTrip,
-    joinCourse,
-    leaveCourse,
-  };
+  ...state,
+  loginAsDemoAdmin,
+  loginWithEmail,
+  logout,
+
+  registerUser,
+  approveUser,
+  setUserRole,
+
+  canManageTrips,
+  canManageSystem,
+
+  createTrip,
+  joinTrip,
+  leaveTrip,
+
+  createCourse,
+  joinCourse,
+  leaveCourse,
+};
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };
