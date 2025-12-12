@@ -17,7 +17,7 @@ export interface User {
   role: Role;
   status: Status;
 
-  // ✅ Camps que el Navbar espera
+  // Necessari pel Navbar
   level: string;
   avatarUrl: string;
 }
@@ -45,7 +45,7 @@ export interface Course {
   participants: string[];
 }
 
-// ✅ Settings que el Navbar espera
+// Necessari pel Navbar (logo + textos)
 export interface ClubSettings {
   logoUrl: string;
   navbarPreTitle: string;
@@ -76,9 +76,7 @@ interface AppContextValue extends AppState {
   canManageSystem: () => boolean;
 
   // sortides / cursos
-  createTrip: (
-    data: Omit<Trip, "id" | "createdBy" | "participants">
-  ) => void;
+  createTrip: (data: Omit<Trip, "id" | "createdBy" | "participants">) => void;
   createCourse: (
     data: Omit<Course, "id" | "createdBy" | "participants">
   ) => void;
@@ -86,20 +84,19 @@ interface AppContextValue extends AppState {
   joinCourse: (courseId: string) => void;
 }
 
-const STORAGE_KEY = "westdivers-app-state-v2";
-
+const STORAGE_KEY = "westdivers-app-state-v3";
 const AppContext = createContext<AppContextValue | undefined>(undefined);
 
-// ✅ Logo per defecte (després el canviarem pel teu)
+// ✅ Textos nous (sense “Almenar”) + logo
 const defaultClubSettings: ClubSettings = {
-  logoUrl: "/westdivers-logo.png",
+  logoUrl: "/westdivers-logo.png", // el que ja tens a public
   navbarPreTitle: "CLUB DE BUSSEIG",
   heroTitle: "WEST DIVERS",
 };
 
 const initialAdmin: User = {
   id: "admin-1",
-  name: "Administrador West Divers",
+  name: "Administrador/a West Divers",
   email: "admin@westdivers.local",
   role: "admin",
   status: "active",
@@ -125,40 +122,41 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   // carregar estat guardat al navegador
   useEffect(() => {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw) as AppState;
+    if (!raw) return;
 
-        // ✅ Backward-compat: si falten camps, posem defaults
-        const safe: AppState = {
-          ...initialState,
-          ...parsed,
-          clubSettings: {
-            ...defaultClubSettings,
-            ...(parsed.clubSettings ?? {}),
-          },
-          users: (parsed.users ?? initialState.users).map((u: any) => ({
-            ...u,
-            level: u.level ?? (u.role === "admin" ? "ADMIN" : "B1"),
-            avatarUrl: u.avatarUrl ?? "https://i.pravatar.cc/150?img=8",
-          })),
-          currentUser: parsed.currentUser
-            ? {
-                ...parsed.currentUser,
-                level:
-                  (parsed.currentUser as any).level ??
-                  ((parsed.currentUser as any).role === "admin" ? "ADMIN" : "B1"),
-                avatarUrl:
-                  (parsed.currentUser as any).avatarUrl ??
-                  "https://i.pravatar.cc/150?img=8",
-              }
-            : null,
-        };
+    try {
+      const parsed = JSON.parse(raw) as Partial<AppState>;
 
-        setState(safe);
-      } catch {
-        // ignorem errors i fem servir initialState
-      }
+      const safeUsers = (parsed.users ?? initialState.users).map((u: any) => ({
+        ...u,
+        level: u.level ?? (u.role === "admin" ? "ADMIN" : "B1"),
+        avatarUrl: u.avatarUrl ?? "https://i.pravatar.cc/150?img=8",
+      }));
+
+      const safeCurrentUser = parsed.currentUser
+        ? ({
+            ...(parsed.currentUser as any),
+            level:
+              (parsed.currentUser as any).level ??
+              ((parsed.currentUser as any).role === "admin" ? "ADMIN" : "B1"),
+            avatarUrl:
+              (parsed.currentUser as any).avatarUrl ??
+              "https://i.pravatar.cc/150?img=8",
+          } as User)
+        : null;
+
+      setState({
+        ...initialState,
+        ...parsed,
+        users: safeUsers,
+        currentUser: safeCurrentUser,
+        clubSettings: {
+          ...defaultClubSettings,
+          ...(parsed.clubSettings ?? {}),
+        },
+      });
+    } catch {
+      // ignorem errors
     }
   }, []);
 
@@ -176,29 +174,26 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setState((prev) => {
       const user = prev.users.find((u) => u.email.toLowerCase() === trimmed);
       if (!user) {
-        alert("No hi ha cap usuari amb aquest correu.");
+        alert("No hi ha cap usuari/ària amb aquest correu.");
         return prev;
       }
       if (user.status !== "active") {
-        alert("Encara no s’ha aprovat aquest compte.");
+        alert("Aquest compte encara no està aprovat.");
         return prev;
       }
       return { ...prev, currentUser: user };
     });
   };
 
-  const logout = () => {
-    setState((prev) => ({ ...prev, currentUser: null }));
-  };
+  const logout = () => setState((prev) => ({ ...prev, currentUser: null }));
 
   const registerUser: AppContextValue["registerUser"] = ({ name, email }) => {
     setState((prev) => {
       const trimmed = email.trim().toLowerCase();
       if (prev.users.some((u) => u.email.toLowerCase() === trimmed)) {
-        alert("Ja existeix un usuari amb aquest correu.");
+        alert("Ja existeix un/a usuari/ària amb aquest correu.");
         return prev;
       }
-
       const user: User = {
         id: createId(),
         name: name.trim(),
@@ -208,9 +203,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         level: "PENDENT",
         avatarUrl: "https://i.pravatar.cc/150?img=5",
       };
-
       alert(
-        "Sol·licitud enviada. Un administrador revisarà i aprovarà el teu accés."
+        "Sol·licitud enviada. Un/a administrador/a revisarà i aprovarà el teu accés."
       );
       return { ...prev, users: [...prev.users, user] };
     });
@@ -220,9 +214,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setState((prev) => ({
       ...prev,
       users: prev.users.map((u) =>
-        u.id === userId
-          ? { ...u, status: "active", role: "member", level: "B1" }
-          : u
+        u.id === userId ? { ...u, status: "active", role: "member", level: "B1" } : u
       ),
     }));
   };
@@ -249,7 +241,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }));
   };
 
-  // ✅ Funcions que el Navbar espera
+  // ✅ Funcions que el Navbar crida
   const canManageTrips = useMemo(() => {
     return () =>
       !!state.currentUser &&
@@ -266,11 +258,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       alert("Has d’iniciar sessió.");
       return false;
     }
-    if (
-      state.currentUser.role !== "admin" &&
-      state.currentUser.role !== "instructor"
-    ) {
-      alert("Només administradors o instructors poden crear això.");
+    if (state.currentUser.role !== "admin" && state.currentUser.role !== "instructor") {
+      alert("Només administració o instructors poden crear això.");
       return false;
     }
     return true;
@@ -282,12 +271,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       ...prev,
       trips: [
         ...prev.trips,
-        {
-          ...data,
-          id: createId(),
-          createdBy: prev.currentUser!.id,
-          participants: [],
-        },
+        { ...data, id: createId(), createdBy: prev.currentUser!.id, participants: [] },
       ],
     }));
   };
@@ -298,12 +282,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       ...prev,
       courses: [
         ...prev.courses,
-        {
-          ...data,
-          id: createId(),
-          createdBy: prev.currentUser!.id,
-          participants: [],
-        },
+        { ...data, id: createId(), createdBy: prev.currentUser!.id, participants: [] },
       ],
     }));
   };
@@ -363,5 +342,5 @@ export const useAppContext = () => {
   return ctx;
 };
 
-// ✅ el Navbar fa servir useApp()
+// ✅ el Navbar importa useApp()
 export const useApp = () => useAppContext();
