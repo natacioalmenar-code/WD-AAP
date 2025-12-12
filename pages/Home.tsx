@@ -19,7 +19,7 @@ export const Home: React.FC = () => {
             {clubSettings.heroTitle}
           </h1>
           <p className="text-xl md:text-2xl mb-8 font-light max-w-2xl mx-auto drop-shadow-md">
-            El teu club de busseig a Almenar. <br/>
+            El teu club de busseig per excel·lència. <br/>
             <span className="font-semibold">{clubSettings.heroSubtitle}</span>
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
