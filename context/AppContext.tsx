@@ -345,8 +345,5 @@ export const useAppContext = () => {
   return ctx;
 };
 
-export const useApp = () => useAppContext();
-
-
-// ✅ el Navbar importa useApp()
-export const useApp = () => useAppContext();
+// ✅ Un sol export de useApp
+export const useApp = useAppContext;
