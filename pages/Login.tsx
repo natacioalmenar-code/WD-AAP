@@ -7,6 +7,7 @@ export const Login: React.FC = () => {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
+  const [certification, setCertification] = useState(""); // ✅ nou
   const [error, setError] = useState("");
 
   const { loginWithEmail, registerUser, loginAsDemoAdmin } = useApp();
@@ -24,6 +25,7 @@ export const Login: React.FC = () => {
 
     const trimmedEmail = email.trim();
     const trimmedName = name.trim();
+    const trimmedCert = certification.trim();
 
     if (!trimmedEmail) {
       setError("Introdueix el correu electrònic.");
@@ -35,11 +37,18 @@ export const Login: React.FC = () => {
         setError("Introdueix el nom i cognoms.");
         return;
       }
-      registerUser({ name: trimmedName, email: trimmedEmail });
+      if (!trimmedCert) {
+        setError("Indica la titulació de busseig.");
+        return;
+      }
+
+      registerUser({ name: trimmedName, email: trimmedEmail, certification: trimmedCert });
+
       // Després de sol·licitar alta, es queden a la pantalla d'accés
       setMode("login");
       setName("");
       setEmail("");
+      setCertification("");
       return;
     }
 
@@ -110,20 +119,37 @@ export const Login: React.FC = () => {
 
         <form className="mt-4 space-y-6" onSubmit={handleSubmit}>
           {mode === "register" && (
-            <div className="mb-4">
-              <label htmlFor="name" className="sr-only">
-                Nom i cognoms
-              </label>
-              <input
-                id="name"
-                name="name"
-                type="text"
-                className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="Nom i cognoms"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
+            <>
+              <div className="mb-4">
+                <label htmlFor="name" className="sr-only">
+                  Nom i cognoms
+                </label>
+                <input
+                  id="name"
+                  name="name"
+                  type="text"
+                  className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  placeholder="Nom i cognoms"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </div>
+
+              <div className="mb-4">
+                <label htmlFor="certification" className="sr-only">
+                  Titulació de busseig
+                </label>
+                <input
+                  id="certification"
+                  name="certification"
+                  type="text"
+                  className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  placeholder="Titulació (ex: B1E, B2E, AOWD...)"
+                  value={certification}
+                  onChange={(e) => setCertification(e.target.value)}
+                />
+              </div>
+            </>
           )}
 
           <div className="mb-4">
@@ -178,3 +204,4 @@ export const Login: React.FC = () => {
     </div>
   );
 };
+
