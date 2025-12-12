@@ -22,7 +22,7 @@ export interface User {
 
   // Necessari pel Navbar
   level: string;
-  avatarUrl: string; // ✅ buit si no hi ha foto
+  avatarUrl: string; // buit si no hi ha foto
 }
 
 export interface Trip {
@@ -34,6 +34,13 @@ export interface Trip {
   maxSpots: number;
   createdBy: string;
   participants: string[];
+
+  // extra (si existeixen a les teves dades)
+  description?: string;
+  time?: string;
+  depth?: string;
+  imageUrl?: string;
+  locationUrl?: string;
 }
 
 export interface Course {
@@ -52,8 +59,6 @@ export interface ClubSettings {
   logoUrl: string;
   navbarPreTitle: string;
   heroTitle: string;
-
-  // opcional (si no existeix, no passa res)
   appBackgroundUrl?: string;
 }
 
@@ -70,7 +75,6 @@ interface AppContextValue extends AppState {
   loginAsDemoAdmin: () => void;
   loginWithEmail: (email: string) => void;
   logout: () => void;
-  leaveTrip: (tripId: string) => void;
 
   // persones sòcies
   registerUser: (data: { name: string; email: string; certification: string }) => void;
@@ -83,29 +87,13 @@ interface AppContextValue extends AppState {
 
   // sortides / cursos
   createTrip: (data: Omit<Trip, "id" | "createdBy" | "participants">) => void;
-  createCourse: (
-    data: Omit<Course, "id" | "createdBy" | "participants">
-  ) => void;
-  joinTrip: (tripId: string) => void;
-  const leaveTrip: AppContextValue["leaveTrip"] = (tripId) => {
-  if (!state.currentUser) return;
+  createCourse: (data: Omit<Course, "id" | "createdBy" | "participants">) => void;
 
-  setState((prev) => ({
-    ...prev,
-    trips: prev.trips.map((t) =>
-      t.id === tripId
-        ? {
-            ...t,
-            participants: t.participants.filter(
-              (id) => id !== prev.currentUser!.id
-            ),
-          }
-        : t
-    ),
-  }));
-};
+  joinTrip: (tripId: string) => void;
+  leaveTrip: (tripId: string) => void;
 
   joinCourse: (courseId: string) => void;
+  leaveCourse: (courseId: string) => void;
 }
 
 const STORAGE_KEY = "westdivers-app-state-v4";
@@ -115,7 +103,7 @@ const defaultClubSettings: ClubSettings = {
   logoUrl: "/westdivers-logo.png",
   navbarPreTitle: "CLUB DE BUSSEIG",
   heroTitle: "WEST DIVERS",
-  appBackgroundUrl: "", // ✅ per defecte buit (sense imatge)
+  appBackgroundUrl: "",
 };
 
 const initialAdmin: User = {
@@ -125,7 +113,7 @@ const initialAdmin: User = {
   role: "admin",
   status: "active",
   level: "ADMIN",
-  avatarUrl: "", // ✅ sense foto per defecte
+  avatarUrl: "",
   certification: "ADMIN",
 };
 
@@ -144,6 +132,7 @@ function createId() {
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [state, setState] = useState<AppState>(initialState);
 
+  // carregar estat del navegador
   useEffect(() => {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return;
@@ -154,7 +143,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const safeUsers = (parsed.users ?? initialState.users).map((u: any) => ({
         ...u,
         level: u.level ?? (u.role === "admin" ? "ADMIN" : "B1"),
-        avatarUrl: u.avatarUrl ?? "", // ✅ mai pravatar
+        avatarUrl: u.avatarUrl ?? "",
         certification: u.certification ?? "",
       }));
 
@@ -164,7 +153,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             level:
               (parsed.currentUser as any).level ??
               ((parsed.currentUser as any).role === "admin" ? "ADMIN" : "B1"),
-            avatarUrl: (parsed.currentUser as any).avatarUrl ?? "", // ✅ mai pravatar
+            avatarUrl: (parsed.currentUser as any).avatarUrl ?? "",
             certification: (parsed.currentUser as any).certification ?? "",
           } as User)
         : null;
@@ -184,6 +173,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  // guardar estat cada vegada que canvia
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
@@ -225,7 +215,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         role: "pending",
         status: "pending",
         level: "PENDENT",
-        avatarUrl: "", // ✅ no posem cap imatge
+        avatarUrl: "",
         certification: certification.trim(),
       };
 
@@ -324,6 +314,21 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }));
   };
 
+  const leaveTrip: AppContextValue["leaveTrip"] = (tripId) => {
+    if (!state.currentUser) {
+      alert("Has d’iniciar sessió per desapuntar-te.");
+      return;
+    }
+    setState((prev) => ({
+      ...prev,
+      trips: prev.trips.map((t) =>
+        t.id === tripId
+          ? { ...t, participants: t.participants.filter((uid) => uid !== prev.currentUser!.id) }
+          : t
+      ),
+    }));
+  };
+
   const joinCourse: AppContextValue["joinCourse"] = (courseId) => {
     if (!state.currentUser) {
       alert("Has d’iniciar sessió per apuntar-te.");
@@ -333,7 +338,22 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       ...prev,
       courses: prev.courses.map((c) =>
         c.id === courseId && !c.participants.includes(prev.currentUser!.id)
-          ? { ...c, participants: [...t.participants, prev.currentUser!.id] }
+          ? { ...c, participants: [...c.participants, prev.currentUser!.id] }
+          : c
+      ),
+    }));
+  };
+
+  const leaveCourse: AppContextValue["leaveCourse"] = (courseId) => {
+    if (!state.currentUser) {
+      alert("Has d’iniciar sessió per desapuntar-te.");
+      return;
+    }
+    setState((prev) => ({
+      ...prev,
+      courses: prev.courses.map((c) =>
+        c.id === courseId
+          ? { ...c, participants: c.participants.filter((uid) => uid !== prev.currentUser!.id) }
           : c
       ),
     }));
@@ -352,8 +372,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     createTrip,
     createCourse,
     joinTrip,
-    laveTrip,
+    leaveTrip,
     joinCourse,
+    leaveCourse,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
