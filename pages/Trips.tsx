@@ -3,14 +3,18 @@ import { useApp } from "../context/AppContext";
 import { Calendar, MapPin, Clock, ArrowRight, ExternalLink } from "lucide-react";
 
 export const Trips: React.FC = () => {
-  const { trips, users, currentUser, joinTrip } = useApp();
+  const { trips, users, currentUser, joinTrip, leaveTrip } = useApp();
 
   const sortedTrips = useMemo(
-    () => [...trips].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+    () =>
+      [...trips].sort(
+        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+      ),
     [trips]
   );
 
-  const nameFromId = (id: string) => users.find((u) => u.id === id)?.name || "Persona desconeguda";
+  const nameFromId = (id: string) =>
+    users.find((u) => u.id === id)?.name || "Persona desconeguda";
 
   if (!currentUser) return null;
 
@@ -20,7 +24,9 @@ export const Trips: React.FC = () => {
         <h1 className="text-3xl font-extrabold text-slate-900 uppercase tracking-tight">
           Sortides i viatges
         </h1>
-        <p className="text-gray-600 mt-2">Apunta’t a les properes immersions amb un sol clic.</p>
+        <p className="text-gray-600 mt-2">
+          Apunta’t a les properes immersions amb un sol clic.
+        </p>
       </div>
 
       <div className="space-y-8">
@@ -55,7 +61,9 @@ export const Trips: React.FC = () => {
               <div className="flex-1 p-6 flex flex-col justify-between relative">
                 <div>
                   <div className="flex justify-between items-start mb-2">
-                    <h2 className="text-2xl font-bold text-slate-900">{trip.title}</h2>
+                    <h2 className="text-2xl font-bold text-slate-900">
+                      {trip.title}
+                    </h2>
                     {isSignedUp && (
                       <span className="bg-green-100 text-green-800 text-xs px-3 py-1 rounded-full font-bold uppercase">
                         Inscrit/a
@@ -66,7 +74,9 @@ export const Trips: React.FC = () => {
                   <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-y-3 gap-x-4 text-sm text-gray-600 mb-5">
                     <div className="flex items-center gap-2">
                       <Calendar size={18} className="text-yellow-500" />
-                      <span className="font-medium text-slate-800">{trip.date}</span>
+                      <span className="font-medium text-slate-800">
+                        {trip.date}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Clock size={18} className="text-yellow-500" />
@@ -93,21 +103,28 @@ export const Trips: React.FC = () => {
                     </div>
                   </div>
 
-                  <p className="text-gray-600 mb-4 leading-relaxed">{trip.description}</p>
+                  <p className="text-gray-600 mb-4 leading-relaxed">
+                    {trip.description}
+                  </p>
 
-                  {/* ✅ Participants list (NOMS) */}
+                  {/* Participants list (NOMS) */}
                   <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
                     <div className="flex items-center justify-between gap-3">
                       <p className="text-sm font-extrabold text-slate-900 uppercase tracking-wide">
                         Apuntats/des
                       </p>
                       <span className="text-sm font-bold text-slate-700">
-                        {trip.participants.length} <span className="text-slate-400 font-normal">/ {trip.maxSpots}</span>
+                        {trip.participants.length}{" "}
+                        <span className="text-slate-400 font-normal">
+                          / {trip.maxSpots}
+                        </span>
                       </span>
                     </div>
 
                     {trip.participants.length === 0 ? (
-                      <p className="text-sm text-gray-500 mt-2">Encara no hi ha ningú apuntat/da.</p>
+                      <p className="text-sm text-gray-500 mt-2">
+                        Encara no hi ha ningú apuntat/da.
+                      </p>
                     ) : (
                       <ul className="mt-2 space-y-1">
                         {trip.participants.map((uid) => (
@@ -125,11 +142,10 @@ export const Trips: React.FC = () => {
                   <div className="w-full md:w-auto">
                     {isSignedUp ? (
                       <button
-                        disabled
-                        className="w-full md:w-auto px-6 py-2 border-2 border-green-200 text-green-700 rounded-lg bg-green-50 font-bold uppercase text-sm tracking-wide cursor-default"
-                        title="Ja estàs apuntat/da"
+                        onClick={() => leaveTrip(trip.id)}
+                        className="w-full md:w-auto px-6 py-2 border-2 border-red-200 text-red-700 rounded-lg hover:bg-red-50 transition-colors font-bold uppercase text-sm tracking-wide"
                       >
-                        Ja estàs apuntat/da
+                        Desapuntar-me
                       </button>
                     ) : (
                       <button
