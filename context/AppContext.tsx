@@ -70,6 +70,7 @@ interface AppContextValue extends AppState {
   loginAsDemoAdmin: () => void;
   loginWithEmail: (email: string) => void;
   logout: () => void;
+  leaveTrip: (tripId: string) => void;
 
   // persones sòcies
   registerUser: (data: { name: string; email: string; certification: string }) => void;
