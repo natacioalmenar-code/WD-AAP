@@ -73,7 +73,7 @@ interface AppState {
 interface AppContextValue extends AppState {
   // auth
   loginAsDemoAdmin: () => void;
-  loginWithEmail: (email: string) => void;
+  loginWithEmail: (email: string) => boolean;
   logout: () => void;
 
   // persones sòcies
