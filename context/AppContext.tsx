@@ -68,7 +68,7 @@ interface AppContextValue extends AppState {
   logout: () => void;
 
   // usuaris
-  registerUser: (data: { name: string; email: string }) => void;
+  registerUser: (data: { name: string; email: string; certification: string }) => void;
   approveUser: (userId: string) => void;
   setUserRole: (userId: string, role: Role) => void;
 
