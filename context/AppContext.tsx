@@ -131,7 +131,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const safeUsers = (parsed.users ?? initialState.users).map((u: any) => ({
         ...u,
         level: u.level ?? (u.role === "admin" ? "ADMIN" : "B1"),
-        avatarUrl: u.avatarUrl ?? "https://i.pravatar.cc/150?img=8",
+        avatarUrl: u.avatarUrl ?? "",
       }));
 
       const safeCurrentUser = parsed.currentUser
