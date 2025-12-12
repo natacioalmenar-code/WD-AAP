@@ -56,7 +56,7 @@ export const Login: React.FC = () => {
         return;
       }
 
-      // 1) crear usuari pendent (AppContext)
+      // 1) crear usuari pendent
       registerUser({ name: trimmedName, email: trimmedEmail, certification: trimmedCert });
 
       // 2) guardar password local per email
@@ -68,7 +68,7 @@ export const Login: React.FC = () => {
       setCertification("");
       setPassword("");
       setPassword2("");
-      // mantenim l'email per comoditat
+      // mantenim email per comoditat
       return;
     }
 
@@ -83,26 +83,26 @@ export const Login: React.FC = () => {
       return;
     }
 
-    // si password ok, llavors fem login normal (aquí controla si està pendent o no)
-    loginWithEmail(trimmedEmail);
+    // ✅ ARA: només navega si el login ha sigut correcte (actiu)
+    const ok = loginWithEmail(trimmedEmail);
+    if (!ok) return;
 
-    // si estava pendent, el loginWithEmail ja mostrarà alerta i no canviarà l'usuari;
-    // però nosaltres igualment naveguem. Per evitar-ho, fem un petit truc:
-    // Naveguem només si la sessió ha canviat (ho veurem a dashboard igualment),
-    // però com ara no tenim retorn, ho deixem així (simple i robust).
     navigate(redirectTo, { replace: true });
   };
 
   const quickLogin = (emailToUse: string) => {
     setError("");
-    // Per demos: posem una password demo automàtica si no existeix
+
+    // password demo automàtica
     const key = pwdKey(emailToUse);
     if (!localStorage.getItem(key)) localStorage.setItem(key, "123456");
 
     setEmail(emailToUse);
     setPassword("123456");
 
-    loginWithEmail(emailToUse);
+    const ok = loginWithEmail(emailToUse);
+    if (!ok) return;
+
     navigate("/dashboard", { replace: true });
   };
 
@@ -126,7 +126,6 @@ export const Login: React.FC = () => {
             <button
               onClick={() => {
                 setError("");
-                // demo admin: deixem password demo
                 const demo = "admin@westdivers.local";
                 localStorage.setItem(pwdKey(demo), "123456");
                 setEmail(demo);
@@ -169,12 +168,7 @@ export const Login: React.FC = () => {
           {mode === "register" && (
             <>
               <div>
-                <label htmlFor="name" className="sr-only">
-                  Nom i cognoms
-                </label>
                 <input
-                  id="name"
-                  name="name"
                   type="text"
                   className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   placeholder="Nom i cognoms"
@@ -184,12 +178,7 @@ export const Login: React.FC = () => {
               </div>
 
               <div>
-                <label htmlFor="certification" className="sr-only">
-                  Titulació de busseig
-                </label>
                 <input
-                  id="certification"
-                  name="certification"
                   type="text"
                   className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   placeholder="Titulació (ex: B1E, B2E, AOWD...)"
@@ -201,12 +190,7 @@ export const Login: React.FC = () => {
           )}
 
           <div>
-            <label htmlFor="email-address" className="sr-only">
-              Correu electrònic
-            </label>
             <input
-              id="email-address"
-              name="email"
               type="email"
               autoComplete="email"
               className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
@@ -216,14 +200,8 @@ export const Login: React.FC = () => {
             />
           </div>
 
-          {/* Password */}
           <div className="relative">
-            <label htmlFor="password" className="sr-only">
-              Contrasenya
-            </label>
             <input
-              id="password"
-              name="password"
               type="password"
               className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm pr-10"
               placeholder="Contrasenya"
@@ -235,15 +213,9 @@ export const Login: React.FC = () => {
             </span>
           </div>
 
-          {/* Confirm password (only register) */}
           {mode === "register" && (
             <div>
-              <label htmlFor="password2" className="sr-only">
-                Repeteix contrasenya
-              </label>
               <input
-                id="password2"
-                name="password2"
                 type="password"
                 className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 placeholder="Repeteix la contrasenya"
@@ -281,9 +253,6 @@ export const Login: React.FC = () => {
           <p className="mt-2">
             * Si acabes de sol·licitar alta, el teu compte quedarà <b>pendent</b> fins que
             l’administració el validi.
-          </p>
-          <p className="mt-1">
-            * Contrasenya guardada localment (mode demo). Més endavant ho passarem a login real.
           </p>
         </div>
       </div>
