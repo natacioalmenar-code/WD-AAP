@@ -1,8 +1,7 @@
-
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAppContext as useApp } from '../context/AppContext';
-import { Menu, X, LogOut, Settings, Users, MessageCircle, PenTool } from 'lucide-react';
+import { Menu, X, LogOut, Settings, Users, PenTool } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
   const { currentUser, logout, canManageTrips, canManageSystem, clubSettings } = useApp();
@@ -16,17 +15,17 @@ export const Navbar: React.FC = () => {
   const NavItem = ({ to, label }: { to: string; label: string }) => {
     const isActive = location.pathname === to;
     return (
-        <Link
-          to={to}
-          onClick={() => setIsMenuOpen(false)}
-          className={`px-3 py-2 rounded-md text-sm font-bold tracking-wide transition-colors ${
-            isActive 
-              ? 'bg-yellow-400 text-black shadow-md' 
-              : 'text-gray-300 hover:text-yellow-400 hover:bg-slate-800'
-          }`}
-        >
-          {label}
-        </Link>
+      <Link
+        to={to}
+        onClick={() => setIsMenuOpen(false)}
+        className={`px-3 py-2 rounded-md text-sm font-bold tracking-wide transition-colors ${
+          isActive
+            ? 'bg-yellow-400 text-black shadow-md'
+            : 'text-gray-300 hover:text-yellow-400 hover:bg-slate-800'
+        }`}
+      >
+        {label}
+      </Link>
     );
   };
 
@@ -40,23 +39,26 @@ export const Navbar: React.FC = () => {
                 <img src={clubSettings.logoUrl} alt="West Divers Logo" className="h-9 w-9 object-contain" />
               </div>
               <div className="flex flex-col">
-                  {clubSettings.navbarPreTitle && (
-                      <span className="text-[10px] text-gray-400 leading-none font-bold uppercase tracking-widest">{clubSettings.navbarPreTitle}</span>
-                  )}
-                  <span className="text-white text-xl font-extrabold tracking-wider group-hover:text-yellow-400 transition-colors">
-                    {clubSettings.heroTitle}
+                {clubSettings.navbarPreTitle && (
+                  <span className="text-[10px] text-gray-400 leading-none font-bold uppercase tracking-widest">
+                    {clubSettings.navbarPreTitle}
                   </span>
+                )}
+                <span className="text-white text-xl font-extrabold tracking-wider group-hover:text-yellow-400 transition-colors">
+                  {clubSettings.heroTitle}
+                </span>
               </div>
             </Link>
           </div>
-          
+
           <div className="hidden xl:block">
             <div className="ml-10 flex items-baseline space-x-2">
               <NavItem to="/" label="INICI" />
+
               {isPublic ? (
                 <>
                   <NavItem to="/courses-public" label="CURSOS" />
-                  <NavItem to="/login" label="SOCIS" />
+                  <NavItem to="/login" label="SOCIS/ES" />
                 </>
               ) : (
                 <>
@@ -67,7 +69,7 @@ export const Navbar: React.FC = () => {
                   <NavItem to="/social-events" label="ESDEVENIMENTS" />
                   <NavItem to="/social-wall" label="MUR SOCIAL" />
                   <NavItem to="/resources" label="MATERIAL" />
-                  
+
                   {showInstructor && (
                     <Link
                       to="/admin-trips"
@@ -78,20 +80,20 @@ export const Navbar: React.FC = () => {
                   )}
 
                   {showAdmin && (
-                     <>
-                        <Link
-                          to="/admin-users"
-                          className="px-3 py-2 rounded-md text-sm font-bold text-purple-400 hover:text-purple-300 flex items-center gap-1 border border-transparent hover:border-purple-900"
-                        >
-                          <Users size={16} /> SOCIS
-                        </Link>
-                        <Link
-                          to="/admin-settings"
-                          className="px-3 py-2 rounded-md text-sm font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 border border-transparent hover:border-cyan-900"
-                        >
-                          <PenTool size={16} /> WEB
-                        </Link>
-                     </>
+                    <>
+                      <Link
+                        to="/admin-users"
+                        className="px-3 py-2 rounded-md text-sm font-bold text-purple-400 hover:text-purple-300 flex items-center gap-1 border border-transparent hover:border-purple-900"
+                      >
+                        <Users size={16} /> SOCIS/ES
+                      </Link>
+                      <Link
+                        to="/admin-settings"
+                        className="px-3 py-2 rounded-md text-sm font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 border border-transparent hover:border-cyan-900"
+                      >
+                        <PenTool size={16} /> WEB
+                      </Link>
+                    </>
                   )}
 
                   <div className="ml-6 flex items-center space-x-4 pl-6 border-l border-slate-700">
@@ -100,16 +102,17 @@ export const Navbar: React.FC = () => {
                         <p className="text-xs text-yellow-400 font-bold">{currentUser.name}</p>
                         <p className="text-[10px] text-gray-400">{currentUser.level}</p>
                       </div>
-                      <img 
-                        src={currentUser.avatarUrl} 
-                        alt="Profile" 
+                      <img
+                        src={currentUser.avatarUrl}
+                        alt="Perfil"
                         className="h-9 w-9 rounded-full border-2 border-slate-600 group-hover:border-yellow-400 transition-colors object-cover"
                       />
                     </Link>
-                    <button 
+
+                    <button
                       onClick={logout}
                       className="text-slate-400 hover:text-white transition-colors"
-                      title="Tancar Sessió"
+                      title="Tancar sessió"
                     >
                       <LogOut size={20} />
                     </button>
@@ -135,11 +138,12 @@ export const Navbar: React.FC = () => {
         <div className="xl:hidden bg-slate-900 pb-3 pt-2 border-t border-slate-800">
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 flex flex-col">
             <NavItem to="/" label="INICI" />
+
             {isPublic ? (
-               <>
+              <>
                 <NavItem to="/courses-public" label="CURSOS" />
-                <NavItem to="/login" label="ACCÉS SOCIS" />
-               </>
+                <NavItem to="/login" label="ACCÉS SOCIS/ES" />
+              </>
             ) : (
               <>
                 <NavItem to="/dashboard" label="EL MEU PANELL" />
@@ -149,17 +153,22 @@ export const Navbar: React.FC = () => {
                 <NavItem to="/social-events" label="ESDEVENIMENTS" />
                 <NavItem to="/social-wall" label="MUR SOCIAL" />
                 <NavItem to="/resources" label="BIBLIOTECA" />
+
                 <div className="border-t border-slate-800 my-2 pt-2">
-                    <NavItem to="/profile" label="EL MEU PERFIL" />
-                    {showInstructor && <NavItem to="/admin-trips" label="GESTIÓ SORTIDES" />}
-                    {showAdmin && <NavItem to="/admin-users" label="GESTIÓ SOCIS" />}
-                    {showAdmin && <NavItem to="/admin-settings" label="CONFIGURACIÓ WEB" />}
-                    <button 
-                    onClick={() => { logout(); setIsMenuOpen(false); }}
+                  <NavItem to="/profile" label="EL MEU PERFIL" />
+                  {showInstructor && <NavItem to="/admin-trips" label="GESTIÓ SORTIDES" />}
+                  {showAdmin && <NavItem to="/admin-users" label="GESTIÓ SOCIS/ES" />}
+                  {showAdmin && <NavItem to="/admin-settings" label="CONFIGURACIÓ WEB" />}
+
+                  <button
+                    onClick={() => {
+                      logout();
+                      setIsMenuOpen(false);
+                    }}
                     className="w-full text-left px-3 py-2 rounded-md text-sm font-bold text-red-400 hover:bg-slate-800"
-                    >
+                  >
                     TANCAR SESSIÓ
-                    </button>
+                  </button>
                 </div>
               </>
             )}
