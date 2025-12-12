@@ -86,6 +86,24 @@ interface AppContextValue extends AppState {
     data: Omit<Course, "id" | "createdBy" | "participants">
   ) => void;
   joinTrip: (tripId: string) => void;
+  const leaveTrip: AppContextValue["leaveTrip"] = (tripId) => {
+  if (!state.currentUser) return;
+
+  setState((prev) => ({
+    ...prev,
+    trips: prev.trips.map((t) =>
+      t.id === tripId
+        ? {
+            ...t,
+            participants: t.participants.filter(
+              (id) => id !== prev.currentUser!.id
+            ),
+          }
+        : t
+    ),
+  }));
+};
+
   joinCourse: (courseId: string) => void;
 }
 
