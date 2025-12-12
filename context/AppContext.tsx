@@ -10,6 +10,19 @@ import React, {
 export type Role = "admin" | "instructor" | "member" | "pending";
 export type Status = "pending" | "active";
 
+// ✅ Nivells FECDAS/CMAS que vols
+export const FECDAS_LEVELS = ["B1E", "B2E", "B3E", "GG", "IN1E", "IN2E", "IN3E"] as const;
+export type FecdAsLevel = (typeof FECDAS_LEVELS)[number] | "ALTRES";
+
+export interface UserDocuments {
+  licenseNumber: string;        // Llicència federativa
+  insuranceCompany: string;     // Companyia assegurança
+  insurancePolicy: string;      // Nº pòlissa
+  insuranceExpiry: string;      // Data caducitat (YYYY-MM-DD)
+  medicalCertExpiry: string;    // Data caducitat (YYYY-MM-DD)
+  highestCertification: string; // Titulació més elevada (text)
+}
+
 export interface User {
   id: string;
   name: string;
@@ -17,12 +30,20 @@ export interface User {
   role: Role;
   status: Status;
 
-  // dades de soci/a
-  certification?: string;
+  // ✅ Perfil
+  level: FecdAsLevel;     // B1E, B2E... o ALTRES
+  avatarUrl: string;      // buit si no hi ha foto
 
-  // Necessari pel Navbar
-  level: string;
-  avatarUrl: string; // buit si no hi ha foto
+  // ✅ Titulacions / especialitats
+  certification?: string;        // (el que demanes al registre)
+  specialties: string[];         // Especialitats FECDAS/CMAS (strings)
+  otherSpecialtiesText: string;  // Text lliure si no són FECDAS/CMAS
+
+  // ✅ Documentació
+  documents: UserDocuments;
+
+  // (futur) contrasenya real -> quan fem Firebase/Auth
+  passwordSet: boolean;
 }
 
 export interface Trip {
@@ -35,7 +56,7 @@ export interface Trip {
   createdBy: string;
   participants: string[];
 
-  // camps opcionals (per la teva UI)
+  // opcionals (UI)
   time?: string;
   depth?: string;
   description?: string;
@@ -55,7 +76,7 @@ export interface Course {
   createdBy: string;
   participants: string[];
 
-  // opcional
+  // opcional (UI)
   imageUrl?: string;
 }
 
@@ -85,6 +106,10 @@ interface AppContextValue extends AppState {
   approveUser: (userId: string) => void;
   setUserRole: (userId: string, role: Role) => void;
 
+  // ✅ perfil + documentació (PAS 4)
+  updateMyProfile: (data: Partial<Pick<User, "name" | "avatarUrl" | "level" | "specialties" | "otherSpecialtiesText">>) => void;
+  updateMyDocuments: (data: Partial<UserDocuments>) => void;
+
   // permisos
   canManageTrips: () => boolean;
   canManageSystem: () => boolean;
@@ -100,7 +125,7 @@ interface AppContextValue extends AppState {
   leaveCourse: (courseId: string) => void;
 }
 
-const STORAGE_KEY = "westdivers-app-state-v4";
+const STORAGE_KEY = "westdivers-app-state-v5";
 const AppContext = createContext<AppContextValue | undefined>(undefined);
 
 const defaultClubSettings: ClubSettings = {
@@ -110,15 +135,35 @@ const defaultClubSettings: ClubSettings = {
   appBackgroundUrl: "",
 };
 
+const emptyDocs = (): UserDocuments => ({
+  licenseNumber: "",
+  insuranceCompany: "",
+  insurancePolicy: "",
+  insuranceExpiry: "",
+  medicalCertExpiry: "",
+  highestCertification: "",
+});
+
+const normalizeLevelFromText = (text: string): FecdAsLevel => {
+  const t = (text || "").toUpperCase().trim();
+  return (FECDAS_LEVELS as readonly string[]).includes(t) ? (t as FecdAsLevel) : "ALTRES";
+};
+
 const initialAdmin: User = {
   id: "admin-1",
   name: "Administració West Divers",
   email: "admin@westdivers.local",
   role: "admin",
   status: "active",
-  level: "ADMIN",
+  level: "IN3E",
   avatarUrl: "",
+
   certification: "ADMIN",
+  specialties: [],
+  otherSpecialtiesText: "",
+
+  documents: emptyDocs(),
+  passwordSet: false,
 };
 
 const initialState: AppState = {
@@ -144,21 +189,38 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     try {
       const parsed = JSON.parse(raw) as Partial<AppState>;
 
-      const safeUsers = (parsed.users ?? initialState.users).map((u: any) => ({
-        ...u,
-        level: u.level ?? (u.role === "admin" ? "ADMIN" : "B1"),
-        avatarUrl: u.avatarUrl ?? "",
-        certification: u.certification ?? "",
-      })) as User[];
+      const safeUsers = (parsed.users ?? initialState.users).map((u: any) => {
+        const docs = u.documents ?? {};
+        return {
+          ...u,
+          level: (u.level ?? "B1E") as FecdAsLevel,
+          avatarUrl: u.avatarUrl ?? "",
+          certification: u.certification ?? "",
+          specialties: Array.isArray(u.specialties) ? u.specialties : [],
+          otherSpecialtiesText: u.otherSpecialtiesText ?? "",
+          documents: {
+            ...emptyDocs(),
+            ...docs,
+          },
+          passwordSet: !!u.passwordSet,
+        } as User;
+      });
 
       const safeCurrentUser = parsed.currentUser
         ? ({
             ...(parsed.currentUser as any),
-            level:
-              (parsed.currentUser as any).level ??
-              ((parsed.currentUser as any).role === "admin" ? "ADMIN" : "B1"),
+            level: ((parsed.currentUser as any).level ?? "B1E") as FecdAsLevel,
             avatarUrl: (parsed.currentUser as any).avatarUrl ?? "",
             certification: (parsed.currentUser as any).certification ?? "",
+            specialties: Array.isArray((parsed.currentUser as any).specialties)
+              ? (parsed.currentUser as any).specialties
+              : [],
+            otherSpecialtiesText: (parsed.currentUser as any).otherSpecialtiesText ?? "",
+            documents: {
+              ...emptyDocs(),
+              ...(((parsed.currentUser as any).documents ?? {}) as any),
+            },
+            passwordSet: !!(parsed.currentUser as any).passwordSet,
           } as User)
         : null;
 
@@ -186,7 +248,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setState((prev) => ({ ...prev, currentUser: initialAdmin }));
   };
 
-  // ✅ retorna boolean i NO té claus mal tancades
   const loginWithEmail = (email: string): boolean => {
     const trimmed = email.trim().toLowerCase();
 
@@ -222,9 +283,20 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         email: trimmed,
         role: "pending",
         status: "pending",
-        level: "PENDENT",
-        avatarUrl: "",
+
         certification: certification.trim(),
+        level: normalizeLevelFromText(certification),
+        avatarUrl: "",
+
+        specialties: [],
+        otherSpecialtiesText: "",
+
+        documents: {
+          ...emptyDocs(),
+          highestCertification: certification.trim(),
+        },
+
+        passwordSet: false,
       };
 
       alert("Sol·licitud enviada. L’administració revisarà i aprovarà l’accés.");
@@ -236,7 +308,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setState((prev) => ({
       ...prev,
       users: prev.users.map((u) =>
-        u.id === userId ? { ...u, status: "active", role: "member", level: "B1" } : u
+        u.id === userId
+          ? {
+              ...u,
+              status: "active",
+              role: "member",
+              // si era ALTRES, el mantenim; si no, ja porta el seu
+              level: (u.level ?? "B1E") as FecdAsLevel,
+            }
+          : u
       ),
     }));
   };
@@ -251,16 +331,49 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
               role,
               level:
                 role === "admin"
-                  ? "ADMIN"
+                  ? "IN3E"
                   : role === "instructor"
-                  ? "INSTRUCTOR"
-                  : role === "pending"
-                  ? "PENDENT"
-                  : "B1",
+                  ? "IN1E"
+                  : u.level ?? "B1E",
             }
           : u
       ),
     }));
+  };
+
+  // ✅ actualitzar perfil propi
+  const updateMyProfile: AppContextValue["updateMyProfile"] = (data) => {
+    if (!state.currentUser) return;
+
+    setState((prev) => {
+      const updatedCurrent = { ...prev.currentUser!, ...data };
+      return {
+        ...prev,
+        currentUser: updatedCurrent,
+        users: prev.users.map((u) => (u.id === updatedCurrent.id ? updatedCurrent : u)),
+      };
+    });
+  };
+
+  // ✅ actualitzar documentació pròpia
+  const updateMyDocuments: AppContextValue["updateMyDocuments"] = (data) => {
+    if (!state.currentUser) return;
+
+    setState((prev) => {
+      const updatedCurrent = {
+        ...prev.currentUser!,
+        documents: {
+          ...prev.currentUser!.documents,
+          ...data,
+        },
+      };
+
+      return {
+        ...prev,
+        currentUser: updatedCurrent,
+        users: prev.users.map((u) => (u.id === updatedCurrent.id ? updatedCurrent : u)),
+      };
+    });
   };
 
   const canManageTrips = useMemo(() => {
@@ -376,6 +489,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     approveUser,
     setUserRole,
 
+    updateMyProfile,
+    updateMyDocuments,
+
     canManageTrips,
     canManageSystem,
 
@@ -397,4 +513,5 @@ export const useAppContext = () => {
   return ctx;
 };
 
+// ✅ Un sol export
 export const useApp = useAppContext;
