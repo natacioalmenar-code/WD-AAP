@@ -16,6 +16,7 @@ export interface User {
   email: string;
   role: Role;
   status: Status;
+  certification?: string;
 
   // Necessari pel Navbar
   level: string;
