@@ -1,3 +1,4 @@
+import { AppProvider } from "./context/AppContext";
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
@@ -8,6 +9,8 @@ const root = createRoot(rootElement);
 
 root.render(
   <React.StrictMode>
-    <App />
+    <AppProvider>
+      <App />
+    </AppProvider>
   </React.StrictMode>
 );
