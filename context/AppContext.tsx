@@ -16,11 +16,13 @@ export interface User {
   email: string;
   role: Role;
   status: Status;
+
+  // dades de soci/a
   certification?: string;
 
   // Necessari pel Navbar
   level: string;
-  avatarUrl: string;
+  avatarUrl: string; // ✅ buit si no hi ha foto
 }
 
 export interface Trip {
@@ -46,11 +48,13 @@ export interface Course {
   participants: string[];
 }
 
-// Necessari pel Navbar (logo + textos)
 export interface ClubSettings {
   logoUrl: string;
   navbarPreTitle: string;
   heroTitle: string;
+
+  // opcional (si no existeix, no passa res)
+  appBackgroundUrl?: string;
 }
 
 interface AppState {
@@ -67,7 +71,7 @@ interface AppContextValue extends AppState {
   loginWithEmail: (email: string) => void;
   logout: () => void;
 
-  // usuaris
+  // persones sòcies
   registerUser: (data: { name: string; email: string; certification: string }) => void;
   approveUser: (userId: string) => void;
   setUserRole: (userId: string, role: Role) => void;
@@ -85,24 +89,25 @@ interface AppContextValue extends AppState {
   joinCourse: (courseId: string) => void;
 }
 
-const STORAGE_KEY = "westdivers-app-state-v3";
+const STORAGE_KEY = "westdivers-app-state-v4";
 const AppContext = createContext<AppContextValue | undefined>(undefined);
 
-// ✅ Textos nous (sense “Almenar”) + logo
 const defaultClubSettings: ClubSettings = {
-  logoUrl: "/westdivers-logo.png", // el que ja tens a public
+  logoUrl: "/westdivers-logo.png",
   navbarPreTitle: "CLUB DE BUSSEIG",
   heroTitle: "WEST DIVERS",
+  appBackgroundUrl: "", // ✅ per defecte buit (sense imatge)
 };
 
 const initialAdmin: User = {
   id: "admin-1",
-  name: "Administrador/a West Divers",
+  name: "Administració West Divers",
   email: "admin@westdivers.local",
   role: "admin",
   status: "active",
   level: "ADMIN",
-  avatarUrl: "https://i.pravatar.cc/150?img=12",
+  avatarUrl: "", // ✅ sense foto per defecte
+  certification: "ADMIN",
 };
 
 const initialState: AppState = {
@@ -120,7 +125,6 @@ function createId() {
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [state, setState] = useState<AppState>(initialState);
 
-  // carregar estat guardat al navegador
   useEffect(() => {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return;
@@ -131,7 +135,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const safeUsers = (parsed.users ?? initialState.users).map((u: any) => ({
         ...u,
         level: u.level ?? (u.role === "admin" ? "ADMIN" : "B1"),
-        avatarUrl: u.avatarUrl ?? "",
+        avatarUrl: u.avatarUrl ?? "", // ✅ mai pravatar
+        certification: u.certification ?? "",
       }));
 
       const safeCurrentUser = parsed.currentUser
@@ -140,9 +145,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
             level:
               (parsed.currentUser as any).level ??
               ((parsed.currentUser as any).role === "admin" ? "ADMIN" : "B1"),
-            avatarUrl:
-              (parsed.currentUser as any).avatarUrl ??
-              "https://i.pravatar.cc/150?img=8",
+            avatarUrl: (parsed.currentUser as any).avatarUrl ?? "", // ✅ mai pravatar
+            certification: (parsed.currentUser as any).certification ?? "",
           } as User)
         : null;
 
@@ -161,7 +165,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  // guardar estat cada vegada que canvia
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
@@ -175,11 +178,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setState((prev) => {
       const user = prev.users.find((u) => u.email.toLowerCase() === trimmed);
       if (!user) {
-        alert("No hi ha cap usuari/ària amb aquest correu.");
+        alert("No hi ha cap persona sòcia amb aquest correu.");
         return prev;
       }
       if (user.status !== "active") {
-        alert("Aquest compte encara no està aprovat.");
+        alert("Aquest compte encara està pendent d’aprovació.");
         return prev;
       }
       return { ...prev, currentUser: user };
@@ -188,26 +191,26 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = () => setState((prev) => ({ ...prev, currentUser: null }));
 
-  const registerUser: AppContextValue["registerUser"] = ({ name, email }) => {
+  const registerUser: AppContextValue["registerUser"] = ({ name, email, certification }) => {
     setState((prev) => {
       const trimmed = email.trim().toLowerCase();
       if (prev.users.some((u) => u.email.toLowerCase() === trimmed)) {
-        alert("Ja existeix un/a usuari/ària amb aquest correu.");
+        alert("Ja existeix una persona usuària amb aquest correu.");
         return prev;
       }
+
       const user: User = {
-  id: createId(),
-  name: name.trim(),
-  email: trimmed,
-  role: "pending",
-  status: "pending",
-  level: "PENDENT",
-  avatarUrl: "",              // ✅ buit
-  certification: certification.trim(), // ✅ guarda titulació
-};
-      alert(
-        "Sol·licitud enviada. Un/a administrador/a revisarà i aprovarà el teu accés."
-      );
+        id: createId(),
+        name: name.trim(),
+        email: trimmed,
+        role: "pending",
+        status: "pending",
+        level: "PENDENT",
+        avatarUrl: "", // ✅ no posem cap imatge
+        certification: certification.trim(),
+      };
+
+      alert("Sol·licitud enviada. L’administració revisarà i aprovarà l’accés.");
       return { ...prev, users: [...prev.users, user] };
     });
   };
@@ -243,12 +246,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }));
   };
 
-  // ✅ Funcions que el Navbar crida
   const canManageTrips = useMemo(() => {
     return () =>
       !!state.currentUser &&
-      (state.currentUser.role === "admin" ||
-        state.currentUser.role === "instructor");
+      (state.currentUser.role === "admin" || state.currentUser.role === "instructor");
   }, [state.currentUser]);
 
   const canManageSystem = useMemo(() => {
@@ -261,7 +262,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return false;
     }
     if (state.currentUser.role !== "admin" && state.currentUser.role !== "instructor") {
-      alert("Només administració o instructors poden crear això.");
+      alert("Només administració o equip instructor poden crear això.");
       return false;
     }
     return true;
@@ -313,7 +314,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       ...prev,
       courses: prev.courses.map((c) =>
         c.id === courseId && !c.participants.includes(prev.currentUser!.id)
-          ? { ...c, participants: [...c.participants, prev.currentUser!.id] }
+          ? { ...c, participants: [...t.participants, prev.currentUser!.id] }
           : c
       ),
     }));
@@ -343,6 +344,9 @@ export const useAppContext = () => {
   if (!ctx) throw new Error("useAppContext must be used within AppProvider");
   return ctx;
 };
+
+export const useApp = () => useAppContext();
+
 
 // ✅ el Navbar importa useApp()
 export const useApp = () => useAppContext();
