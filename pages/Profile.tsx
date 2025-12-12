@@ -1,527 +1,591 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useApp } from "../context/AppContext";
-import { Camera, Save, ShieldCheck, GraduationCap, KeyRound, FileText, Plus, Trash2 } from "lucide-react";
+import { useApp, FECDAS_LEVELS, FecdAsLevel } from "../context/AppContext";
+import {
+  Camera,
+  Save,
+  ShieldCheck,
+  Activity,
+  CreditCard,
+  Award,
+  User as UserIcon,
+  FileText,
+} from "lucide-react";
 
-type Tab = "personal" | "docs" | "certs" | "password";
+type TabKey = "personal" | "docs" | "certs";
 
-const LEVELS = ["B1E", "B2E", "B3E", "GG", "IN1E", "IN2E", "IN3E"] as const;
+const SPECIALTIES_FECDAS: string[] = [
+  "Nitrox",
+  "Flotabilitat / Control de flotabilitat",
+  "Navegació submarina",
+  "Rescat",
+  "Primeres cures / Oxigenoteràpia",
+  "Busseig nocturn",
+  "Busseig profund",
+  "Barques",
+  "Fotografia submarina",
+  "Biologia marina",
+  "Apnea",
+  "Sidemount",
+  "Cavernes / Cova (si aplica)",
+];
 
 export const Profile: React.FC = () => {
-  const { currentUser, users, logout } = useApp();
-  const [activeTab, setActiveTab] = useState<Tab>("personal");
+  const { currentUser, updateMyProfile, updateMyDocuments } = useApp();
 
-  // Guard: sense user, fora
-  if (!currentUser) return null;
+  const [tab, setTab] = useState<TabKey>("personal");
 
-  // --- LocalStorage per dades extra del perfil (per no tocar encara AppContext)
-  // Clau per usuari/a
-  const EXTRA_KEY = useMemo(() => `wd-profile-extra-${currentUser.id}`, [currentUser.id]);
+  // ---- Local forms ----
+  const [name, setName] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [level, setLevel] = useState<FecdAsLevel>("B1E");
 
-  type ExtraProfile = {
-    avatarUrl?: string; // URL opcional
-    phone?: string;
-    birthDate?: string;
-    address?: string;
-
-    // documents (text lliure per ara)
-    licenseInsurance?: string; // Llicència / assegurança
-    medicalCertificate?: string; // Certificat mèdic
-    highestCertificationDoc?: string; // Titulació més elevada (doc o text)
-
-    // titulacions
-    level?: string; // nivell del club (B1E..)
-    specialties?: string[]; // especialitzacions FECDAS/CMAS
-    otherCertifications?: string; // text lliure
-
-    // password (simulada)
-    password?: string;
-  };
-
-  const [extra, setExtra] = useState<ExtraProfile>({
-    avatarUrl: currentUser.avatarUrl || "",
-    level: currentUser.level || "B1E",
-    specialties: [],
-    otherCertifications: "",
-    licenseInsurance: "",
-    medicalCertificate: "",
-    highestCertificationDoc: "",
-    phone: "",
-    birthDate: "",
-    address: "",
-    password: "",
+  const [docsForm, setDocsForm] = useState({
+    licenseNumber: "",
+    insuranceCompany: "",
+    insurancePolicy: "",
+    insuranceExpiry: "",
+    medicalCertExpiry: "",
+    highestCertification: "",
   });
 
-  // Inputs auxiliars
-  const [newSpecialty, setNewSpecialty] = useState("");
-  const [pwd1, setPwd1] = useState("");
-  const [pwd2, setPwd2] = useState("");
-  const [pwdMsg, setPwdMsg] = useState<string | null>(null);
+  const [specialties, setSpecialties] = useState<string[]>([]);
+  const [otherSpecialtiesText, setOtherSpecialtiesText] = useState("");
 
-  // carregar extra
   useEffect(() => {
-    const raw = localStorage.getItem(EXTRA_KEY);
-    if (!raw) return;
+    if (!currentUser) return;
 
-    try {
-      const parsed = JSON.parse(raw) as ExtraProfile;
-      setExtra((prev) => ({
-        ...prev,
-        ...parsed,
-        // assegurem arrays
-        specialties: Array.isArray(parsed.specialties) ? parsed.specialties : prev.specialties,
-      }));
-    } catch {
-      // ignorem
-    }
-  }, [EXTRA_KEY]);
+    setName(currentUser.name ?? "");
+    setAvatarUrl(currentUser.avatarUrl ?? "");
+    setLevel((currentUser.level ?? "B1E") as FecdAsLevel);
 
-  // guardar extra
-  const saveExtra = (next: ExtraProfile) => {
-    setExtra(next);
-    localStorage.setItem(EXTRA_KEY, JSON.stringify(next));
+    setDocsForm({
+      licenseNumber: currentUser.documents?.licenseNumber ?? "",
+      insuranceCompany: currentUser.documents?.insuranceCompany ?? "",
+      insurancePolicy: currentUser.documents?.insurancePolicy ?? "",
+      insuranceExpiry: currentUser.documents?.insuranceExpiry ?? "",
+      medicalCertExpiry: currentUser.documents?.medicalCertExpiry ?? "",
+      highestCertification: currentUser.documents?.highestCertification ?? "",
+    });
+
+    setSpecialties(Array.isArray(currentUser.specialties) ? currentUser.specialties : []);
+    setOtherSpecialtiesText(currentUser.otherSpecialtiesText ?? "");
+  }, [currentUser]);
+
+  const isExpired = (dateString?: string) => {
+    if (!dateString) return false;
+    const d = new Date(dateString);
+    if (Number.isNaN(d.getTime())) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return d < today;
   };
 
-  const roleLabel =
-    currentUser.role === "admin"
-      ? "Administració"
-      : currentUser.role === "instructor"
-      ? "Instructor/a"
-      : "Soci/a";
+  const avatarVisible = useMemo(() => {
+    const url = (avatarUrl || "").trim();
+    return url.length > 0;
+  }, [avatarUrl]);
 
-  const email = currentUser.email || "";
-  const name = currentUser.name || "";
+  if (!currentUser) return null;
 
-  // avatar: si no hi ha URL, no mostrem cap foto aleatòria
-  const avatarToShow = extra.avatarUrl?.trim() ? extra.avatarUrl.trim() : "";
+  const savePersonal = () => {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      alert("Introdueix el nom i cognoms.");
+      return;
+    }
+    updateMyProfile({
+      name: trimmedName,
+      avatarUrl: (avatarUrl || "").trim(),
+      level,
+    });
+    alert("Dades personals actualitzades.");
+  };
+
+  const saveDocs = () => {
+    updateMyDocuments({
+      licenseNumber: docsForm.licenseNumber.trim(),
+      insuranceCompany: docsForm.insuranceCompany.trim(),
+      insurancePolicy: docsForm.insurancePolicy.trim(),
+      insuranceExpiry: docsForm.insuranceExpiry,
+      medicalCertExpiry: docsForm.medicalCertExpiry,
+      highestCertification: docsForm.highestCertification.trim(),
+    });
+    alert("Documentació actualitzada.");
+  };
+
+  const toggleSpecialty = (spec: string) => {
+    setSpecialties((prev) =>
+      prev.includes(spec) ? prev.filter((s) => s !== spec) : [...prev, spec]
+    );
+  };
+
+  const saveCerts = () => {
+    updateMyProfile({
+      specialties,
+      otherSpecialtiesText: otherSpecialtiesText.trim(),
+      // IMPORTANT: el level es guarda al tab personal
+    });
+    alert("Titulacions i especialitats actualitzades.");
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       {/* Header */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-8 flex flex-col md:flex-row items-center gap-6">
         <div className="relative">
-          {avatarToShow ? (
+          {avatarVisible ? (
             <img
-              src={avatarToShow}
+              src={avatarUrl}
               alt="Foto de perfil"
               className="w-28 h-28 rounded-full object-cover border-4 border-yellow-400 shadow-md"
             />
           ) : (
-            <div className="w-28 h-28 rounded-full border-4 border-yellow-400 shadow-md bg-slate-100 flex items-center justify-center text-slate-400 font-extrabold">
-              {name?.slice(0, 1)?.toUpperCase() || "W"}
+            <div className="w-28 h-28 rounded-full border-4 border-yellow-400 shadow-md bg-slate-100 flex items-center justify-center">
+              <UserIcon className="text-slate-400" size={40} />
             </div>
           )}
-        </div>
-
-        <div className="flex-1 text-center md:text-left">
-          <h1 className="text-3xl font-extrabold text-slate-900">{name}</h1>
-          <p className="text-gray-500 mt-1">{email}</p>
-
-          <div className="flex flex-wrap gap-2 justify-center md:justify-start mt-3">
-            <span className="bg-slate-900 text-yellow-400 px-3 py-1 rounded-full text-xs font-extrabold uppercase">
-              {roleLabel}
-            </span>
-            <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-extrabold uppercase">
-              Nivell: {extra.level || currentUser.level || "—"}
-            </span>
+          <div
+            className="absolute -bottom-2 -right-2 bg-slate-900 text-yellow-400 p-2 rounded-full"
+            title="Foto opcional (URL)"
+          >
+            <Camera size={16} />
           </div>
         </div>
 
-        <div className="flex gap-2">
-          <button
-            onClick={() => logout()}
-            className="px-4 py-2 rounded-lg bg-slate-900 text-yellow-400 font-extrabold hover:bg-slate-800"
-            title="Tancar sessió"
-          >
-            Sortir
-          </button>
+        <div className="flex-1 text-center md:text-left">
+          <h1 className="text-3xl font-bold text-slate-900">{currentUser.name}</h1>
+          <p className="text-gray-600 mt-1">{currentUser.email}</p>
+          <div className="mt-3 flex flex-wrap gap-2 justify-center md:justify-start">
+            <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-900 text-white">
+              {currentUser.role === "admin"
+                ? "Administració"
+                : currentUser.role === "instructor"
+                ? "Instructor/a"
+                : "Soci/a"}
+            </span>
+            <span className="px-3 py-1 rounded-full text-xs font-bold bg-yellow-400 text-black">
+              Nivell: {currentUser.level}
+            </span>
+            {currentUser.status !== "active" && (
+              <span className="px-3 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-800 border border-orange-200">
+                Pendent d’aprovació
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Tabs */}
       <div className="flex overflow-x-auto border-b border-gray-200 mb-8">
-        {[
-          { key: "personal", label: "Dades personals" },
-          { key: "docs", label: "Documents" },
-          { key: "certs", label: "Titulacions" },
-          { key: "password", label: "Contrasenya" },
-        ].map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setActiveTab(t.key as Tab)}
-            className={`px-6 py-3 font-extrabold text-sm uppercase tracking-wider transition-colors whitespace-nowrap border-b-2 ${
-              activeTab === (t.key as Tab)
-                ? "border-yellow-400 text-slate-900"
-                : "border-transparent text-gray-400 hover:text-gray-600"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+        <button
+          onClick={() => setTab("personal")}
+          className={`px-6 py-3 font-bold text-sm uppercase tracking-wider whitespace-nowrap border-b-2 transition-colors ${
+            tab === "personal"
+              ? "border-yellow-400 text-slate-900"
+              : "border-transparent text-gray-400 hover:text-gray-600"
+          }`}
+        >
+          Dades personals
+        </button>
+        <button
+          onClick={() => setTab("docs")}
+          className={`px-6 py-3 font-bold text-sm uppercase tracking-wider whitespace-nowrap border-b-2 transition-colors ${
+            tab === "docs"
+              ? "border-yellow-400 text-slate-900"
+              : "border-transparent text-gray-400 hover:text-gray-600"
+          }`}
+        >
+          Documents
+        </button>
+        <button
+          onClick={() => setTab("certs")}
+          className={`px-6 py-3 font-bold text-sm uppercase tracking-wider whitespace-nowrap border-b-2 transition-colors ${
+            tab === "certs"
+              ? "border-yellow-400 text-slate-900"
+              : "border-transparent text-gray-400 hover:text-gray-600"
+          }`}
+        >
+          Titulacions
+        </button>
       </div>
 
-      {/* CONTENT */}
-      <div className="animate-fade-in">
-        {/* 1) DADES PERSONALS */}
-        {activeTab === "personal" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-              <h3 className="font-extrabold text-slate-900 mb-4 flex items-center gap-2">
-                <FileText size={18} /> Perfil
-              </h3>
+      {/* PERSONAL */}
+      {tab === "personal" && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <UserIcon size={18} /> Perfil
+            </h2>
 
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-extrabold text-gray-500 uppercase mb-1">
-                    Nom i cognoms
-                  </label>
-                  <input
-                    value={name}
-                    disabled
-                    className="w-full border border-gray-200 rounded-lg p-2 bg-gray-50 text-gray-700"
-                  />
-                  <p className="text-xs text-gray-400 mt-1">
-                    (Ara mateix el nom es canvia des del registre. Si vols, després afegim “editar nom”.)
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                  Nom i cognoms
+                </label>
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2"
+                  placeholder="Nom i cognoms"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                  Correu electrònic
+                </label>
+                <input
+                  value={currentUser.email}
+                  readOnly
+                  className="w-full border border-gray-200 rounded-md px-3 py-2 bg-gray-50 text-gray-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                  Foto de perfil (opcional, URL)
+                </label>
+                <input
+                  value={avatarUrl}
+                  onChange={(e) => setAvatarUrl(e.target.value)}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2"
+                  placeholder="https://..."
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Si ho deixes buit, no es mostrarà cap foto.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                  Nivell FECDAS / CMAS
+                </label>
+                <select
+                  value={level}
+                  onChange={(e) => setLevel(e.target.value as FecdAsLevel)}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white"
+                >
+                  {FECDAS_LEVELS.map((l) => (
+                    <option key={l} value={l}>
+                      {l}
+                    </option>
+                  ))}
+                  <option value="ALTRES">ALTRES</option>
+                </select>
+                {level === "ALTRES" && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Si el teu nivell no és FECDAS/CMAS, descriu-lo a “Altres titulacions” (pestanya Titulacions).
                   </p>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-extrabold text-gray-500 uppercase mb-1">
-                    Correu electrònic
-                  </label>
-                  <input
-                    value={email}
-                    disabled
-                    className="w-full border border-gray-200 rounded-lg p-2 bg-gray-50 text-gray-700"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-extrabold text-gray-500 uppercase mb-1">
-                    Telèfon (opcional)
-                  </label>
-                  <input
-                    value={extra.phone || ""}
-                    onChange={(e) => saveExtra({ ...extra, phone: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg p-2"
-                    placeholder="+34 ..."
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-extrabold text-gray-500 uppercase mb-1">
-                      Data naixement (opcional)
-                    </label>
-                    <input
-                      type="date"
-                      value={extra.birthDate || ""}
-                      onChange={(e) => saveExtra({ ...extra, birthDate: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg p-2"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-extrabold text-gray-500 uppercase mb-1">
-                      Adreça (opcional)
-                    </label>
-                    <input
-                      value={extra.address || ""}
-                      onChange={(e) => saveExtra({ ...extra, address: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg p-2"
-                      placeholder="Població, zona..."
-                    />
-                  </div>
-                </div>
+                )}
               </div>
-            </div>
-
-            <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-              <h3 className="font-extrabold text-slate-900 mb-4 flex items-center gap-2">
-                <Camera size={18} /> Foto de perfil
-              </h3>
-
-              <label className="block text-xs font-extrabold text-gray-500 uppercase mb-1">
-                URL de la foto (opcional)
-              </label>
-              <input
-                value={extra.avatarUrl || ""}
-                onChange={(e) => saveExtra({ ...extra, avatarUrl: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg p-2"
-                placeholder="https://..."
-              />
-              <p className="text-xs text-gray-400 mt-2">
-                Si ho deixes buit, no es mostrarà cap imatge aleatòria.
-              </p>
-
-              <div className="mt-4">
-                <button
-                  onClick={() => saveExtra({ ...extra, avatarUrl: (extra.avatarUrl || "").trim() })}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-yellow-400 text-black font-extrabold hover:bg-yellow-300"
-                >
-                  <Save size={16} /> Guardar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 2) DOCUMENTS */}
-        {activeTab === "docs" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-              <h3 className="font-extrabold text-slate-900 mb-4 flex items-center gap-2">
-                <ShieldCheck size={18} /> Documents
-              </h3>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-extrabold text-gray-500 uppercase mb-1">
-                    Llicència / Assegurança (text lliure)
-                  </label>
-                  <textarea
-                    value={extra.licenseInsurance || ""}
-                    onChange={(e) => saveExtra({ ...extra, licenseInsurance: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg p-2 min-h-[90px]"
-                    placeholder="Ex: Llicència FECDAS 2026, assegurança DAN, núm pòlissa..."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-extrabold text-gray-500 uppercase mb-1">
-                    Certificat mèdic (text lliure)
-                  </label>
-                  <textarea
-                    value={extra.medicalCertificate || ""}
-                    onChange={(e) => saveExtra({ ...extra, medicalCertificate: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg p-2 min-h-[90px]"
-                    placeholder="Ex: vigent fins 2026-05-01..."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-extrabold text-gray-500 uppercase mb-1">
-                    Titulació més elevada (text lliure)
-                  </label>
-                  <textarea
-                    value={extra.highestCertificationDoc || ""}
-                    onChange={(e) =>
-                      saveExtra({ ...extra, highestCertificationDoc: e.target.value })
-                    }
-                    className="w-full border border-gray-300 rounded-lg p-2 min-h-[90px]"
-                    placeholder="Ex: B3E / IN1E / altres..."
-                  />
-                </div>
-
-                <button
-                  onClick={() => saveExtra({ ...extra })}
-                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-slate-900 text-yellow-400 font-extrabold hover:bg-slate-800"
-                >
-                  <Save size={16} /> Guardar documents
-                </button>
-              </div>
-            </div>
-
-            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
-              <h3 className="font-extrabold text-slate-900 mb-2">
-                Nota important
-              </h3>
-              <p className="text-sm text-gray-700">
-                Ara mateix aquests documents es guarden al navegador (localStorage).  
-                Més endavant, quan passem a Firebase/Supabase, els podrem pujar com fitxers.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* 3) TITULACIONS */}
-        {activeTab === "certs" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Levels */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-              <h3 className="font-extrabold text-slate-900 mb-4 flex items-center gap-2">
-                <GraduationCap size={18} /> Nivell (FECDAS/CMAS)
-              </h3>
-
-              <label className="block text-xs font-extrabold text-gray-500 uppercase mb-1">
-                Selecciona el teu nivell
-              </label>
-              <select
-                value={extra.level || "B1E"}
-                onChange={(e) => saveExtra({ ...extra, level: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg p-2"
-              >
-                {LEVELS.map((lvl) => (
-                  <option key={lvl} value={lvl}>
-                    {lvl}
-                  </option>
-                ))}
-              </select>
-
-              <p className="text-xs text-gray-400 mt-2">
-                Si algú no té FECDAS/CMAS, pot deixar això al nivell més proper i posar els detalls a “Altres titulacions”.
-              </p>
 
               <button
-                onClick={() => saveExtra({ ...extra })}
-                className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-yellow-400 text-black font-extrabold hover:bg-yellow-300"
+                onClick={savePersonal}
+                className="w-full mt-2 bg-yellow-400 text-black font-bold py-2 rounded-lg hover:bg-yellow-300 flex items-center justify-center gap-2"
               >
-                <Save size={16} /> Guardar nivell
+                <Save size={18} /> Guardar dades personals
               </button>
             </div>
+          </div>
 
-            {/* Specialties + other */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-              <h3 className="font-extrabold text-slate-900 mb-4">
-                Especialitzacions + Altres titulacions
-              </h3>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <Award size={18} /> Resum
+            </h2>
 
-              <div className="mb-4">
-                <label className="block text-xs font-extrabold text-gray-500 uppercase mb-1">
-                  Especialitzacions FECDAS/CMAS (afegeix una a una)
-                </label>
+            <div className="space-y-4">
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                <p className="text-xs font-bold uppercase text-gray-500">Titulació indicada a l’alta</p>
+                <p className="text-slate-900 font-semibold mt-1">
+                  {currentUser.certification ? currentUser.certification : "No indicada"}
+                </p>
+              </div>
 
-                <div className="flex gap-2">
-                  <input
-                    value={newSpecialty}
-                    onChange={(e) => setNewSpecialty(e.target.value)}
-                    className="flex-1 border border-gray-300 rounded-lg p-2"
-                    placeholder="Ex: Nitrox, Profunditat, Rescat..."
-                  />
-                  <button
-                    onClick={() => {
-                      const s = newSpecialty.trim();
-                      if (!s) return;
-                      const next = Array.from(new Set([...(extra.specialties || []), s]));
-                      saveExtra({ ...extra, specialties: next });
-                      setNewSpecialty("");
-                    }}
-                    className="px-4 py-2 rounded-lg bg-slate-900 text-yellow-400 font-extrabold hover:bg-slate-800 inline-flex items-center gap-2"
-                  >
-                    <Plus size={16} /> Afegir
-                  </button>
-                </div>
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                <p className="text-xs font-bold uppercase text-gray-500">Especialitats FECDAS/CMAS</p>
+                {specialties.length === 0 ? (
+                  <p className="text-gray-600 mt-1">Cap especialitat registrada.</p>
+                ) : (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {specialties.map((s) => (
+                      <span
+                        key={s}
+                        className="px-3 py-1 rounded-full text-xs font-semibold bg-white border border-slate-200 text-slate-700"
+                      >
+                        {s}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
 
-                <div className="mt-3">
-                  {(extra.specialties || []).length === 0 ? (
-                    <p className="text-sm text-gray-500">Encara no hi ha especialitzacions.</p>
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                <p className="text-xs font-bold uppercase text-gray-500">Altres titulacions (text lliure)</p>
+                <p className="text-gray-700 mt-1 whitespace-pre-wrap">
+                  {otherSpecialtiesText ? otherSpecialtiesText : "—"}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DOCS */}
+      {tab === "docs" && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Status cards */}
+          <div className="space-y-4">
+            <div
+              className={`p-6 rounded-xl border-l-4 shadow-sm ${
+                isExpired(docsForm.insuranceExpiry)
+                  ? "bg-red-50 border-red-500"
+                  : "bg-green-50 border-green-500"
+              }`}
+            >
+              <div className="flex justify-between items-start mb-2">
+                <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                  <ShieldCheck size={20} /> Assegurança
+                </h3>
+                {docsForm.insuranceExpiry ? (
+                  isExpired(docsForm.insuranceExpiry) ? (
+                    <span className="text-red-600 text-xs font-bold uppercase border border-red-200 px-2 py-1 rounded bg-white">
+                      Caducada
+                    </span>
                   ) : (
-                    <ul className="space-y-2">
-                      {(extra.specialties || []).map((s) => (
-                        <li
-                          key={s}
-                          className="flex items-center justify-between gap-3 border border-gray-200 rounded-lg px-3 py-2"
-                        >
-                          <span className="text-sm text-gray-800 font-semibold">{s}</span>
-                          <button
-                            onClick={() => {
-                              const next = (extra.specialties || []).filter((x) => x !== s);
-                              saveExtra({ ...extra, specialties: next });
-                            }}
-                            className="text-red-600 hover:text-red-700 inline-flex items-center gap-2 font-bold"
-                            title="Eliminar"
-                          >
-                            <Trash2 size={16} /> Treure
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                    <span className="text-green-600 text-xs font-bold uppercase border border-green-200 px-2 py-1 rounded bg-white">
+                      Vigent
+                    </span>
+                  )
+                ) : (
+                  <span className="text-gray-500 text-xs font-bold uppercase border border-gray-200 px-2 py-1 rounded bg-white">
+                    No informada
+                  </span>
+                )}
+              </div>
+              <p className="text-sm text-gray-700">
+                Companyia: <span className="font-semibold">{docsForm.insuranceCompany || "—"}</span>
+              </p>
+              <p className="text-sm text-gray-700">
+                Nº pòlissa: <span className="font-mono">{docsForm.insurancePolicy || "—"}</span>
+              </p>
+              <p className="text-sm text-gray-700 mt-2">
+                Caduca: <span className="font-mono font-bold">{docsForm.insuranceExpiry || "—"}</span>
+              </p>
+            </div>
+
+            <div
+              className={`p-6 rounded-xl border-l-4 shadow-sm ${
+                isExpired(docsForm.medicalCertExpiry)
+                  ? "bg-red-50 border-red-500"
+                  : "bg-green-50 border-green-500"
+              }`}
+            >
+              <div className="flex justify-between items-start mb-2">
+                <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                  <Activity size={20} /> Certificat mèdic
+                </h3>
+                {docsForm.medicalCertExpiry ? (
+                  isExpired(docsForm.medicalCertExpiry) ? (
+                    <span className="text-red-600 text-xs font-bold uppercase border border-red-200 px-2 py-1 rounded bg-white">
+                      Caducat
+                    </span>
+                  ) : (
+                    <span className="text-green-600 text-xs font-bold uppercase border border-green-200 px-2 py-1 rounded bg-white">
+                      Vigent
+                    </span>
+                  )
+                ) : (
+                  <span className="text-gray-500 text-xs font-bold uppercase border border-gray-200 px-2 py-1 rounded bg-white">
+                    No informat
+                  </span>
+                )}
+              </div>
+              <p className="text-sm text-gray-700">
+                Caduca: <span className="font-mono font-bold">{docsForm.medicalCertExpiry || "—"}</span>
+              </p>
+            </div>
+
+            <div className="p-6 rounded-xl border-l-4 border-blue-500 bg-blue-50 shadow-sm">
+              <div className="flex justify-between items-start mb-2">
+                <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                  <CreditCard size={20} /> Llicència federativa
+                </h3>
+              </div>
+              <p className="text-sm text-gray-700">
+                Nº llicència:{" "}
+                <span className="font-mono font-bold">{docsForm.licenseNumber || "—"}</span>
+              </p>
+            </div>
+
+            <div className="p-6 rounded-xl border-l-4 border-yellow-500 bg-yellow-50 shadow-sm">
+              <div className="flex justify-between items-start mb-2">
+                <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                  <FileText size={20} /> Titulació més elevada
+                </h3>
+              </div>
+              <p className="text-sm text-gray-700">
+                <span className="font-semibold">{docsForm.highestCertification || "—"}</span>
+              </p>
+            </div>
+          </div>
+
+          {/* Editing form */}
+          <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6">
+            <h3 className="font-bold text-gray-900 mb-6 flex items-center gap-2">
+              <Save size={20} /> Actualitzar documentació
+            </h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                  Nº llicència federativa
+                </label>
+                <input
+                  type="text"
+                  className="w-full border border-gray-300 rounded-md px-3 py-2"
+                  value={docsForm.licenseNumber}
+                  onChange={(e) => setDocsForm({ ...docsForm, licenseNumber: e.target.value })}
+                  placeholder="Ex: CAT-12345"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                    Companyia assegurança
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full border border-gray-300 rounded-md px-3 py-2"
+                    value={docsForm.insuranceCompany}
+                    onChange={(e) => setDocsForm({ ...docsForm, insuranceCompany: e.target.value })}
+                    placeholder="Ex: DAN"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                    Nº pòlissa
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full border border-gray-300 rounded-md px-3 py-2"
+                    value={docsForm.insurancePolicy}
+                    onChange={(e) => setDocsForm({ ...docsForm, insurancePolicy: e.target.value })}
+                    placeholder="Ex: 00112233"
+                  />
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-gray-200">
-                <label className="block text-xs font-extrabold text-gray-500 uppercase mb-1">
-                  Altres titulacions (si no tens FECDAS/CMAS, escriu aquí)
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                    Caducitat assegurança
+                  </label>
+                  <input
+                    type="date"
+                    className="w-full border border-gray-300 rounded-md px-3 py-2"
+                    value={docsForm.insuranceExpiry}
+                    onChange={(e) => setDocsForm({ ...docsForm, insuranceExpiry: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                    Caducitat certificat mèdic
+                  </label>
+                  <input
+                    type="date"
+                    className="w-full border border-gray-300 rounded-md px-3 py-2"
+                    value={docsForm.medicalCertExpiry}
+                    onChange={(e) => setDocsForm({ ...docsForm, medicalCertExpiry: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                  Titulació més elevada (text)
                 </label>
-                <textarea
-                  value={extra.otherCertifications || ""}
+                <input
+                  type="text"
+                  className="w-full border border-gray-300 rounded-md px-3 py-2"
+                  value={docsForm.highestCertification}
                   onChange={(e) =>
-                    saveExtra({ ...extra, otherCertifications: e.target.value })
+                    setDocsForm({ ...docsForm, highestCertification: e.target.value })
                   }
-                  className="w-full border border-gray-300 rounded-lg p-2 min-h-[110px]"
-                  placeholder="Ex: PADI AOW + Nitrox, SSI ..., certificacions internacionals..."
+                  placeholder="Ex: B2E / AOWD / Rescue..."
                 />
               </div>
 
               <button
-                onClick={() => saveExtra({ ...extra })}
-                className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-yellow-400 text-black font-extrabold hover:bg-yellow-300"
+                onClick={saveDocs}
+                className="w-full bg-blue-600 text-white font-bold py-2 rounded-lg hover:bg-blue-700"
               >
-                <Save size={16} /> Guardar titulacions
+                Guardar documentació
               </button>
-            </div>
-          </div>
-        )}
-
-        {/* 4) PASSWORD */}
-        {activeTab === "password" && (
-          <div className="max-w-3xl">
-            <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-              <h3 className="font-extrabold text-slate-900 mb-2 flex items-center gap-2">
-                <KeyRound size={18} /> Contrasenya (mode local)
-              </h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Per ara és una contrasenya guardada al navegador. Més endavant ho convertirem a login real (Firebase/Supabase).
+              <p className="text-xs text-gray-500">
+                * Aquí només guardem dades. La pujada de fitxers (PDF/foto) la farem al PAS 5.
               </p>
-
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-extrabold text-gray-500 uppercase mb-1">
-                    Nova contrasenya
-                  </label>
-                  <input
-                    type="password"
-                    value={pwd1}
-                    onChange={(e) => setPwd1(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg p-2"
-                    placeholder="••••••••"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-extrabold text-gray-500 uppercase mb-1">
-                    Repeteix la contrasenya
-                  </label>
-                  <input
-                    type="password"
-                    value={pwd2}
-                    onChange={(e) => setPwd2(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg p-2"
-                    placeholder="••••••••"
-                  />
-                </div>
-
-                {pwdMsg && (
-                  <div className="text-sm font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-lg p-3">
-                    {pwdMsg}
-                  </div>
-                )}
-
-                <button
-                  onClick={() => {
-                    setPwdMsg(null);
-                    if (!pwd1.trim() || pwd1.trim().length < 6) {
-                      setPwdMsg("La contrasenya ha de tenir com a mínim 6 caràcters.");
-                      return;
-                    }
-                    if (pwd1 !== pwd2) {
-                      setPwdMsg("Les contrasenyes no coincideixen.");
-                      return;
-                    }
-                    saveExtra({ ...extra, password: pwd1 });
-                    setPwd1("");
-                    setPwd2("");
-                    setPwdMsg("Contrasenya desada correctament (mode local).");
-                  }}
-                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-slate-900 text-yellow-400 font-extrabold hover:bg-slate-800"
-                >
-                  <Save size={16} /> Guardar contrasenya
-                </button>
-              </div>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* CERTS */}
+      {tab === "certs" && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <Award size={18} /> Especialitats FECDAS / CMAS
+            </h2>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {SPECIALTIES_FECDAS.map((spec) => {
+                const checked = specialties.includes(spec);
+                return (
+                  <label
+                    key={spec}
+                    className={`flex items-center gap-3 p-3 rounded-xl border transition-colors cursor-pointer ${
+                      checked ? "border-yellow-400 bg-yellow-50" : "border-gray-200 bg-white"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleSpecialty(spec)}
+                      className="h-4 w-4"
+                    />
+                    <span className="text-sm text-slate-800 font-medium">{spec}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <FileText size={18} /> Altres titulacions (text lliure)
+            </h2>
+
+            <textarea
+              value={otherSpecialtiesText}
+              onChange={(e) => setOtherSpecialtiesText(e.target.value)}
+              className="w-full border border-gray-300 rounded-xl p-3 min-h-[180px]"
+              placeholder="Escriu aquí qualsevol titulació o especialitat que no sigui FECDAS/CMAS (ex: PADI AOWD, SSI, etc.)"
+            />
+
+            <button
+              onClick={saveCerts}
+              className="w-full mt-4 bg-yellow-400 text-black font-bold py-2 rounded-lg hover:bg-yellow-300 flex items-center justify-center gap-2"
+            >
+              <Save size={18} /> Guardar titulacions
+            </button>
+
+            <p className="text-xs text-gray-500 mt-3">
+              * Si el teu nivell és “ALTRES”, explica’l aquí també (per exemple “PADI Rescue + Nitrox”).
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
