@@ -182,17 +182,24 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setState((prev) => ({ ...prev, currentUser: initialAdmin }));
   };
 
-  const loginWithEmail = (email: string) => {
-    const trimmed = email.trim().toLowerCase();
-    setState((prev) => {
-      const user = prev.users.find((u) => u.email.toLowerCase() === trimmed);
-      if (!user) {
-        alert("No hi ha cap persona sòcia amb aquest correu.");
-        return prev;
-      }
-      if (user.status !== "active") {
-        alert("Aquest compte encara està pendent d’aprovació.");
-        return prev;
+  const loginWithEmail = (email: string): boolean => {
+  const trimmed = email.trim().toLowerCase();
+
+  const user = state.users.find((u) => u.email.toLowerCase() === trimmed);
+
+  if (!user) {
+    alert("No hi ha cap persona sòcia amb aquest correu.");
+    return false;
+  }
+
+  if (user.status !== "active") {
+    alert("Aquest compte encara està pendent d’aprovació.");
+    return false;
+  }
+
+  setState((prev) => ({ ...prev, currentUser: user }));
+  return true;
+};
       }
       return { ...prev, currentUser: user };
     });
