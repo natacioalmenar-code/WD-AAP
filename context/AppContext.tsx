@@ -397,9 +397,4 @@ export const useAppContext = () => {
   return ctx;
 };
 
-// ✅ Un sol export
-export const useApp = useAppContext;
-
-
-// ✅ Un sol export de useApp
 export const useApp = useAppContext;
