@@ -320,20 +320,23 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }));
   };
 
-  const leaveTrip: AppContextValue["leaveTrip"] = (tripId) => {
-    if (!state.currentUser) {
-      alert("Has d’iniciar sessió per desapuntar-te.");
-      return;
-    }
-    setState((prev) => ({
-      ...prev,
-      trips: prev.trips.map((t) =>
-        t.id === tripId
-          ? { ...t, participants: t.participants.filter((uid) => uid !== prev.currentUser!.id) }
-          : t
-      ),
-    }));
-  };
+ const leaveTrip: AppContextValue["leaveTrip"] = (tripId) => {
+  if (!state.currentUser) return;
+
+  setState((prev) => ({
+    ...prev,
+    trips: prev.trips.map((t) =>
+      t.id === tripId
+        ? {
+            ...t,
+            participants: t.participants.filter(
+              (id) => id !== prev.currentUser!.id
+            ),
+          }
+        : t
+    ),
+  }));
+};
 
   const joinCourse: AppContextValue["joinCourse"] = (courseId) => {
     if (!state.currentUser) {
