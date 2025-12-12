@@ -2,6 +2,7 @@ import React, {
   createContext,
   useContext,
   useEffect,
+  useMemo,
   useState,
   ReactNode,
 } from "react";
@@ -15,6 +16,10 @@ export interface User {
   email: string;
   role: Role;
   status: Status;
+
+  // ✅ Camps que el Navbar espera
+  level: string;
+  avatarUrl: string;
 }
 
 export interface Trip {
@@ -24,7 +29,7 @@ export interface Trip {
   location: string;
   levelRequired: string;
   maxSpots: number;
-  createdBy: string; // user id
+  createdBy: string;
   participants: string[];
 }
 
@@ -40,11 +45,19 @@ export interface Course {
   participants: string[];
 }
 
+// ✅ Settings que el Navbar espera
+export interface ClubSettings {
+  logoUrl: string;
+  navbarPreTitle: string;
+  heroTitle: string;
+}
+
 interface AppState {
   users: User[];
   trips: Trip[];
   courses: Course[];
   currentUser: User | null;
+  clubSettings: ClubSettings;
 }
 
 interface AppContextValue extends AppState {
@@ -58,6 +71,10 @@ interface AppContextValue extends AppState {
   approveUser: (userId: string) => void;
   setUserRole: (userId: string, role: Role) => void;
 
+  // permisos (Navbar)
+  canManageTrips: () => boolean;
+  canManageSystem: () => boolean;
+
   // sortides / cursos
   createTrip: (
     data: Omit<Trip, "id" | "createdBy" | "participants">
@@ -69,9 +86,16 @@ interface AppContextValue extends AppState {
   joinCourse: (courseId: string) => void;
 }
 
-const STORAGE_KEY = "westdivers-app-state-v1";
+const STORAGE_KEY = "westdivers-app-state-v2";
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
+
+// ✅ Logo per defecte (després el canviarem pel teu)
+const defaultClubSettings: ClubSettings = {
+  logoUrl: "/westdivers-logo.png",
+  navbarPreTitle: "CLUB DE BUSSEIG",
+  heroTitle: "WEST DIVERS",
+};
 
 const initialAdmin: User = {
   id: "admin-1",
@@ -79,6 +103,8 @@ const initialAdmin: User = {
   email: "admin@westdivers.local",
   role: "admin",
   status: "active",
+  level: "ADMIN",
+  avatarUrl: "https://i.pravatar.cc/150?img=12",
 };
 
 const initialState: AppState = {
@@ -86,6 +112,7 @@ const initialState: AppState = {
   trips: [],
   courses: [],
   currentUser: initialAdmin,
+  clubSettings: defaultClubSettings,
 };
 
 function createId() {
@@ -101,9 +128,36 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (raw) {
       try {
         const parsed = JSON.parse(raw) as AppState;
-        setState(parsed);
+
+        // ✅ Backward-compat: si falten camps, posem defaults
+        const safe: AppState = {
+          ...initialState,
+          ...parsed,
+          clubSettings: {
+            ...defaultClubSettings,
+            ...(parsed.clubSettings ?? {}),
+          },
+          users: (parsed.users ?? initialState.users).map((u: any) => ({
+            ...u,
+            level: u.level ?? (u.role === "admin" ? "ADMIN" : "B1"),
+            avatarUrl: u.avatarUrl ?? "https://i.pravatar.cc/150?img=8",
+          })),
+          currentUser: parsed.currentUser
+            ? {
+                ...parsed.currentUser,
+                level:
+                  (parsed.currentUser as any).level ??
+                  ((parsed.currentUser as any).role === "admin" ? "ADMIN" : "B1"),
+                avatarUrl:
+                  (parsed.currentUser as any).avatarUrl ??
+                  "https://i.pravatar.cc/150?img=8",
+              }
+            : null,
+        };
+
+        setState(safe);
       } catch {
-        // si hi ha algun error, ignorem i usem initialState
+        // ignorem errors i fem servir initialState
       }
     }
   }, []);
@@ -120,9 +174,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const loginWithEmail = (email: string) => {
     const trimmed = email.trim().toLowerCase();
     setState((prev) => {
-      const user = prev.users.find(
-        (u) => u.email.toLowerCase() === trimmed
-      );
+      const user = prev.users.find((u) => u.email.toLowerCase() === trimmed);
       if (!user) {
         alert("No hi ha cap usuari amb aquest correu.");
         return prev;
@@ -146,13 +198,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         alert("Ja existeix un usuari amb aquest correu.");
         return prev;
       }
+
       const user: User = {
         id: createId(),
         name: name.trim(),
         email: trimmed,
         role: "pending",
         status: "pending",
+        level: "PENDENT",
+        avatarUrl: "https://i.pravatar.cc/150?img=5",
       };
+
       alert(
         "Sol·licitud enviada. Un administrador revisarà i aprovarà el teu accés."
       );
@@ -164,7 +220,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setState((prev) => ({
       ...prev,
       users: prev.users.map((u) =>
-        u.id === userId ? { ...u, status: "active", role: "member" } : u
+        u.id === userId
+          ? { ...u, status: "active", role: "member", level: "B1" }
+          : u
       ),
     }));
   };
@@ -173,10 +231,35 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setState((prev) => ({
       ...prev,
       users: prev.users.map((u) =>
-        u.id === userId ? { ...u, role } : u
+        u.id === userId
+          ? {
+              ...u,
+              role,
+              level:
+                role === "admin"
+                  ? "ADMIN"
+                  : role === "instructor"
+                  ? "INSTRUCTOR"
+                  : role === "pending"
+                  ? "PENDENT"
+                  : "B1",
+            }
+          : u
       ),
     }));
   };
+
+  // ✅ Funcions que el Navbar espera
+  const canManageTrips = useMemo(() => {
+    return () =>
+      !!state.currentUser &&
+      (state.currentUser.role === "admin" ||
+        state.currentUser.role === "instructor");
+  }, [state.currentUser]);
+
+  const canManageSystem = useMemo(() => {
+    return () => !!state.currentUser && state.currentUser.role === "admin";
+  }, [state.currentUser]);
 
   const canCreate = () => {
     if (!state.currentUser) {
@@ -234,10 +317,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       ...prev,
       trips: prev.trips.map((t) =>
         t.id === tripId && !t.participants.includes(prev.currentUser!.id)
-          ? {
-              ...t,
-              participants: [...t.participants, prev.currentUser!.id],
-            }
+          ? { ...t, participants: [...t.participants, prev.currentUser!.id] }
           : t
       ),
     }));
@@ -252,10 +332,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       ...prev,
       courses: prev.courses.map((c) =>
         c.id === courseId && !c.participants.includes(prev.currentUser!.id)
-          ? {
-              ...c,
-              participants: [...c.participants, prev.currentUser!.id],
-            }
+          ? { ...c, participants: [...c.participants, prev.currentUser!.id] }
           : c
       ),
     }));
@@ -269,6 +346,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     registerUser,
     approveUser,
     setUserRole,
+    canManageTrips,
+    canManageSystem,
     createTrip,
     createCourse,
     joinTrip,
@@ -280,9 +359,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
 export const useAppContext = () => {
   const ctx = useContext(AppContext);
-  if (!ctx) {
-    throw new Error("useAppContext must be used within AppProvider");
-  }
+  if (!ctx) throw new Error("useAppContext must be used within AppProvider");
   return ctx;
 };
-export const useApp = useAppContext;
+
+// ✅ el Navbar fa servir useApp()
+export const useApp = () => useAppContext();
