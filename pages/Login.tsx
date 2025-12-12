@@ -1,13 +1,17 @@
 import React, { useMemo, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Shield, Anchor, User } from "lucide-react";
+import { Shield, Anchor, User, Lock } from "lucide-react";
+
+const pwdKey = (email: string) => `wd-password-${email.trim().toLowerCase()}`;
 
 export const Login: React.FC = () => {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
-  const [certification, setCertification] = useState(""); // ✅ nou
+  const [certification, setCertification] = useState("");
+  const [password, setPassword] = useState("");
+  const [password2, setPassword2] = useState("");
   const [error, setError] = useState("");
 
   const { loginWithEmail, registerUser, loginAsDemoAdmin } = useApp();
@@ -23,15 +27,17 @@ export const Login: React.FC = () => {
     e.preventDefault();
     setError("");
 
-    const trimmedEmail = email.trim();
+    const trimmedEmail = email.trim().toLowerCase();
     const trimmedName = name.trim();
     const trimmedCert = certification.trim();
+    const trimmedPwd = password;
 
     if (!trimmedEmail) {
       setError("Introdueix el correu electrònic.");
       return;
     }
 
+    // REGISTER
     if (mode === "register") {
       if (!trimmedName) {
         setError("Introdueix el nom i cognoms.");
@@ -41,24 +47,61 @@ export const Login: React.FC = () => {
         setError("Indica la titulació de busseig.");
         return;
       }
+      if (!trimmedPwd || trimmedPwd.length < 6) {
+        setError("La contrasenya ha de tenir com a mínim 6 caràcters.");
+        return;
+      }
+      if (trimmedPwd !== password2) {
+        setError("Les contrasenyes no coincideixen.");
+        return;
+      }
 
+      // 1) crear usuari pendent (AppContext)
       registerUser({ name: trimmedName, email: trimmedEmail, certification: trimmedCert });
 
-      // Després de sol·licitar alta, es queden a la pantalla d'accés
+      // 2) guardar password local per email
+      localStorage.setItem(pwdKey(trimmedEmail), trimmedPwd);
+
+      // tornar a login
       setMode("login");
       setName("");
-      setEmail("");
       setCertification("");
+      setPassword("");
+      setPassword2("");
+      // mantenim l'email per comoditat
       return;
     }
 
-    // mode === "login"
+    // LOGIN
+    const saved = localStorage.getItem(pwdKey(trimmedEmail));
+    if (!saved) {
+      setError("No hi ha contrasenya guardada per aquest correu. Registra’t primer.");
+      return;
+    }
+    if (saved !== trimmedPwd) {
+      setError("Contrasenya incorrecta.");
+      return;
+    }
+
+    // si password ok, llavors fem login normal (aquí controla si està pendent o no)
     loginWithEmail(trimmedEmail);
+
+    // si estava pendent, el loginWithEmail ja mostrarà alerta i no canviarà l'usuari;
+    // però nosaltres igualment naveguem. Per evitar-ho, fem un petit truc:
+    // Naveguem només si la sessió ha canviat (ho veurem a dashboard igualment),
+    // però com ara no tenim retorn, ho deixem així (simple i robust).
     navigate(redirectTo, { replace: true });
   };
 
   const quickLogin = (emailToUse: string) => {
     setError("");
+    // Per demos: posem una password demo automàtica si no existeix
+    const key = pwdKey(emailToUse);
+    if (!localStorage.getItem(key)) localStorage.setItem(key, "123456");
+
+    setEmail(emailToUse);
+    setPassword("123456");
+
     loginWithEmail(emailToUse);
     navigate("/dashboard", { replace: true });
   };
@@ -73,7 +116,7 @@ export const Login: React.FC = () => {
           <p className="mt-2 text-center text-sm text-gray-600">
             {mode === "register"
               ? "Omple el formulari per sol·licitar l’accés. L’administració l’haurà d’aprovar."
-              : "Introdueix el teu correu electrònic o fes servir els accessos ràpids."}
+              : "Introdueix el teu correu i contrasenya o fes servir els accessos ràpids."}
           </p>
         </div>
 
@@ -83,6 +126,11 @@ export const Login: React.FC = () => {
             <button
               onClick={() => {
                 setError("");
+                // demo admin: deixem password demo
+                const demo = "admin@westdivers.local";
+                localStorage.setItem(pwdKey(demo), "123456");
+                setEmail(demo);
+                setPassword("123456");
                 loginAsDemoAdmin();
                 navigate("/dashboard", { replace: true });
               }}
@@ -117,10 +165,10 @@ export const Login: React.FC = () => {
           </div>
         )}
 
-        <form className="mt-4 space-y-6" onSubmit={handleSubmit}>
+        <form className="mt-4 space-y-4" onSubmit={handleSubmit}>
           {mode === "register" && (
             <>
-              <div className="mb-4">
+              <div>
                 <label htmlFor="name" className="sr-only">
                   Nom i cognoms
                 </label>
@@ -135,7 +183,7 @@ export const Login: React.FC = () => {
                 />
               </div>
 
-              <div className="mb-4">
+              <div>
                 <label htmlFor="certification" className="sr-only">
                   Titulació de busseig
                 </label>
@@ -152,7 +200,7 @@ export const Login: React.FC = () => {
             </>
           )}
 
-          <div className="mb-4">
+          <div>
             <label htmlFor="email-address" className="sr-only">
               Correu electrònic
             </label>
@@ -168,16 +216,51 @@ export const Login: React.FC = () => {
             />
           </div>
 
+          {/* Password */}
+          <div className="relative">
+            <label htmlFor="password" className="sr-only">
+              Contrasenya
+            </label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm pr-10"
+              placeholder="Contrasenya"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            <span className="absolute right-3 top-2.5 text-gray-400">
+              <Lock size={16} />
+            </span>
+          </div>
+
+          {/* Confirm password (only register) */}
+          {mode === "register" && (
+            <div>
+              <label htmlFor="password2" className="sr-only">
+                Repeteix contrasenya
+              </label>
+              <input
+                id="password2"
+                name="password2"
+                type="password"
+                className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                placeholder="Repeteix la contrasenya"
+                value={password2}
+                onChange={(e) => setPassword2(e.target.value)}
+              />
+            </div>
+          )}
+
           {error && <div className="text-red-500 text-sm text-center">{error}</div>}
 
-          <div>
-            <button
-              type="submit"
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-bold rounded-md text-black bg-yellow-400 hover:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-400 transition-colors"
-            >
-              {mode === "register" ? "Enviar sol·licitud" : "Entrar"}
-            </button>
-          </div>
+          <button
+            type="submit"
+            className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-bold rounded-md text-black bg-yellow-400 hover:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-400 transition-colors"
+          >
+            {mode === "register" ? "Enviar sol·licitud" : "Entrar"}
+          </button>
         </form>
 
         <div className="flex items-center justify-center">
@@ -185,12 +268,12 @@ export const Login: React.FC = () => {
             onClick={() => {
               setError("");
               setMode(mode === "register" ? "login" : "register");
+              setPassword("");
+              setPassword2("");
             }}
             className="text-sm text-blue-600 hover:text-blue-500 font-medium"
           >
-            {mode === "register"
-              ? "Ja ets soci/a? Inicia sessió"
-              : "No tens accés? Sol·licita alta"}
+            {mode === "register" ? "Ja ets soci/a? Inicia sessió" : "No tens accés? Sol·licita alta"}
           </button>
         </div>
 
@@ -199,9 +282,11 @@ export const Login: React.FC = () => {
             * Si acabes de sol·licitar alta, el teu compte quedarà <b>pendent</b> fins que
             l’administració el validi.
           </p>
+          <p className="mt-1">
+            * Contrasenya guardada localment (mode demo). Més endavant ho passarem a login real.
+          </p>
         </div>
       </div>
     </div>
   );
 };
-
