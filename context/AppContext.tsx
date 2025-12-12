@@ -352,6 +352,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     createTrip,
     createCourse,
     joinTrip,
+    laveTrip,
     joinCourse,
   };
 
