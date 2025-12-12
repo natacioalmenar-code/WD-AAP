@@ -285,3 +285,4 @@ export const useAppContext = () => {
   }
   return ctx;
 };
+export const useApp = useAppContext;
