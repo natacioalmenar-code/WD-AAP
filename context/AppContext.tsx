@@ -35,10 +35,10 @@ export interface Trip {
   createdBy: string;
   participants: string[];
 
-  // extra (si existeixen a les teves dades)
-  description?: string;
+  // camps opcionals (per la teva UI)
   time?: string;
   depth?: string;
+  description?: string;
   imageUrl?: string;
   locationUrl?: string;
 }
@@ -51,8 +51,12 @@ export interface Course {
   description: string;
   price: string;
   levelRequired: string;
+  maxSpots: number;
   createdBy: string;
   participants: string[];
+
+  // opcional
+  imageUrl?: string;
 }
 
 export interface ClubSettings {
@@ -85,11 +89,12 @@ interface AppContextValue extends AppState {
   canManageTrips: () => boolean;
   canManageSystem: () => boolean;
 
-  // sortides / cursos
+  // sortides
   createTrip: (data: Omit<Trip, "id" | "createdBy" | "participants">) => void;
   joinTrip: (tripId: string) => void;
   leaveTrip: (tripId: string) => void;
 
+  // cursos
   createCourse: (data: Omit<Course, "id" | "createdBy" | "participants">) => void;
   joinCourse: (courseId: string) => void;
   leaveCourse: (courseId: string) => void;
@@ -131,7 +136,7 @@ function createId() {
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [state, setState] = useState<AppState>(initialState);
 
-  // carregar estat del navegador
+  // carregar estat guardat
   useEffect(() => {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return;
@@ -144,7 +149,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         level: u.level ?? (u.role === "admin" ? "ADMIN" : "B1"),
         avatarUrl: u.avatarUrl ?? "",
         certification: u.certification ?? "",
-      }));
+      })) as User[];
 
       const safeCurrentUser = parsed.currentUser
         ? ({
@@ -172,7 +177,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  // guardar estat cada vegada que canvia
+  // guardar estat
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
@@ -181,27 +186,24 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setState((prev) => ({ ...prev, currentUser: initialAdmin }));
   };
 
+  // ✅ retorna boolean i NO té claus mal tancades
   const loginWithEmail = (email: string): boolean => {
-  const trimmed = email.trim().toLowerCase();
+    const trimmed = email.trim().toLowerCase();
 
-  const user = state.users.find((u) => u.email.toLowerCase() === trimmed);
+    const user = state.users.find((u) => u.email.toLowerCase() === trimmed);
 
-  if (!user) {
-    alert("No hi ha cap persona sòcia amb aquest correu.");
-    return false;
-  }
+    if (!user) {
+      alert("No hi ha cap persona sòcia amb aquest correu.");
+      return false;
+    }
 
-  if (user.status !== "active") {
-    alert("Aquest compte encara està pendent d’aprovació.");
-    return false;
-  }
+    if (user.status !== "active") {
+      alert("Aquest compte encara està pendent d’aprovació.");
+      return false;
+    }
 
-  setState((prev) => ({ ...prev, currentUser: user }));
-  return true;
-};
-      }
-      return { ...prev, currentUser: user };
-    });
+    setState((prev) => ({ ...prev, currentUser: user }));
+    return true;
   };
 
   const logout = () => setState((prev) => ({ ...prev, currentUser: null }));
@@ -294,6 +296,35 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }));
   };
 
+  const joinTrip: AppContextValue["joinTrip"] = (tripId) => {
+    if (!state.currentUser) {
+      alert("Has d’iniciar sessió per apuntar-te.");
+      return;
+    }
+
+    setState((prev) => ({
+      ...prev,
+      trips: prev.trips.map((t) =>
+        t.id === tripId && !t.participants.includes(prev.currentUser!.id)
+          ? { ...t, participants: [...t.participants, prev.currentUser!.id] }
+          : t
+      ),
+    }));
+  };
+
+  const leaveTrip: AppContextValue["leaveTrip"] = (tripId) => {
+    if (!state.currentUser) return;
+
+    setState((prev) => ({
+      ...prev,
+      trips: prev.trips.map((t) =>
+        t.id === tripId
+          ? { ...t, participants: t.participants.filter((id) => id !== prev.currentUser!.id) }
+          : t
+      ),
+    }));
+  };
+
   const createCourse: AppContextValue["createCourse"] = (data) => {
     if (!canCreate()) return;
     setState((prev) => ({
@@ -305,44 +336,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }));
   };
 
-  const joinTrip: AppContextValue["joinTrip"] = (tripId) => {
-    if (!state.currentUser) {
-      alert("Has d’iniciar sessió per apuntar-te.");
-      return;
-    }
-    setState((prev) => ({
-      ...prev,
-      trips: prev.trips.map((t) =>
-        t.id === tripId && !t.participants.includes(prev.currentUser!.id)
-          ? { ...t, participants: [...t.participants, prev.currentUser!.id] }
-          : t
-      ),
-    }));
-  };
-
- const leaveTrip: AppContextValue["leaveTrip"] = (tripId) => {
-  if (!state.currentUser) return;
-
-  setState((prev) => ({
-    ...prev,
-    trips: prev.trips.map((t) =>
-      t.id === tripId
-        ? {
-            ...t,
-            participants: t.participants.filter(
-              (id) => id !== prev.currentUser!.id
-            ),
-          }
-        : t
-    ),
-  }));
-};
-
   const joinCourse: AppContextValue["joinCourse"] = (courseId) => {
     if (!state.currentUser) {
       alert("Has d’iniciar sessió per apuntar-te.");
       return;
     }
+
     setState((prev) => ({
       ...prev,
       courses: prev.courses.map((c) =>
@@ -354,44 +353,40 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const leaveCourse: AppContextValue["leaveCourse"] = (courseId) => {
-  if (!state.currentUser) return;
+    if (!state.currentUser) return;
 
-  setState((prev) => ({
-    ...prev,
-    courses: prev.courses.map((c) =>
-      c.id === courseId
-        ? {
-            ...c,
-            participants: c.participants.filter(
-              (id) => id !== prev.currentUser!.id
-            ),
-          }
-        : c
-    ),
-  }));
-};
+    setState((prev) => ({
+      ...prev,
+      courses: prev.courses.map((c) =>
+        c.id === courseId
+          ? { ...c, participants: c.participants.filter((id) => id !== prev.currentUser!.id) }
+          : c
+      ),
+    }));
+  };
 
   const value: AppContextValue = {
-  ...state,
-  loginAsDemoAdmin,
-  loginWithEmail,
-  logout,
+    ...state,
 
-  registerUser,
-  approveUser,
-  setUserRole,
+    loginAsDemoAdmin,
+    loginWithEmail,
+    logout,
 
-  canManageTrips,
-  canManageSystem,
+    registerUser,
+    approveUser,
+    setUserRole,
 
-  createTrip,
-  joinTrip,
-  leaveTrip,
+    canManageTrips,
+    canManageSystem,
 
-  createCourse,
-  joinCourse,
-  leaveCourse,
-};
+    createTrip,
+    joinTrip,
+    leaveTrip,
+
+    createCourse,
+    joinCourse,
+    leaveCourse,
+  };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };
@@ -401,6 +396,10 @@ export const useAppContext = () => {
   if (!ctx) throw new Error("useAppContext must be used within AppProvider");
   return ctx;
 };
+
+// ✅ Un sol export
+export const useApp = useAppContext;
+
 
 // ✅ Un sol export de useApp
 export const useApp = useAppContext;
