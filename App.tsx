@@ -1,22 +1,26 @@
-import React from 'react';
-import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { AppProvider, useApp } from './context/AppContext';
-import { Navbar } from './components/Navbar';
-import { Home } from './pages/Home';
-import { Login } from './pages/Login';
-import { Dashboard } from './pages/Dashboard';
-import { Trips } from './pages/Trips';
-import { AdminTrips } from './pages/AdminTrips';
-import { AdminUsers } from './pages/AdminUsers';
-import { AdminSettings } from './pages/AdminSettings';
-import { CalendarPage } from './pages/CalendarPage';
-import { PrivateCourses } from './pages/PrivateCourses';
-import { ResourcesPage } from './pages/ResourcesPage';
-import { SocialEvents } from './pages/SocialEvents';
-import { Profile } from './pages/Profile';
-import { SocialWall } from './pages/SocialWall';
-import { GeminiDiveGuide } from './components/GeminiDiveGuide';
-import { Admin } from './pages/Admin'; // ✅ NOU
+import React from "react";
+import { HashRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { AppProvider, useApp } from "./context/AppContext";
+import { Navbar } from "./components/Navbar";
+import { Home } from "./pages/Home";
+import { Login } from "./pages/Login";
+import { Dashboard } from "./pages/Dashboard";
+import { Trips } from "./pages/Trips";
+import { AdminTrips } from "./pages/AdminTrips";
+import { AdminUsers } from "./pages/AdminUsers";
+import { AdminSettings } from "./pages/AdminSettings";
+import { CalendarPage } from "./pages/CalendarPage";
+import { PrivateCourses } from "./pages/PrivateCourses";
+import { ResourcesPage } from "./pages/ResourcesPage";
+import { SocialEvents } from "./pages/SocialEvents";
+import { Profile } from "./pages/Profile";
+import { SocialWall } from "./pages/SocialWall";
+import { GeminiDiveGuide } from "./components/GeminiDiveGuide";
+
+// ✅ nous
+import { Admin } from "./pages/Admin";
+import { AdminCourses } from "./pages/AdminCourses";
+import { AdminEvents } from "./pages/AdminEvents";
 
 // Guard component for private routes
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
@@ -30,7 +34,7 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-// Guard component for Instructor/Admin routes (Activities)
+// Guard component for Instructor/Admin routes
 const InstructorRoute = ({ children }: { children: React.ReactNode }) => {
   const { canManageTrips } = useApp();
 
@@ -41,7 +45,7 @@ const InstructorRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-// Guard component for Super Admin routes (Users)
+// Guard component for Super Admin routes
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   const { canManageSystem } = useApp();
 
@@ -60,17 +64,18 @@ const AppContent = () => {
       className="min-h-screen font-sans text-gray-900 bg-fixed bg-cover transition-all duration-500"
       style={{
         backgroundImage: `linear-gradient(rgba(249, 250, 251, 0.95), rgba(249, 250, 251, 0.95)), url("${clubSettings.appBackgroundUrl}")`,
-        backgroundColor: '#f9fafb',
+        backgroundColor: "#f9fafb",
       }}
     >
       <Navbar />
+
       <Routes>
-        {/* Public Routes */}
+        {/* Public */}
         <Route path="/" element={<Home />} />
         <Route path="/courses-public" element={<div className="p-8 text-center">Cursos Page (Public)</div>} />
         <Route path="/login" element={<Login />} />
 
-        {/* Private Routes */}
+        {/* Private */}
         <Route
           path="/dashboard"
           element={
@@ -136,7 +141,16 @@ const AppContent = () => {
           }
         />
 
-        {/* Management Routes */}
+        {/* Management */}
+        <Route
+          path="/admin"
+          element={
+            <InstructorRoute>
+              <Admin />
+            </InstructorRoute>
+          }
+        />
+
         <Route
           path="/admin-trips"
           element={
@@ -145,6 +159,25 @@ const AppContent = () => {
             </InstructorRoute>
           }
         />
+
+        <Route
+          path="/admin-courses"
+          element={
+            <InstructorRoute>
+              <AdminCourses />
+            </InstructorRoute>
+          }
+        />
+
+        <Route
+          path="/admin-events"
+          element={
+            <InstructorRoute>
+              <AdminEvents />
+            </InstructorRoute>
+          }
+        />
+
         <Route
           path="/admin-users"
           element={
@@ -153,6 +186,7 @@ const AppContent = () => {
             </AdminRoute>
           }
         />
+
         <Route
           path="/admin-settings"
           element={
@@ -161,19 +195,9 @@ const AppContent = () => {
             </AdminRoute>
           }
         />
-
-        {/* ✅ NOU: /admin (només ADMIN) */}
-        <Route
-          path="/admin"
-          element={
-            <AdminRoute>
-              <Admin />
-            </AdminRoute>
-          }
-        />
       </Routes>
 
-      {/* AI Assistant - Only visible if logged in */}
+      {/* AI Assistant - only logged */}
       {currentUser && <GeminiDiveGuide />}
     </div>
   );
@@ -190,4 +214,3 @@ const App = () => {
 };
 
 export default App;
-
