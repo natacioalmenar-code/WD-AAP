@@ -1,26 +1,31 @@
 import React from "react";
-import { HashRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import {
+  HashRouter,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+} from "react-router-dom";
 import { AppProvider, useApp } from "./context/AppContext";
 import { Navbar } from "./components/Navbar";
+
 import { Home } from "./pages/Home";
 import { Login } from "./pages/Login";
 import { Dashboard } from "./pages/Dashboard";
 import { Trips } from "./pages/Trips";
-import { AdminTrips } from "./pages/AdminTrips";
-import { AdminUsers } from "./pages/AdminUsers";
-import { AdminSettings } from "./pages/AdminSettings";
 import { CalendarPage } from "./pages/CalendarPage";
 import { PrivateCourses } from "./pages/PrivateCourses";
 import { ResourcesPage } from "./pages/ResourcesPage";
 import { SocialEvents } from "./pages/SocialEvents";
 import { Profile } from "./pages/Profile";
 import { SocialWall } from "./pages/SocialWall";
-import { GeminiDiveGuide } from "./components/GeminiDiveGuide";
 
-// ✅ nous
 import { Admin } from "./pages/Admin";
-import { AdminCourses } from "./pages/AdminCourses";
-import { AdminEvents } from "./pages/AdminEvents";
+import { AdminTrips } from "./pages/AdminTrips";
+import { AdminUsers } from "./pages/AdminUsers";
+import { AdminSettings } from "./pages/AdminSettings";
+
+import { GeminiDiveGuide } from "./components/GeminiDiveGuide";
 
 // Guard component for private routes
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
@@ -30,29 +35,26 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   if (!currentUser) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
-
   return <>{children}</>;
 };
 
-// Guard component for Instructor/Admin routes
+// Guard component for Instructor/Admin routes (Activities)
 const InstructorRoute = ({ children }: { children: React.ReactNode }) => {
   const { canManageTrips } = useApp();
 
   if (!canManageTrips()) {
     return <Navigate to="/dashboard" replace />;
   }
-
   return <>{children}</>;
 };
 
-// Guard component for Super Admin routes
+// Guard component for Super Admin routes (Users + Settings)
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   const { canManageSystem } = useApp();
 
   if (!canManageSystem()) {
     return <Navigate to="/dashboard" replace />;
   }
-
   return <>{children}</>;
 };
 
@@ -72,7 +74,6 @@ const AppContent = () => {
       <Routes>
         {/* Public */}
         <Route path="/" element={<Home />} />
-        <Route path="/courses-public" element={<div className="p-8 text-center">Cursos Page (Public)</div>} />
         <Route path="/login" element={<Login />} />
 
         {/* Private */}
@@ -141,7 +142,7 @@ const AppContent = () => {
           }
         />
 
-        {/* Management */}
+        {/* Admin hub */}
         <Route
           path="/admin"
           element={
@@ -151,6 +152,7 @@ const AppContent = () => {
           }
         />
 
+        {/* Management */}
         <Route
           path="/admin-trips"
           element={
@@ -159,25 +161,6 @@ const AppContent = () => {
             </InstructorRoute>
           }
         />
-
-        <Route
-          path="/admin-courses"
-          element={
-            <InstructorRoute>
-              <AdminCourses />
-            </InstructorRoute>
-          }
-        />
-
-        <Route
-          path="/admin-events"
-          element={
-            <InstructorRoute>
-              <AdminEvents />
-            </InstructorRoute>
-          }
-        />
-
         <Route
           path="/admin-users"
           element={
@@ -186,7 +169,6 @@ const AppContent = () => {
             </AdminRoute>
           }
         />
-
         <Route
           path="/admin-settings"
           element={
@@ -195,9 +177,12 @@ const AppContent = () => {
             </AdminRoute>
           }
         />
+
+        {/* fallback */}
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
 
-      {/* AI Assistant - only logged */}
+      {/* AI Assistant - Only visible if logged in */}
       {currentUser && <GeminiDiveGuide />}
     </div>
   );
