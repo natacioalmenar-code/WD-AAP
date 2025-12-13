@@ -7,21 +7,18 @@ import React, {
   ReactNode,
 } from "react";
 
+import {
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile,
+  signOut,
+} from "firebase/auth";
+
+import { auth } from "../firebase/firebase";
+
 export type Role = "admin" | "instructor" | "member" | "pending";
 export type Status = "pending" | "active";
-
-// ✅ Nivells FECDAS/CMAS que vols
-export const FECDAS_LEVELS = ["B1E", "B2E", "B3E", "GG", "IN1E", "IN2E", "IN3E"] as const;
-export type FecdAsLevel = (typeof FECDAS_LEVELS)[number] | "ALTRES";
-
-export interface UserDocuments {
-  licenseNumber: string;        // Llicència federativa
-  insuranceCompany: string;     // Companyia assegurança
-  insurancePolicy: string;      // Nº pòlissa
-  insuranceExpiry: string;      // Data caducitat (YYYY-MM-DD)
-  medicalCertExpiry: string;    // Data caducitat (YYYY-MM-DD)
-  highestCertification: string; // Titulació més elevada (text)
-}
 
 export interface User {
   id: string;
@@ -30,20 +27,11 @@ export interface User {
   role: Role;
   status: Status;
 
-  // ✅ Perfil
-  level: FecdAsLevel;     // B1E, B2E... o ALTRES
-  avatarUrl: string;      // buit si no hi ha foto
+  certification?: string;
 
-  // ✅ Titulacions / especialitats
-  certification?: string;        // (el que demanes al registre)
-  specialties: string[];         // Especialitats FECDAS/CMAS (strings)
-  otherSpecialtiesText: string;  // Text lliure si no són FECDAS/CMAS
-
-  // ✅ Documentació
-  documents: UserDocuments;
-
-  // (futur) contrasenya real -> quan fem Firebase/Auth
-  passwordSet: boolean;
+  // Necessari pel Navbar
+  level: string;
+  avatarUrl: string; // buit si no hi ha foto
 }
 
 export interface Trip {
@@ -56,7 +44,7 @@ export interface Trip {
   createdBy: string;
   participants: string[];
 
-  // opcionals (UI)
+  // si els tens a la UI:
   time?: string;
   depth?: string;
   description?: string;
@@ -72,11 +60,11 @@ export interface Course {
   description: string;
   price: string;
   levelRequired: string;
-  maxSpots: number;
   createdBy: string;
   participants: string[];
 
-  // opcional (UI)
+  // si els tens a la UI:
+  maxSpots?: number;
   imageUrl?: string;
 }
 
@@ -98,29 +86,33 @@ interface AppState {
 interface AppContextValue extends AppState {
   // auth
   loginAsDemoAdmin: () => void;
-  loginWithEmail: (email: string) => boolean;
-  logout: () => void;
+  loginWithEmail: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
 
   // persones sòcies
-  registerUser: (data: { name: string; email: string; certification: string }) => void;
+  registerUser: (data: {
+    name: string;
+    email: string;
+    password: string;
+    certification: string;
+  }) => Promise<void>;
+
   approveUser: (userId: string) => void;
   setUserRole: (userId: string, role: Role) => void;
-
-  // ✅ perfil + documentació (PAS 4)
-  updateMyProfile: (data: Partial<Pick<User, "name" | "avatarUrl" | "level" | "specialties" | "otherSpecialtiesText">>) => void;
-  updateMyDocuments: (data: Partial<UserDocuments>) => void;
 
   // permisos
   canManageTrips: () => boolean;
   canManageSystem: () => boolean;
 
-  // sortides
+  // sortides / cursos
   createTrip: (data: Omit<Trip, "id" | "createdBy" | "participants">) => void;
+  createCourse: (
+    data: Omit<Course, "id" | "createdBy" | "participants">
+  ) => void;
+
   joinTrip: (tripId: string) => void;
   leaveTrip: (tripId: string) => void;
 
-  // cursos
-  createCourse: (data: Omit<Course, "id" | "createdBy" | "participants">) => void;
   joinCourse: (courseId: string) => void;
   leaveCourse: (courseId: string) => void;
 }
@@ -135,42 +127,22 @@ const defaultClubSettings: ClubSettings = {
   appBackgroundUrl: "",
 };
 
-const emptyDocs = (): UserDocuments => ({
-  licenseNumber: "",
-  insuranceCompany: "",
-  insurancePolicy: "",
-  insuranceExpiry: "",
-  medicalCertExpiry: "",
-  highestCertification: "",
-});
-
-const normalizeLevelFromText = (text: string): FecdAsLevel => {
-  const t = (text || "").toUpperCase().trim();
-  return (FECDAS_LEVELS as readonly string[]).includes(t) ? (t as FecdAsLevel) : "ALTRES";
-};
-
 const initialAdmin: User = {
   id: "admin-1",
   name: "Administració West Divers",
   email: "admin@westdivers.local",
   role: "admin",
   status: "active",
-  level: "IN3E",
+  level: "ADMIN",
   avatarUrl: "",
-
   certification: "ADMIN",
-  specialties: [],
-  otherSpecialtiesText: "",
-
-  documents: emptyDocs(),
-  passwordSet: false,
 };
 
 const initialState: AppState = {
   users: [initialAdmin],
   trips: [],
   courses: [],
-  currentUser: initialAdmin,
+  currentUser: null, // ✅ ara el currentUser el governa Firebase Auth
   clubSettings: defaultClubSettings,
 };
 
@@ -178,10 +150,20 @@ function createId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
+function roleToLevel(role: Role) {
+  return role === "admin"
+    ? "ADMIN"
+    : role === "instructor"
+    ? "INSTRUCTOR"
+    : role === "pending"
+    ? "PENDENT"
+    : "B1";
+}
+
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [state, setState] = useState<AppState>(initialState);
 
-  // carregar estat guardat
+  // carregar estat guardat (trips/courses/users)
   useEffect(() => {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return;
@@ -189,134 +171,157 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     try {
       const parsed = JSON.parse(raw) as Partial<AppState>;
 
-      const safeUsers = (parsed.users ?? initialState.users).map((u: any) => {
-        const docs = u.documents ?? {};
-        return {
-          ...u,
-          level: (u.level ?? "B1E") as FecdAsLevel,
-          avatarUrl: u.avatarUrl ?? "",
-          certification: u.certification ?? "",
-          specialties: Array.isArray(u.specialties) ? u.specialties : [],
-          otherSpecialtiesText: u.otherSpecialtiesText ?? "",
-          documents: {
-            ...emptyDocs(),
-            ...docs,
-          },
-          passwordSet: !!u.passwordSet,
-        } as User;
-      });
+      const safeUsers = (parsed.users ?? initialState.users).map((u: any) => ({
+        ...u,
+        level: u.level ?? roleToLevel(u.role),
+        avatarUrl: u.avatarUrl ?? "",
+        certification: u.certification ?? "",
+      }));
 
-      const safeCurrentUser = parsed.currentUser
-        ? ({
-            ...(parsed.currentUser as any),
-            level: ((parsed.currentUser as any).level ?? "B1E") as FecdAsLevel,
-            avatarUrl: (parsed.currentUser as any).avatarUrl ?? "",
-            certification: (parsed.currentUser as any).certification ?? "",
-            specialties: Array.isArray((parsed.currentUser as any).specialties)
-              ? (parsed.currentUser as any).specialties
-              : [],
-            otherSpecialtiesText: (parsed.currentUser as any).otherSpecialtiesText ?? "",
-            documents: {
-              ...emptyDocs(),
-              ...(((parsed.currentUser as any).documents ?? {}) as any),
-            },
-            passwordSet: !!(parsed.currentUser as any).passwordSet,
-          } as User)
-        : null;
-
-      setState({
-        ...initialState,
+      setState((prev) => ({
+        ...prev,
         ...parsed,
         users: safeUsers,
-        currentUser: safeCurrentUser,
         clubSettings: {
           ...defaultClubSettings,
           ...(parsed.clubSettings ?? {}),
         },
-      });
+      }));
     } catch {
       // ignorem errors
     }
   }, []);
 
-  // guardar estat
+  // guardar estat cada vegada que canvia (excepte currentUser que ve de Firebase)
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }, [state]);
+    const { currentUser, ...rest } = state;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(rest));
+  }, [state.users, state.trips, state.courses, state.clubSettings]);
 
+  // ✅ Firebase Auth listener: quan canvies de login, s’actualitza currentUser
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (fbUser) => {
+      if (!fbUser?.email) {
+        setState((prev) => ({ ...prev, currentUser: null }));
+        return;
+      }
+
+      const email = fbUser.email.toLowerCase();
+
+      setState((prev) => {
+        let found = prev.users.find((u) => u.email.toLowerCase() === email);
+
+        // si no existeix a "users", el creem en pending (perquè admin l’aprovi)
+        if (!found) {
+          const newUser: User = {
+            id: fbUser.uid,
+            name: fbUser.displayName || "Nou/va soci/a",
+            email,
+            role: "pending",
+            status: "pending",
+            level: "PENDENT",
+            avatarUrl: "",
+            certification: "",
+          };
+          return { ...prev, users: [...prev.users, newUser], currentUser: newUser };
+        }
+
+        // assegurar que l'id coincideix amb uid (important)
+        if (found.id !== fbUser.uid) {
+          found = { ...found, id: fbUser.uid };
+          return {
+            ...prev,
+            users: prev.users.map((u) => (u.email.toLowerCase() === email ? found! : u)),
+            currentUser: found,
+          };
+        }
+
+        return { ...prev, currentUser: found };
+      });
+    });
+
+    return () => unsub();
+  }, []);
+
+  // DEMO admin (sense Firebase)
   const loginAsDemoAdmin = () => {
     setState((prev) => ({ ...prev, currentUser: initialAdmin }));
   };
 
-  const loginWithEmail = (email: string): boolean => {
+  // ✅ Login Firebase (email + password)
+  const loginWithEmail: AppContextValue["loginWithEmail"] = async (email, password) => {
     const trimmed = email.trim().toLowerCase();
-
-    const user = state.users.find((u) => u.email.toLowerCase() === trimmed);
-
-    if (!user) {
-      alert("No hi ha cap persona sòcia amb aquest correu.");
-      return false;
+    if (!trimmed || !password) {
+      alert("Falten dades (correu i contrasenya).");
+      return;
     }
 
-    if (user.status !== "active") {
-      alert("Aquest compte encara està pendent d’aprovació.");
-      return false;
+    try {
+      await signInWithEmailAndPassword(auth, trimmed, password);
+    } catch (e: any) {
+      alert("No s’ha pogut iniciar sessió. Revisa correu/contrasenya.");
     }
-
-    setState((prev) => ({ ...prev, currentUser: user }));
-    return true;
   };
 
-  const logout = () => setState((prev) => ({ ...prev, currentUser: null }));
+  const logout: AppContextValue["logout"] = async () => {
+    try {
+      await signOut(auth);
+      setState((prev) => ({ ...prev, currentUser: null }));
+    } catch {
+      // ignore
+    }
+  };
 
-  const registerUser: AppContextValue["registerUser"] = ({ name, email, certification }) => {
-    setState((prev) => {
-      const trimmed = email.trim().toLowerCase();
-      if (prev.users.some((u) => u.email.toLowerCase() === trimmed)) {
-        alert("Ja existeix una persona usuària amb aquest correu.");
-        return prev;
-      }
+  // ✅ Register Firebase (email + password) + crea usuari pending a la teva llista
+  const registerUser: AppContextValue["registerUser"] = async ({
+    name,
+    email,
+    password,
+    certification,
+  }) => {
+    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedName = name.trim();
+    const trimmedCert = certification.trim();
 
-      const user: User = {
-        id: createId(),
-        name: name.trim(),
-        email: trimmed,
-        role: "pending",
-        status: "pending",
+    if (!trimmedEmail || !trimmedName || !password) {
+      alert("Falten dades.");
+      return;
+    }
 
-        certification: certification.trim(),
-        level: normalizeLevelFromText(certification),
-        avatarUrl: "",
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, trimmedEmail, password);
+      await updateProfile(cred.user, { displayName: trimmedName });
 
-        specialties: [],
-        otherSpecialtiesText: "",
+      setState((prev) => {
+        // evitar duplicat
+        if (prev.users.some((u) => u.email.toLowerCase() === trimmedEmail)) return prev;
 
-        documents: {
-          ...emptyDocs(),
-          highestCertification: certification.trim(),
-        },
+        const newUser: User = {
+          id: cred.user.uid,
+          name: trimmedName,
+          email: trimmedEmail,
+          role: "pending",
+          status: "pending",
+          level: "PENDENT",
+          avatarUrl: "",
+          certification: trimmedCert,
+        };
 
-        passwordSet: false,
-      };
+        return { ...prev, users: [...prev.users, newUser] };
+      });
 
-      alert("Sol·licitud enviada. L’administració revisarà i aprovarà l’accés.");
-      return { ...prev, users: [...prev.users, user] };
-    });
+      alert("Compte creat. Ara l’administració ha d’aprovar el teu accés.");
+      await signOut(auth);
+    } catch (e: any) {
+      alert("No s’ha pogut crear el compte. Potser el correu ja existeix.");
+    }
   };
 
   const approveUser: AppContextValue["approveUser"] = (userId) => {
     setState((prev) => ({
       ...prev,
       users: prev.users.map((u) =>
-        u.id === userId
-          ? {
-              ...u,
-              status: "active",
-              role: "member",
-              // si era ALTRES, el mantenim; si no, ja porta el seu
-              level: (u.level ?? "B1E") as FecdAsLevel,
-            }
-          : u
+        u.id === userId ? { ...u, status: "active", role: "member", level: "B1" } : u
       ),
     }));
   };
@@ -325,55 +330,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setState((prev) => ({
       ...prev,
       users: prev.users.map((u) =>
-        u.id === userId
-          ? {
-              ...u,
-              role,
-              level:
-                role === "admin"
-                  ? "IN3E"
-                  : role === "instructor"
-                  ? "IN1E"
-                  : u.level ?? "B1E",
-            }
-          : u
+        u.id === userId ? { ...u, role, level: roleToLevel(role) } : u
       ),
     }));
-  };
-
-  // ✅ actualitzar perfil propi
-  const updateMyProfile: AppContextValue["updateMyProfile"] = (data) => {
-    if (!state.currentUser) return;
-
-    setState((prev) => {
-      const updatedCurrent = { ...prev.currentUser!, ...data };
-      return {
-        ...prev,
-        currentUser: updatedCurrent,
-        users: prev.users.map((u) => (u.id === updatedCurrent.id ? updatedCurrent : u)),
-      };
-    });
-  };
-
-  // ✅ actualitzar documentació pròpia
-  const updateMyDocuments: AppContextValue["updateMyDocuments"] = (data) => {
-    if (!state.currentUser) return;
-
-    setState((prev) => {
-      const updatedCurrent = {
-        ...prev.currentUser!,
-        documents: {
-          ...prev.currentUser!.documents,
-          ...data,
-        },
-      };
-
-      return {
-        ...prev,
-        currentUser: updatedCurrent,
-        users: prev.users.map((u) => (u.id === updatedCurrent.id ? updatedCurrent : u)),
-      };
-    });
   };
 
   const canManageTrips = useMemo(() => {
@@ -392,7 +351,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return false;
     }
     if (state.currentUser.role !== "admin" && state.currentUser.role !== "instructor") {
-      alert("Només administració o equip instructor poden crear això.");
+      alert("Només administració o instructors poden crear això.");
       return false;
     }
     return true;
@@ -409,12 +368,22 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }));
   };
 
+  const createCourse: AppContextValue["createCourse"] = (data) => {
+    if (!canCreate()) return;
+    setState((prev) => ({
+      ...prev,
+      courses: [
+        ...prev.courses,
+        { ...data, id: createId(), createdBy: prev.currentUser!.id, participants: [] },
+      ],
+    }));
+  };
+
   const joinTrip: AppContextValue["joinTrip"] = (tripId) => {
     if (!state.currentUser) {
       alert("Has d’iniciar sessió per apuntar-te.");
       return;
     }
-
     setState((prev) => ({
       ...prev,
       trips: prev.trips.map((t) =>
@@ -427,7 +396,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const leaveTrip: AppContextValue["leaveTrip"] = (tripId) => {
     if (!state.currentUser) return;
-
     setState((prev) => ({
       ...prev,
       trips: prev.trips.map((t) =>
@@ -438,23 +406,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }));
   };
 
-  const createCourse: AppContextValue["createCourse"] = (data) => {
-    if (!canCreate()) return;
-    setState((prev) => ({
-      ...prev,
-      courses: [
-        ...prev.courses,
-        { ...data, id: createId(), createdBy: prev.currentUser!.id, participants: [] },
-      ],
-    }));
-  };
-
   const joinCourse: AppContextValue["joinCourse"] = (courseId) => {
     if (!state.currentUser) {
       alert("Has d’iniciar sessió per apuntar-te.");
       return;
     }
-
     setState((prev) => ({
       ...prev,
       courses: prev.courses.map((c) =>
@@ -467,7 +423,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const leaveCourse: AppContextValue["leaveCourse"] = (courseId) => {
     if (!state.currentUser) return;
-
     setState((prev) => ({
       ...prev,
       courses: prev.courses.map((c) =>
@@ -480,26 +435,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const value: AppContextValue = {
     ...state,
-
     loginAsDemoAdmin,
     loginWithEmail,
     logout,
-
     registerUser,
     approveUser,
     setUserRole,
-
-    updateMyProfile,
-    updateMyDocuments,
-
     canManageTrips,
     canManageSystem,
-
     createTrip,
+    createCourse,
     joinTrip,
     leaveTrip,
-
-    createCourse,
     joinCourse,
     leaveCourse,
   };
@@ -513,5 +460,4 @@ export const useAppContext = () => {
   return ctx;
 };
 
-// ✅ Un sol export
 export const useApp = useAppContext;
