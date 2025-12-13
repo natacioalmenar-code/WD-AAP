@@ -19,6 +19,27 @@ import { auth } from "../firebase/firebase";
 
 export type Role = "admin" | "instructor" | "member" | "pending";
 export type Status = "pending" | "active";
+// ✅ Nivells FECDAS/CMAS (per al Perfil)
+export type FecdAsLevel =
+  | "B1E"
+  | "B2E"
+  | "B3E"
+  | "GG"
+  | "IN1E"
+  | "IN2E"
+  | "IN3E";
+
+// IMPORTANT: "as const" perquè TypeScript ho tracti com a literals
+export const FECDAS_LEVELS = [
+  "B1E",
+  "B2E",
+  "B3E",
+  "GG",
+  "IN1E",
+  "IN2E",
+  "IN3E",
+] as const;
+
 
 export interface User {
   id: string;
