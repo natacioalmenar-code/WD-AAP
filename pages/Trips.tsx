@@ -1,22 +1,70 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { useApp } from "../context/AppContext";
-import { Calendar, MapPin, Clock, ArrowRight, ExternalLink } from "lucide-react";
+import { Calendar, MapPin, Clock, ArrowRight, ExternalLink, PlusCircle } from "lucide-react";
 
 export const Trips: React.FC = () => {
-  const { trips, users, currentUser, joinTrip, leaveTrip } = useApp();
+  const { trips, users, currentUser, joinTrip, leaveTrip, createTrip, canManageTrips } = useApp();
 
   const sortedTrips = useMemo(
-    () =>
-      [...trips].sort(
-        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-      ),
+    () => [...trips].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
     [trips]
   );
 
-  const nameFromId = (id: string) =>
-    users.find((u) => u.id === id)?.name || "Persona desconeguda";
+  const nameFromId = (id: string) => users.find((u) => u.id === id)?.name || "Persona desconeguda";
+
+  const [form, setForm] = useState({
+    title: "",
+    date: "",
+    time: "",
+    location: "",
+    locationUrl: "",
+    depth: "",
+    levelRequired: "B1E",
+    maxSpots: 12,
+    imageUrl: "",
+    description: "",
+  });
 
   if (!currentUser) return null;
+
+  const handleCreateTrip = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!form.title.trim()) return alert("Introdueix el títol.");
+    if (!form.date.trim()) return alert("Introdueix la data.");
+    if (!form.location.trim()) return alert("Introdueix la ubicació.");
+    if (!form.maxSpots || form.maxSpots < 1) return alert("Posa un màxim de places correcte.");
+
+    createTrip({
+      title: form.title.trim(),
+      date: form.date.trim(),
+      time: form.time.trim(),
+      location: form.location.trim(),
+      locationUrl: form.locationUrl.trim(),
+      depth: form.depth.trim(),
+      levelRequired: form.levelRequired.trim(),
+      maxSpots: Number(form.maxSpots),
+      imageUrl: form.imageUrl.trim(),
+      description: form.description.trim(),
+    });
+
+    setForm({
+      title: "",
+      date: "",
+      time: "",
+      location: "",
+      locationUrl: "",
+      depth: "",
+      levelRequired: "B1E",
+      maxSpots: 12,
+      imageUrl: "",
+      description: "",
+    });
+
+    alert("✅ Sortida creada!");
+  };
+
+  const canCreateTripsHere = canManageTrips();
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -24,11 +72,103 @@ export const Trips: React.FC = () => {
         <h1 className="text-3xl font-extrabold text-slate-900 uppercase tracking-tight">
           Sortides i viatges
         </h1>
-        <p className="text-gray-600 mt-2">
-          Apunta’t a les properes immersions amb un sol clic.
-        </p>
+        <p className="text-gray-600 mt-2">Apunta’t a les properes immersions amb un sol clic.</p>
       </div>
 
+      {/* ✅ CREAR SORTIDA (només admin/instructor) */}
+      {canCreateTripsHere && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <PlusCircle className="text-yellow-500" />
+            <h2 className="text-lg font-extrabold text-slate-900 uppercase tracking-wide">
+              Crear nova sortida
+            </h2>
+          </div>
+
+          <form onSubmit={handleCreateTrip} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <input
+              className="border border-gray-300 rounded-lg p-2"
+              placeholder="Títol (ex: Cala X)"
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+            />
+
+            <input
+              type="date"
+              className="border border-gray-300 rounded-lg p-2"
+              value={form.date}
+              onChange={(e) => setForm({ ...form, date: e.target.value })}
+            />
+
+            <input
+              className="border border-gray-300 rounded-lg p-2"
+              placeholder="Hora (ex: 09:00)"
+              value={form.time}
+              onChange={(e) => setForm({ ...form, time: e.target.value })}
+            />
+
+            <input
+              className="border border-gray-300 rounded-lg p-2"
+              placeholder="Ubicació (ex: Tossa de Mar)"
+              value={form.location}
+              onChange={(e) => setForm({ ...form, location: e.target.value })}
+            />
+
+            <input
+              className="border border-gray-300 rounded-lg p-2 md:col-span-2"
+              placeholder="Link ubicació (opcional: Google Maps)"
+              value={form.locationUrl}
+              onChange={(e) => setForm({ ...form, locationUrl: e.target.value })}
+            />
+
+            <input
+              className="border border-gray-300 rounded-lg p-2"
+              placeholder="Profunditat (ex: 18m)"
+              value={form.depth}
+              onChange={(e) => setForm({ ...form, depth: e.target.value })}
+            />
+
+            <input
+              type="number"
+              className="border border-gray-300 rounded-lg p-2"
+              placeholder="Places màximes"
+              value={form.maxSpots}
+              onChange={(e) => setForm({ ...form, maxSpots: Number(e.target.value) })}
+            />
+
+            <input
+              className="border border-gray-300 rounded-lg p-2"
+              placeholder="Nivell requerit (ex: B1E)"
+              value={form.levelRequired}
+              onChange={(e) => setForm({ ...form, levelRequired: e.target.value })}
+            />
+
+            <input
+              className="border border-gray-300 rounded-lg p-2 md:col-span-2"
+              placeholder="Imatge URL (opcional)"
+              value={form.imageUrl}
+              onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
+            />
+
+            <textarea
+              className="border border-gray-300 rounded-lg p-2 md:col-span-2"
+              placeholder="Descripció (opcional)"
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              rows={3}
+            />
+
+            <button
+              type="submit"
+              className="md:col-span-2 bg-yellow-400 text-black font-extrabold rounded-lg py-2 hover:bg-yellow-300"
+            >
+              Crear sortida
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* ✅ LLISTA SORTIDES */}
       <div className="space-y-8">
         {sortedTrips.map((trip) => {
           const isSignedUp = trip.participants.includes(currentUser.id);
@@ -61,9 +201,7 @@ export const Trips: React.FC = () => {
               <div className="flex-1 p-6 flex flex-col justify-between relative">
                 <div>
                   <div className="flex justify-between items-start mb-2">
-                    <h2 className="text-2xl font-bold text-slate-900">
-                      {trip.title}
-                    </h2>
+                    <h2 className="text-2xl font-bold text-slate-900">{trip.title}</h2>
                     {isSignedUp && (
                       <span className="bg-green-100 text-green-800 text-xs px-3 py-1 rounded-full font-bold uppercase">
                         Inscrit/a
@@ -74,9 +212,7 @@ export const Trips: React.FC = () => {
                   <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-y-3 gap-x-4 text-sm text-gray-600 mb-5">
                     <div className="flex items-center gap-2">
                       <Calendar size={18} className="text-yellow-500" />
-                      <span className="font-medium text-slate-800">
-                        {trip.date}
-                      </span>
+                      <span className="font-medium text-slate-800">{trip.date}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Clock size={18} className="text-yellow-500" />
@@ -103,9 +239,7 @@ export const Trips: React.FC = () => {
                     </div>
                   </div>
 
-                  <p className="text-gray-600 mb-4 leading-relaxed">
-                    {trip.description}
-                  </p>
+                  <p className="text-gray-600 mb-4 leading-relaxed">{trip.description}</p>
 
                   {/* Participants list (NOMS) */}
                   <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
@@ -122,9 +256,7 @@ export const Trips: React.FC = () => {
                     </div>
 
                     {trip.participants.length === 0 ? (
-                      <p className="text-sm text-gray-500 mt-2">
-                        Encara no hi ha ningú apuntat/da.
-                      </p>
+                      <p className="text-sm text-gray-500 mt-2">Encara no hi ha ningú apuntat/da.</p>
                     ) : (
                       <ul className="mt-2 space-y-1">
                         {trip.participants.map((uid) => (
@@ -137,30 +269,28 @@ export const Trips: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Action Button */}
-                <div className="flex flex-col md:flex-row justify-end items-center gap-4 pt-4">
-                  <div className="w-full md:w-auto">
-                    {isSignedUp ? (
-                      <button
-                        onClick={() => leaveTrip(trip.id)}
-                        className="w-full md:w-auto px-6 py-2 border-2 border-red-200 text-red-700 rounded-lg hover:bg-red-50 transition-colors font-bold uppercase text-sm tracking-wide"
-                      >
-                        Desapuntar-me
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => joinTrip(trip.id)}
-                        disabled={isFull}
-                        className={`w-full md:w-auto px-8 py-3 rounded-lg font-bold shadow-md uppercase text-sm tracking-wider transition-all transform active:scale-95 ${
-                          isFull
-                            ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                            : "bg-yellow-400 text-black hover:bg-yellow-300 hover:shadow-lg"
-                        }`}
-                      >
-                        {isFull ? "Complet" : "Apunta-m’hi"}
-                      </button>
-                    )}
-                  </div>
+                {/* Action Buttons */}
+                <div className="flex flex-col md:flex-row justify-end items-center gap-3 pt-4">
+                  {isSignedUp ? (
+                    <button
+                      onClick={() => leaveTrip(trip.id)}
+                      className="w-full md:w-auto px-6 py-2 border-2 border-red-100 text-red-600 rounded-lg hover:bg-red-50 transition-colors font-bold uppercase text-sm tracking-wide"
+                    >
+                      Desapuntar-me
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => joinTrip(trip.id)}
+                      disabled={isFull}
+                      className={`w-full md:w-auto px-8 py-3 rounded-lg font-bold shadow-md uppercase text-sm tracking-wider transition-all transform active:scale-95 ${
+                        isFull
+                          ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                          : "bg-yellow-400 text-black hover:bg-yellow-300 hover:shadow-lg"
+                      }`}
+                    >
+                      {isFull ? "Complet" : "Apunta-m’hi"}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
