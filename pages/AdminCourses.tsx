@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useApp } from "../context/AppContext";
-import { Calendar, Clock, GraduationCap, Euro, Users } from "lucide-react";
+import { PlusCircle, Users, Calendar, Clock, GraduationCap } from "lucide-react";
 
 export const AdminCourses: React.FC = () => {
   const { courses, createCourse, currentUser } = useApp();
@@ -12,7 +12,7 @@ export const AdminCourses: React.FC = () => {
     description: "",
     price: "",
     levelRequired: "B1E",
-    maxSpots: 10,
+    maxSpots: 12,
     imageUrl: "",
   });
 
@@ -26,182 +26,162 @@ export const AdminCourses: React.FC = () => {
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!form.title || !form.date) {
-      alert("Falten camps obligatoris (títol i data).");
-      return;
-    }
+    if (!form.title.trim()) return alert("Falta el títol.");
+    if (!form.date.trim()) return alert("Falta la data.");
+    if (!form.schedule.trim()) return alert("Falta l'horari.");
+    if (!form.description.trim()) return alert("Falta la descripció.");
+    if (!form.price.trim()) return alert("Falta el preu.");
 
     createCourse({
-      title: form.title,
-      date: form.date,
-      schedule: form.schedule,
-      description: form.description,
-      price: form.price,
+      title: form.title.trim(),
+      date: form.date.trim(),
+      schedule: form.schedule.trim(),
+      description: form.description.trim(),
+      price: form.price.trim(),
       levelRequired: form.levelRequired,
-      maxSpots: Number(form.maxSpots) || 0,
-      imageUrl: form.imageUrl || "",
+      maxSpots: Number(form.maxSpots) || 12,
+      imageUrl: form.imageUrl.trim(),
     });
 
-    setForm((p) => ({
-      ...p,
+    setForm({
       title: "",
       date: "",
       schedule: "",
       description: "",
       price: "",
+      levelRequired: "B1E",
+      maxSpots: 12,
       imageUrl: "",
-    }));
+    });
+
+    alert("✅ Curs creat!");
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="mb-6">
-        <h1 className="text-3xl font-extrabold text-slate-900">Gestió de Cursos</h1>
-        <p className="text-gray-600 mt-2">Crear cursos (admin / instructor).</p>
+    <div className="max-w-6xl mx-auto px-4 py-10">
+      <div className="mb-8 border-b border-gray-200 pb-4">
+        <h1 className="text-3xl font-extrabold text-slate-900 uppercase tracking-tight">
+          Gestió Cursos
+        </h1>
+        <p className="text-gray-600 mt-2">Crea cursos i gestiona informació.</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* FORM */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h2 className="text-lg font-bold text-slate-900 mb-4">Crear curs</h2>
-
-          <form onSubmit={submit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Títol *</label>
-              <input
-                value={form.title}
-                onChange={(e) => setForm({ ...form, title: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg p-2"
-                placeholder="Ex: Nitrox, Rescat..."
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Data inici *</label>
-                <input
-                  type="date"
-                  value={form.date}
-                  onChange={(e) => setForm({ ...form, date: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg p-2"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Horari</label>
-                <input
-                  value={form.schedule}
-                  onChange={(e) => setForm({ ...form, schedule: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg p-2"
-                  placeholder="Ex: 19:00-21:00"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Preu</label>
-                <input
-                  value={form.price}
-                  onChange={(e) => setForm({ ...form, price: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg p-2"
-                  placeholder="Ex: 120€"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Places</label>
-                <input
-                  type="number"
-                  value={form.maxSpots}
-                  onChange={(e) => setForm({ ...form, maxSpots: Number(e.target.value) })}
-                  className="w-full border border-gray-300 rounded-lg p-2"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nivell requerit</label>
-              <input
-                value={form.levelRequired}
-                onChange={(e) => setForm({ ...form, levelRequired: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg p-2"
-                placeholder="Ex: B1E"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Imatge (URL)</label>
-              <input
-                value={form.imageUrl}
-                onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg p-2"
-                placeholder="https://..."
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Descripció</label>
-              <textarea
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg p-2 min-h-[110px]"
-                placeholder="Info del curs..."
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="w-full bg-yellow-400 text-black font-extrabold py-2 rounded-lg hover:bg-yellow-300"
-            >
-              Crear curs
-            </button>
-          </form>
+      {/* FORM */}
+      <div className="bg-white rounded-2xl border shadow-sm p-6 mb-10">
+        <div className="flex items-center gap-2 mb-4">
+          <PlusCircle className="text-yellow-500" />
+          <h2 className="text-xl font-bold text-slate-900">Crear nou curs</h2>
         </div>
 
-        {/* LIST */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h2 className="text-lg font-bold text-slate-900 mb-4">Cursos creats</h2>
+        <form onSubmit={submit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <input
+            className="border rounded-lg p-2"
+            placeholder="Títol"
+            value={form.title}
+            onChange={(e) => setForm({ ...form, title: e.target.value })}
+          />
 
-          {sorted.length === 0 ? (
-            <p className="text-gray-500">Encara no hi ha cursos.</p>
-          ) : (
-            <div className="space-y-4">
-              {sorted.map((c) => (
-                <div key={c.id} className="border border-gray-200 rounded-xl p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="font-bold text-slate-900">{c.title}</p>
-                      <div className="text-sm text-gray-600 mt-2 space-y-1">
-                        <p className="flex items-center gap-2"><Calendar size={16} /> {c.date}</p>
-                        <p className="flex items-center gap-2"><Clock size={16} /> {c.schedule || "-"}</p>
-                        <p className="flex items-center gap-2"><GraduationCap size={16} /> {c.levelRequired}</p>
-                        <p className="flex items-center gap-2"><Euro size={16} /> {c.price || "-"}</p>
-                        <p className="flex items-center gap-2">
-                          <Users size={16} /> {c.participants.length} / {c.maxSpots ?? "-"}
-                        </p>
-                      </div>
-                    </div>
+          <input
+            type="date"
+            className="border rounded-lg p-2"
+            value={form.date}
+            onChange={(e) => setForm({ ...form, date: e.target.value })}
+          />
 
-                    {c.imageUrl ? (
-                      <img
-                        src={c.imageUrl}
-                        alt={c.title}
-                        className="w-24 h-24 object-cover rounded-lg border"
-                      />
-                    ) : (
-                      <div className="w-24 h-24 bg-gray-100 rounded-lg border" />
-                    )}
-                  </div>
+          <input
+            className="border rounded-lg p-2"
+            placeholder="Horari (ex: 19:00-21:00)"
+            value={form.schedule}
+            onChange={(e) => setForm({ ...form, schedule: e.target.value })}
+          />
 
-                  {c.description && (
-                    <p className="text-sm text-gray-600 mt-3">{c.description}</p>
-                  )}
+          <input
+            className="border rounded-lg p-2"
+            placeholder="Preu (ex: 120€)"
+            value={form.price}
+            onChange={(e) => setForm({ ...form, price: e.target.value })}
+          />
+
+          <select
+            className="border rounded-lg p-2"
+            value={form.levelRequired}
+            onChange={(e) => setForm({ ...form, levelRequired: e.target.value })}
+          >
+            {["B1E", "B2E", "B3E", "GG", "IN1E", "IN2E", "IN3E"].map((lvl) => (
+              <option key={lvl} value={lvl}>
+                {lvl}
+              </option>
+            ))}
+          </select>
+
+          <input
+            type="number"
+            className="border rounded-lg p-2"
+            placeholder="Places màximes"
+            value={form.maxSpots}
+            onChange={(e) => setForm({ ...form, maxSpots: Number(e.target.value) })}
+          />
+
+          <input
+            className="border rounded-lg p-2 md:col-span-2"
+            placeholder="Imatge (URL) - opcional"
+            value={form.imageUrl}
+            onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
+          />
+
+          <textarea
+            className="border rounded-lg p-2 md:col-span-2"
+            placeholder="Descripció"
+            rows={4}
+            value={form.description}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+          />
+
+          <button
+            type="submit"
+            className="md:col-span-2 bg-yellow-400 text-black font-extrabold rounded-lg py-3 hover:bg-yellow-300 transition"
+          >
+            Crear Curs
+          </button>
+        </form>
+      </div>
+
+      {/* LIST */}
+      <div className="space-y-4">
+        {sorted.length === 0 ? (
+          <p className="text-gray-500 italic">Encara no hi ha cursos creats.</p>
+        ) : (
+          sorted.map((c) => (
+            <div key={c.id} className="bg-white rounded-2xl border shadow-sm p-6">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900">{c.title}</h3>
+                  <p className="text-sm text-gray-600 mt-1">{c.description}</p>
                 </div>
-              ))}
+
+                <div className="flex flex-wrap gap-3 text-sm text-gray-700">
+                  <span className="inline-flex items-center gap-1">
+                    <Calendar size={16} className="text-yellow-500" /> {c.date}
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <Clock size={16} className="text-yellow-500" /> {c.schedule}
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <GraduationCap size={16} className="text-yellow-500" /> {c.levelRequired}
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <Users size={16} className="text-yellow-500" /> {c.participants.length} /{" "}
+                    {c.maxSpots ?? "-"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-3 text-sm font-bold text-slate-900">
+                Preu: <span className="text-gray-700">{c.price}</span>
+              </div>
             </div>
-          )}
-        </div>
+          ))
+        )}
       </div>
     </div>
   );
