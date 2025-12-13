@@ -17,6 +17,18 @@ import {
 
 import { auth } from "../firebase/firebase";
 
+export const FECDAS_LEVELS = [
+  "B1E",
+  "B2E",
+  "B3E",
+  "GG",
+  "IN1E",
+  "IN2E",
+  "IN3E",
+] as const;
+
+export type FecdAsLevel = (typeof FECDAS_LEVELS)[number];
+
 export type Role = "admin" | "instructor" | "member" | "pending";
 export type Status = "pending" | "active";
 
