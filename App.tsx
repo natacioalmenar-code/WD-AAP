@@ -24,6 +24,8 @@ import { Admin } from "./pages/Admin";
 import { AdminTrips } from "./pages/AdminTrips";
 import { AdminUsers } from "./pages/AdminUsers";
 import { AdminSettings } from "./pages/AdminSettings";
+import { AdminCourses } from "./pages/AdminCourses";
+import { AdminEvents } from "./pages/AdminEvents";
 
 import { GeminiDiveGuide } from "./components/GeminiDiveGuide";
 
@@ -152,7 +154,7 @@ const AppContent = () => {
           }
         />
 
-        {/* Management */}
+        {/* Management (Instructor/Admin) */}
         <Route
           path="/admin-trips"
           element={
@@ -161,6 +163,24 @@ const AppContent = () => {
             </InstructorRoute>
           }
         />
+        <Route
+          path="/admin-courses"
+          element={
+            <InstructorRoute>
+              <AdminCourses />
+            </InstructorRoute>
+          }
+        />
+        <Route
+          path="/admin-events"
+          element={
+            <InstructorRoute>
+              <AdminEvents />
+            </InstructorRoute>
+          }
+        />
+
+        {/* Management (Admin only) */}
         <Route
           path="/admin-users"
           element={
