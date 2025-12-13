@@ -1,17 +1,17 @@
 import React, { useMemo, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Shield, Anchor, User, Lock } from "lucide-react";
-
-const pwdKey = (email: string) => `wd-password-${email.trim().toLowerCase()}`;
+import { Shield, Anchor, User } from "lucide-react";
 
 export const Login: React.FC = () => {
   const [mode, setMode] = useState<"login" | "register">("login");
+
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
   const [name, setName] = useState("");
   const [certification, setCertification] = useState("");
-  const [password, setPassword] = useState("");
-  const [password2, setPassword2] = useState("");
+
   const [error, setError] = useState("");
 
   const { loginWithEmail, registerUser, loginAsDemoAdmin } = useApp();
@@ -23,87 +23,49 @@ export const Login: React.FC = () => {
     return state?.from?.pathname || "/dashboard";
   }, [location.state]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedEmail = email.trim();
+    const trimmedPassword = password.trim();
     const trimmedName = name.trim();
     const trimmedCert = certification.trim();
-    const trimmedPwd = password;
 
-    if (!trimmedEmail) {
-      setError("Introdueix el correu electrònic.");
-      return;
-    }
+    if (!trimmedEmail) return setError("Introdueix el correu electrònic.");
+    if (!trimmedPassword) return setError("Introdueix la contrasenya.");
 
-    // REGISTER
     if (mode === "register") {
-      if (!trimmedName) {
-        setError("Introdueix el nom i cognoms.");
-        return;
-      }
-      if (!trimmedCert) {
-        setError("Indica la titulació de busseig.");
-        return;
-      }
-      if (!trimmedPwd || trimmedPwd.length < 6) {
-        setError("La contrasenya ha de tenir com a mínim 6 caràcters.");
-        return;
-      }
-      if (trimmedPwd !== password2) {
-        setError("Les contrasenyes no coincideixen.");
-        return;
-      }
+      if (!trimmedName) return setError("Introdueix el nom i cognoms.");
+      if (!trimmedCert) return setError("Indica la titulació de busseig.");
 
-      // 1) crear usuari pendent
-      registerUser({ name: trimmedName, email: trimmedEmail, certification: trimmedCert });
+      await registerUser({
+        name: trimmedName,
+        email: trimmedEmail,
+        password: trimmedPassword,
+        certification: trimmedCert,
+      });
 
-      // 2) guardar password local per email
-      localStorage.setItem(pwdKey(trimmedEmail), trimmedPwd);
-
-      // tornar a login
+      // després de crear el compte (pending), tornem a login
       setMode("login");
       setName("");
       setCertification("");
+      setEmail("");
       setPassword("");
-      setPassword2("");
-      // mantenim email per comoditat
       return;
     }
 
-    // LOGIN
-    const saved = localStorage.getItem(pwdKey(trimmedEmail));
-    if (!saved) {
-      setError("No hi ha contrasenya guardada per aquest correu. Registra’t primer.");
-      return;
-    }
-    if (saved !== trimmedPwd) {
-      setError("Contrasenya incorrecta.");
-      return;
-    }
-
-    // ✅ ARA: només navega si el login ha sigut correcte (actiu)
-    const ok = loginWithEmail(trimmedEmail);
-    if (!ok) return;
-
+    // mode === login
+    await loginWithEmail(trimmedEmail, trimmedPassword);
     navigate(redirectTo, { replace: true });
   };
 
-  const quickLogin = (emailToUse: string) => {
+  const quickLogin = async (emailToUse: string) => {
     setError("");
-
-    // password demo automàtica
-    const key = pwdKey(emailToUse);
-    if (!localStorage.getItem(key)) localStorage.setItem(key, "123456");
-
     setEmail(emailToUse);
-    setPassword("123456");
-
-    const ok = loginWithEmail(emailToUse);
-    if (!ok) return;
-
-    navigate("/dashboard", { replace: true });
+    // IMPORTANT: aquí necessites una password real (Firebase),
+    // així que deixem els botons demo només per ADMIN (local).
+    setError("Els accessos ràpids d’instructor/soci ara requereixen contrasenya (Firebase).");
   };
 
   return (
@@ -111,25 +73,21 @@ export const Login: React.FC = () => {
       <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-2xl shadow-xl border-t-4 border-yellow-400">
         <div>
           <h2 className="mt-2 text-center text-3xl font-extrabold text-slate-900">
-            {mode === "register" ? "Sol·licitar alta (socis/es)" : "Accés socis/es"}
+            {mode === "register" ? "Crear compte (socis/es)" : "Accés socis/es"}
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
             {mode === "register"
-              ? "Omple el formulari per sol·licitar l’accés. L’administració l’haurà d’aprovar."
-              : "Introdueix el teu correu i contrasenya o fes servir els accessos ràpids."}
+              ? "Crea el compte. L’administració haurà d’aprovar l’accés."
+              : "Introdueix el teu correu i contrasenya."}
           </p>
         </div>
 
-        {/* DEMO BUTTONS */}
+        {/* DEMO ADMIN */}
         {mode === "login" && (
           <div className="grid grid-cols-1 gap-3 mb-6">
             <button
               onClick={() => {
                 setError("");
-                const demo = "admin@westdivers.local";
-                localStorage.setItem(pwdKey(demo), "123456");
-                setEmail(demo);
-                setPassword("123456");
                 loginAsDemoAdmin();
                 navigate("/dashboard", { replace: true });
               }}
@@ -142,24 +100,26 @@ export const Login: React.FC = () => {
               <button
                 onClick={() => quickLogin("instructor@westdivers.local")}
                 className="flex-1 flex items-center justify-center gap-2 p-2 bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 font-medium text-sm"
+                type="button"
               >
-                <Anchor size={16} /> Instructor/a (demo)
+                <Anchor size={16} /> Instructor/a (info)
               </button>
 
               <button
                 onClick={() => quickLogin("soci@westdivers.local")}
                 className="flex-1 flex items-center justify-center gap-2 p-2 bg-gray-100 text-gray-800 rounded-lg hover:bg-gray-200 font-medium text-sm"
+                type="button"
               >
-                <User size={16} /> Soci/a (demo)
+                <User size={16} /> Soci/a (info)
               </button>
             </div>
 
             <div className="relative flex py-2 items-center">
-              <div className="flex-grow border-t border-gray-300"></div>
+              <div className="flex-grow border-t border-gray-300" />
               <span className="flex-shrink-0 mx-4 text-gray-400 text-xs">
-                O accedeix manualment
+                Accés manual
               </span>
-              <div className="flex-grow border-t border-gray-300"></div>
+              <div className="flex-grow border-t border-gray-300" />
             </div>
           </div>
         )}
@@ -168,9 +128,14 @@ export const Login: React.FC = () => {
           {mode === "register" && (
             <>
               <div>
+                <label htmlFor="name" className="sr-only">
+                  Nom i cognoms
+                </label>
                 <input
+                  id="name"
+                  name="name"
                   type="text"
-                  className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  className="appearance-none rounded-md block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   placeholder="Nom i cognoms"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -178,9 +143,14 @@ export const Login: React.FC = () => {
               </div>
 
               <div>
+                <label htmlFor="certification" className="sr-only">
+                  Titulació de busseig
+                </label>
                 <input
+                  id="certification"
+                  name="certification"
                   type="text"
-                  className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  className="appearance-none rounded-md block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   placeholder="Titulació (ex: B1E, B2E, AOWD...)"
                   value={certification}
                   onChange={(e) => setCertification(e.target.value)}
@@ -190,48 +160,44 @@ export const Login: React.FC = () => {
           )}
 
           <div>
+            <label htmlFor="email-address" className="sr-only">
+              Correu electrònic
+            </label>
             <input
+              id="email-address"
+              name="email"
               type="email"
               autoComplete="email"
-              className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              className="appearance-none rounded-md block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
               placeholder="Correu electrònic"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
 
-          <div className="relative">
+          <div>
+            <label htmlFor="password" className="sr-only">
+              Contrasenya
+            </label>
             <input
+              id="password"
+              name="password"
               type="password"
-              className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm pr-10"
+              autoComplete={mode === "register" ? "new-password" : "current-password"}
+              className="appearance-none rounded-md block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
               placeholder="Contrasenya"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
-            <span className="absolute right-3 top-2.5 text-gray-400">
-              <Lock size={16} />
-            </span>
           </div>
-
-          {mode === "register" && (
-            <div>
-              <input
-                type="password"
-                className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="Repeteix la contrasenya"
-                value={password2}
-                onChange={(e) => setPassword2(e.target.value)}
-              />
-            </div>
-          )}
 
           {error && <div className="text-red-500 text-sm text-center">{error}</div>}
 
           <button
             type="submit"
-            className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-bold rounded-md text-black bg-yellow-400 hover:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-400 transition-colors"
+            className="w-full flex justify-center py-2 px-4 text-sm font-bold rounded-md text-black bg-yellow-400 hover:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-400 transition-colors"
           >
-            {mode === "register" ? "Enviar sol·licitud" : "Entrar"}
+            {mode === "register" ? "Crear compte" : "Entrar"}
           </button>
         </form>
 
@@ -240,19 +206,17 @@ export const Login: React.FC = () => {
             onClick={() => {
               setError("");
               setMode(mode === "register" ? "login" : "register");
-              setPassword("");
-              setPassword2("");
             }}
             className="text-sm text-blue-600 hover:text-blue-500 font-medium"
+            type="button"
           >
-            {mode === "register" ? "Ja ets soci/a? Inicia sessió" : "No tens accés? Sol·licita alta"}
+            {mode === "register" ? "Ja tens compte? Inicia sessió" : "No tens compte? Crea'n un"}
           </button>
         </div>
 
         <div className="text-xs text-gray-500 leading-relaxed">
           <p className="mt-2">
-            * Si acabes de sol·licitar alta, el teu compte quedarà <b>pendent</b> fins que
-            l’administració el validi.
+            * Quan creïs el compte, quedarà <b>pendent</b> fins que l’administració t’aprovi.
           </p>
         </div>
       </div>
