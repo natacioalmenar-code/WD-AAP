@@ -4,12 +4,13 @@ import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AQUÍ_EL_TEU_API_KEY",
-  authDomain: "AQUÍ_EL_TEU_AUTH_DOMAIN",
-  projectId: "AQUÍ_EL_TEU_PROJECT_ID",
-  storageBucket: "AQUÍ_EL_TEU_STORAGE_BUCKET",
-  messagingSenderId: "AQUÍ_EL_TEU_MESSAGING_ID",
-  appId: "AQUÍ_EL_TEU_APP_ID",
+  apiKey: "AIzaSyAF7dXNLmtZH_G56HGwagFQTF_NcgB-QFo",
+  authDomain: "west-divers-app.firebaseapp.com",
+  projectId: "west-divers-app",
+  storageBucket: "west-divers-app.firebasestorage.app",
+  messagingSenderId: "35101400494",
+  appId: "1:35101400494:web:75c381e9afe03e865b3c3f",
+  measurementId: "G-QDNW56CSDG"
 };
 
 export const firebaseApp = initializeApp(firebaseConfig);
