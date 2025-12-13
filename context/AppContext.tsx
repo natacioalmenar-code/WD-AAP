@@ -19,27 +19,6 @@ import { auth } from "../firebase/firebase";
 
 export type Role = "admin" | "instructor" | "member" | "pending";
 export type Status = "pending" | "active";
-// ✅ Nivells FECDAS/CMAS (per al Perfil)
-export type FecdAsLevel =
-  | "B1E"
-  | "B2E"
-  | "B3E"
-  | "GG"
-  | "IN1E"
-  | "IN2E"
-  | "IN3E";
-
-// IMPORTANT: "as const" perquè TypeScript ho tracti com a literals
-export const FECDAS_LEVELS = [
-  "B1E",
-  "B2E",
-  "B3E",
-  "GG",
-  "IN1E",
-  "IN2E",
-  "IN3E",
-] as const;
-
 
 export interface User {
   id: string;
@@ -47,12 +26,10 @@ export interface User {
   email: string;
   role: Role;
   status: Status;
-
   certification?: string;
 
-  // Necessari pel Navbar
   level: string;
-  avatarUrl: string; // buit si no hi ha foto
+  avatarUrl: string;
 }
 
 export interface Trip {
@@ -65,7 +42,6 @@ export interface Trip {
   createdBy: string;
   participants: string[];
 
-  // si els tens a la UI:
   time?: string;
   depth?: string;
   description?: string;
@@ -81,11 +57,26 @@ export interface Course {
   description: string;
   price: string;
   levelRequired: string;
-  maxSpots: number; // ✅ obligatori
   createdBy: string;
   participants: string[];
 
+  maxSpots?: number;
   imageUrl?: string;
+}
+
+export interface SocialEvent {
+  id: string;
+  title: string;
+  date: string;
+  time?: string;
+  location?: string;
+  description?: string;
+  imageUrl?: string;
+  locationUrl?: string;
+  maxSpots?: number;
+
+  createdBy: string;
+  participants: string[];
 }
 
 export interface ClubSettings {
@@ -99,17 +90,16 @@ interface AppState {
   users: User[];
   trips: Trip[];
   courses: Course[];
+  socialEvents: SocialEvent[];
   currentUser: User | null;
   clubSettings: ClubSettings;
 }
 
 interface AppContextValue extends AppState {
-  // auth
   loginAsDemoAdmin: () => void;
   loginWithEmail: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 
-  // persones sòcies
   registerUser: (data: {
     name: string;
     email: string;
@@ -120,24 +110,24 @@ interface AppContextValue extends AppState {
   approveUser: (userId: string) => void;
   setUserRole: (userId: string, role: Role) => void;
 
-  // permisos
   canManageTrips: () => boolean;
   canManageSystem: () => boolean;
 
-  // sortides / cursos
   createTrip: (data: Omit<Trip, "id" | "createdBy" | "participants">) => void;
-  createCourse: (
-    data: Omit<Course, "id" | "createdBy" | "participants">
-  ) => void;
+  createCourse: (data: Omit<Course, "id" | "createdBy" | "participants">) => void;
+  createSocialEvent: (data: Omit<SocialEvent, "id" | "createdBy" | "participants">) => void;
 
   joinTrip: (tripId: string) => void;
   leaveTrip: (tripId: string) => void;
 
   joinCourse: (courseId: string) => void;
   leaveCourse: (courseId: string) => void;
+
+  joinSocialEvent: (eventId: string) => void;
+  leaveSocialEvent: (eventId: string) => void;
 }
 
-const STORAGE_KEY = "westdivers-app-state-v5";
+const STORAGE_KEY = "westdivers-app-state-v6";
 const AppContext = createContext<AppContextValue | undefined>(undefined);
 
 const defaultClubSettings: ClubSettings = {
@@ -162,7 +152,8 @@ const initialState: AppState = {
   users: [initialAdmin],
   trips: [],
   courses: [],
-  currentUser: null, // ✅ ara el currentUser el governa Firebase Auth
+  socialEvents: [],
+  currentUser: null,
   clubSettings: defaultClubSettings,
 };
 
@@ -183,7 +174,7 @@ function roleToLevel(role: Role) {
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [state, setState] = useState<AppState>(initialState);
 
-  // carregar estat guardat (trips/courses/users)
+  // carregar estat guardat
   useEffect(() => {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return;
@@ -202,6 +193,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         ...prev,
         ...parsed,
         users: safeUsers,
+        trips: parsed.trips ?? [],
+        courses: parsed.courses ?? [],
+        socialEvents: parsed.socialEvents ?? [],
         clubSettings: {
           ...defaultClubSettings,
           ...(parsed.clubSettings ?? {}),
@@ -212,13 +206,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  // guardar estat cada vegada que canvia (excepte currentUser que ve de Firebase)
+  // guardar estat (excepte currentUser)
   useEffect(() => {
     const { currentUser, ...rest } = state;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(rest));
-  }, [state.users, state.trips, state.courses, state.clubSettings]);
+  }, [state.users, state.trips, state.courses, state.socialEvents, state.clubSettings]);
 
-  // ✅ Firebase Auth listener: quan canvies de login, s’actualitza currentUser
+  // Firebase Auth listener
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (fbUser) => {
       if (!fbUser?.email) {
@@ -231,7 +225,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       setState((prev) => {
         let found = prev.users.find((u) => u.email.toLowerCase() === email);
 
-        // si no existeix a "users", el creem en pending (perquè admin l’aprovi)
         if (!found) {
           const newUser: User = {
             id: fbUser.uid,
@@ -246,7 +239,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           return { ...prev, users: [...prev.users, newUser], currentUser: newUser };
         }
 
-        // assegurar que l'id coincideix amb uid (important)
         if (found.id !== fbUser.uid) {
           found = { ...found, id: fbUser.uid };
           return {
@@ -263,12 +255,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     return () => unsub();
   }, []);
 
-  // DEMO admin (sense Firebase)
   const loginAsDemoAdmin = () => {
     setState((prev) => ({ ...prev, currentUser: initialAdmin }));
   };
 
-  // ✅ Login Firebase (email + password)
   const loginWithEmail: AppContextValue["loginWithEmail"] = async (email, password) => {
     const trimmed = email.trim().toLowerCase();
     if (!trimmed || !password) {
@@ -278,7 +268,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       await signInWithEmailAndPassword(auth, trimmed, password);
-    } catch (e: any) {
+    } catch {
       alert("No s’ha pogut iniciar sessió. Revisa correu/contrasenya.");
     }
   };
@@ -292,7 +282,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // ✅ Register Firebase (email + password) + crea usuari pending a la teva llista
   const registerUser: AppContextValue["registerUser"] = async ({
     name,
     email,
@@ -313,7 +302,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       await updateProfile(cred.user, { displayName: trimmedName });
 
       setState((prev) => {
-        // evitar duplicat
         if (prev.users.some((u) => u.email.toLowerCase() === trimmedEmail)) return prev;
 
         const newUser: User = {
@@ -332,7 +320,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
       alert("Compte creat. Ara l’administració ha d’aprovar el teu accés.");
       await signOut(auth);
-    } catch (e: any) {
+    } catch {
       alert("No s’ha pogut crear el compte. Potser el correu ja existeix.");
     }
   };
@@ -399,6 +387,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }));
   };
 
+  const createSocialEvent: AppContextValue["createSocialEvent"] = (data) => {
+    if (!canCreate()) return;
+    setState((prev) => ({
+      ...prev,
+      socialEvents: [
+        ...prev.socialEvents,
+        { ...data, id: createId(), createdBy: prev.currentUser!.id, participants: [] },
+      ],
+    }));
+  };
+
   const joinTrip: AppContextValue["joinTrip"] = (tripId) => {
     if (!state.currentUser) {
       alert("Has d’iniciar sessió per apuntar-te.");
@@ -453,6 +452,33 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }));
   };
 
+  const joinSocialEvent: AppContextValue["joinSocialEvent"] = (eventId) => {
+    if (!state.currentUser) {
+      alert("Has d’iniciar sessió per apuntar-te.");
+      return;
+    }
+    setState((prev) => ({
+      ...prev,
+      socialEvents: prev.socialEvents.map((ev) =>
+        ev.id === eventId && !ev.participants.includes(prev.currentUser!.id)
+          ? { ...ev, participants: [...ev.participants, prev.currentUser!.id] }
+          : ev
+      ),
+    }));
+  };
+
+  const leaveSocialEvent: AppContextValue["leaveSocialEvent"] = (eventId) => {
+    if (!state.currentUser) return;
+    setState((prev) => ({
+      ...prev,
+      socialEvents: prev.socialEvents.map((ev) =>
+        ev.id === eventId
+          ? { ...ev, participants: ev.participants.filter((id) => id !== prev.currentUser!.id) }
+          : ev
+      ),
+    }));
+  };
+
   const value: AppContextValue = {
     ...state,
     loginAsDemoAdmin,
@@ -465,10 +491,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     canManageSystem,
     createTrip,
     createCourse,
+    createSocialEvent,
     joinTrip,
     leaveTrip,
     joinCourse,
     leaveCourse,
+    joinSocialEvent,
+    leaveSocialEvent,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
