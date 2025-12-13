@@ -60,11 +60,10 @@ export interface Course {
   description: string;
   price: string;
   levelRequired: string;
+  maxSpots: number; // ✅ obligatori
   createdBy: string;
   participants: string[];
 
-  // si els tens a la UI:
-  maxSpots?: number;
   imageUrl?: string;
 }
 
