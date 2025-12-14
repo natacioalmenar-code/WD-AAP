@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useApp } from "../context/AppContext";
-import { Mail, Lock, ArrowLeft, CheckCircle, AlertTriangle } from "lucide-react";
+import { Mail, Lock, ArrowLeft, AlertTriangle } from "lucide-react";
 
 export const Login: React.FC = () => {
   const { loginWithEmail } = useApp();
@@ -11,23 +11,22 @@ export const Login: React.FC = () => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    setSuccess("");
     setLoading(true);
 
     try {
       await loginWithEmail(email, password);
-      setSuccess("Sessió iniciada correctament. Redirigint…");
-      setTimeout(() => navigate("/dashboard"), 800);
+      navigate("/dashboard");
     } catch (err: any) {
       if (err?.code === "auth/user-not-found") {
         setError("Aquest correu no està registrat.");
       } else if (err?.code === "auth/wrong-password") {
         setError("Contrasenya incorrecta.");
+      } else if (err?.code === "auth/invalid-email") {
+        setError("El correu no és vàlid.");
       } else {
         setError("No s’ha pogut iniciar sessió. Revisa les dades.");
       }
@@ -51,14 +50,12 @@ export const Login: React.FC = () => {
         </h1>
 
         <p className="text-gray-600 mt-2">
-          Entra amb el teu correu i contrasenya.
+          Introdueix el teu correu i contrasenya.
         </p>
 
-        {/* INFO */}
         <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-900">
-          <b>Important:</b> si és la primera vegada que entres, el teu compte pot
-          estar <b>pendent d’aprovació</b>.  
-          Quan l’administració l’active, podràs accedir a totes les funcionalitats.
+          <b>Important:</b> si és la primera vegada, el teu compte pot estar{" "}
+          <b>pendent d’aprovació</b>. Quan l’administració l’active, podràs entrar.
         </div>
 
         <form onSubmit={onSubmit} className="mt-6 space-y-4">
@@ -103,13 +100,6 @@ export const Login: React.FC = () => {
             </div>
           )}
 
-          {success && (
-            <div className="flex items-start gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl p-3">
-              <CheckCircle size={18} />
-              <span>{success}</span>
-            </div>
-          )}
-
           <button
             type="submit"
             disabled={loading}
@@ -124,8 +114,13 @@ export const Login: React.FC = () => {
         </form>
 
         <div className="mt-6 text-sm text-gray-600">
-          Problemes per accedir?  
-          Contacta amb l’administració del club.
+          No tens compte?{" "}
+          <Link to="/register" className="font-extrabold text-blue-700 hover:underline">
+            Crea’n un
+          </Link>
+          <div className="text-xs text-gray-500 mt-2">
+            * El compte quedarà pendent fins que l’administració l’aprove.
+          </div>
         </div>
       </div>
     </div>
