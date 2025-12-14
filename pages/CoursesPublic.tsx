@@ -20,7 +20,7 @@ export const CoursesPublic: React.FC = () => {
           <div>
             <h1 className="text-3xl font-extrabold text-slate-900">Cursos</h1>
             <p className="text-gray-600">
-              Formació i especialitats a {clubSettings.heroTitle || "West Divers"}.
+              Formació i especialitats a {clubSettings.heroTitle || "WEST DIVERS"}.
             </p>
           </div>
         </div>
@@ -29,7 +29,7 @@ export const CoursesPublic: React.FC = () => {
           <div>
             <p className="font-bold text-slate-900">Vols reservar plaça?</p>
             <p className="text-sm text-gray-600">
-              L’inscripció i la gestió de places és només per a socis/es.
+              La inscripció i la gestió de places és només per a socis/es.
             </p>
           </div>
           <div className="flex gap-3">
@@ -51,8 +51,10 @@ export const CoursesPublic: React.FC = () => {
 
       {sorted.length === 0 ? (
         <div className="bg-white border rounded-2xl shadow-sm p-8 text-center">
-          <p className="text-lg font-extrabold text-slate-900 mb-2">Encara no hi ha cursos publicats</p>
-          <p className="text-gray-600">Quan l’equip instructor en publiqui, apareixeran aquí.</p>
+          <p className="text-lg font-extrabold text-slate-900 mb-2">Encara no hi ha cursos</p>
+          <p className="text-gray-600">
+            Quan l’equip instructor en cree, apareixeran aquí.
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -100,7 +102,11 @@ export const CoursesPublic: React.FC = () => {
                   ) : (
                     <span className="text-xs text-gray-500">&nbsp;</span>
                   )}
-                  <Link to="/login" className="text-sm font-extrabold text-yellow-700 hover:text-yellow-800">
+
+                  <Link
+                    to="/login"
+                    className="text-sm font-extrabold text-yellow-700 hover:text-yellow-800"
+                  >
                     Inicia sessió per inscriure’t →
                   </Link>
                 </div>
