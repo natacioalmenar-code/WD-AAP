@@ -1,35 +1,26 @@
 import React from "react";
-import {
-  HashRouter,
-  Routes,
-  Route,
-  Navigate,
-  useLocation,
-} from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AppProvider, useApp } from "./context/AppContext";
 import { Navbar } from "./components/Navbar";
-
 import { Home } from "./pages/Home";
 import { Login } from "./pages/Login";
 import { Dashboard } from "./pages/Dashboard";
 import { Trips } from "./pages/Trips";
+import { AdminTrips } from "./pages/AdminTrips";
+import { AdminUsers } from "./pages/AdminUsers";
+import { AdminSettings } from "./pages/AdminSettings";
 import { CalendarPage } from "./pages/CalendarPage";
 import { PrivateCourses } from "./pages/PrivateCourses";
 import { ResourcesPage } from "./pages/ResourcesPage";
 import { SocialEvents } from "./pages/SocialEvents";
 import { Profile } from "./pages/Profile";
 import { SocialWall } from "./pages/SocialWall";
+import { GeminiDiveGuide } from "./components/GeminiDiveGuide";
 
 import { Admin } from "./pages/Admin";
-import { AdminTrips } from "./pages/AdminTrips";
-import { AdminUsers } from "./pages/AdminUsers";
-import { AdminSettings } from "./pages/AdminSettings";
 import { AdminCourses } from "./pages/AdminCourses";
 import { AdminEvents } from "./pages/AdminEvents";
 
-import { GeminiDiveGuide } from "./components/GeminiDiveGuide";
-
-// Guard component for private routes
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const { currentUser } = useApp();
   const location = useLocation();
@@ -40,23 +31,15 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-// Guard component for Instructor/Admin routes (Activities)
 const InstructorRoute = ({ children }: { children: React.ReactNode }) => {
   const { canManageTrips } = useApp();
-
-  if (!canManageTrips()) {
-    return <Navigate to="/dashboard" replace />;
-  }
+  if (!canManageTrips()) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 };
 
-// Guard component for Super Admin routes (Users + Settings)
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   const { canManageSystem } = useApp();
-
-  if (!canManageSystem()) {
-    return <Navigate to="/dashboard" replace />;
-  }
+  if (!canManageSystem()) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 };
 
@@ -67,7 +50,7 @@ const AppContent = () => {
     <div
       className="min-h-screen font-sans text-gray-900 bg-fixed bg-cover transition-all duration-500"
       style={{
-        backgroundImage: `linear-gradient(rgba(249, 250, 251, 0.95), rgba(249, 250, 251, 0.95)), url("${clubSettings.appBackgroundUrl}")`,
+        backgroundImage: `linear-gradient(rgba(249, 250, 251, 0.95), rgba(249, 250, 251, 0.95)), url("${clubSettings.appBackgroundUrl || ""}")`,
         backgroundColor: "#f9fafb",
       }}
     >
@@ -76,6 +59,7 @@ const AppContent = () => {
       <Routes>
         {/* Public */}
         <Route path="/" element={<Home />} />
+        <Route path="/courses-public" element={<div className="p-8 text-center">Cursos (públic)</div>} />
         <Route path="/login" element={<Login />} />
 
         {/* Private */}
@@ -144,7 +128,7 @@ const AppContent = () => {
           }
         />
 
-        {/* Admin hub */}
+        {/* Admin / Instructor */}
         <Route
           path="/admin"
           element={
@@ -153,8 +137,6 @@ const AppContent = () => {
             </InstructorRoute>
           }
         />
-
-        {/* Management (Instructor/Admin) */}
         <Route
           path="/admin-trips"
           element={
@@ -179,8 +161,6 @@ const AppContent = () => {
             </InstructorRoute>
           }
         />
-
-        {/* Management (Admin only) */}
         <Route
           path="/admin-users"
           element={
@@ -197,25 +177,19 @@ const AppContent = () => {
             </AdminRoute>
           }
         />
-
-        {/* fallback */}
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
 
-      {/* AI Assistant - Only visible if logged in */}
       {currentUser && <GeminiDiveGuide />}
     </div>
   );
 };
 
-const App = () => {
-  return (
-    <AppProvider>
-      <HashRouter>
-        <AppContent />
-      </HashRouter>
-    </AppProvider>
-  );
-};
+const App = () => (
+  <AppProvider>
+    <HashRouter>
+      <AppContent />
+    </HashRouter>
+  </AppProvider>
+);
 
 export default App;
