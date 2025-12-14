@@ -163,3 +163,37 @@ const AppContent = () => {
             <InstructorRoute>
               <AdminEvents />
             </InstructorRoute>
+          }
+        />
+        <Route
+          path="/admin-users"
+          element={
+            <AdminRoute>
+              <AdminUsers />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin-settings"
+          element={
+            <AdminRoute>
+              <AdminSettings />
+            </AdminRoute>
+          }
+        />
+      </Routes>
+
+      {currentUser && <GeminiDiveGuide />}
+    </div>
+  );
+};
+
+const App = () => (
+  <AppProvider>
+    <HashRouter>
+      <AppContent />
+    </HashRouter>
+  </AppProvider>
+);
+
+export default App;
