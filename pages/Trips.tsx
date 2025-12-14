@@ -130,7 +130,7 @@ export const Trips: React.FC = () => {
             <div className="flex items-center justify-between p-5 border-b">
               <h3 className="text-lg font-extrabold text-slate-900">Crear nova sortida</h3>
               <button
-                onClick={() => { setOpen(false); }}
+                onClick={() => { resetForm(); setOpen(false); }}
                 className="p-2 rounded-lg hover:bg-gray-100"
                 aria-label="Tancar"
               >
