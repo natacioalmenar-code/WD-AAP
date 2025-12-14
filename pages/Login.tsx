@@ -1,24 +1,26 @@
 import React, { useState } from "react";
-import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "../firebase/firebase";
 import { Link, useNavigate } from "react-router-dom";
+import { Mail, Lock, ArrowLeft, AlertTriangle } from "lucide-react";
+import { useApp } from "../context/AppContext";
 
-const Login: React.FC = () => {
+export const Login: React.FC = () => {
+  const { loginWithEmail } = useApp();
   const navigate = useNavigate();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      await loginWithEmail(email, password);
       navigate("/dashboard");
-    } catch (err: any) {
+    } catch {
       setError("Correu o contrasenya incorrectes.");
     } finally {
       setLoading(false);
@@ -26,58 +28,76 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-[calc(100vh-80px)] flex items-center justify-center px-4">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border p-8">
-        <h1 className="text-2xl font-extrabold text-center text-slate-900">
+    <div className="max-w-md mx-auto px-4 py-12">
+      <button
+        onClick={() => navigate("/")}
+        className="mb-6 inline-flex items-center gap-2 text-sm font-extrabold text-gray-600 hover:underline"
+      >
+        <ArrowLeft size={16} /> Tornar a l’inici
+      </button>
+
+      <div className="bg-white border rounded-2xl shadow-sm p-8">
+        <h1 className="text-3xl font-extrabold text-slate-900 text-center">
           Accés socis/es
         </h1>
-        <p className="text-center text-gray-600 mt-1">
+
+        <p className="text-gray-600 mt-2 text-center">
           Introdueix el teu correu i contrasenya.
         </p>
 
-        <form onSubmit={handleLogin} className="mt-6 space-y-4">
+        <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-900">
+          <b>Important:</b> si és la primera vegada, el teu compte pot estar{" "}
+          <b>pendent d’aprovació</b>. Quan l’administració l’active, podràs accedir.
+        </div>
+
+        <form onSubmit={onSubmit} className="mt-6 space-y-4">
           <div>
-            <label className="text-sm font-bold text-slate-700">
-              Correu electrònic
-            </label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full rounded-xl border px-3 py-2"
-            />
+            <label className="text-sm font-bold text-slate-700">Correu electrònic</label>
+            <div className="mt-1 flex items-center gap-2 border rounded-xl px-3 py-2">
+              <Mail size={18} className="text-gray-400" />
+              <input
+                type="email"
+                required
+                className="w-full outline-none"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="nom@correu.com"
+              />
+            </div>
           </div>
 
           <div>
-            <label className="text-sm font-bold text-slate-700">
-              Contrasenya
-            </label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full rounded-xl border px-3 py-2"
-            />
+            <label className="text-sm font-bold text-slate-700">Contrasenya</label>
+            <div className="mt-1 flex items-center gap-2 border rounded-xl px-3 py-2">
+              <Lock size={18} className="text-gray-400" />
+              <input
+                type="password"
+                required
+                className="w-full outline-none"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="********"
+              />
+            </div>
           </div>
 
           {error && (
-            <div className="text-sm text-red-600 font-bold text-center">
-              {error}
+            <div className="flex items-start gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl p-3">
+              <AlertTriangle size={18} />
+              <span>{error}</span>
             </div>
           )}
 
           <button
             type="submit"
             disabled={loading}
-            className={`w-full py-2.5 rounded-xl font-extrabold ${
+            className={`w-full mt-2 px-4 py-3 rounded-xl font-extrabold ${
               loading
                 ? "bg-gray-300 text-gray-600 cursor-not-allowed"
                 : "bg-yellow-400 text-black hover:bg-yellow-500"
             }`}
           >
-            {loading ? "Entrant..." : "Entrar"}
+            {loading ? "Entrant…" : "Entrar"}
           </button>
         </form>
 
@@ -91,12 +111,9 @@ const Login: React.FC = () => {
         </div>
 
         <p className="mt-4 text-xs text-gray-500 text-center">
-          * Quan crees el compte, quedarà pendent fins que l’administració
-          l’aprove.
+          * Quan crees el compte, quedarà pendent fins que l’administració l’aprove.
         </p>
       </div>
     </div>
   );
 };
-
-export default Login;
