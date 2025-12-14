@@ -1,29 +1,100 @@
 import React, { useMemo, useState } from "react";
 import { useApp } from "../context/AppContext";
-import { Plus, FileText, ExternalLink } from "lucide-react";
+import type { ResourceItem, ResourceCategory } from "../types";
+import { Plus, FileText, ExternalLink, X, Tag } from "lucide-react";
+
+const PRESET_CATEGORIES: ResourceCategory[] = [
+  "Seguretat",
+  "Formació",
+  "Protocols",
+  "Equip",
+  "Medi ambient",
+  "Altres",
+];
 
 export const ResourcesPage: React.FC = () => {
-  const { resources, canManageTrips } = useApp();
+  const { resources, canManageTrips, createResource } = useApp();
+
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [open, setOpen] = useState(false);
+
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [url, setUrl] = useState("");
+  const [category, setCategory] = useState<ResourceCategory>("Seguretat");
+  const [customCategory, setCustomCategory] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   const categories = useMemo(() => {
-    const cats = resources.map((r) => r.category);
-    return ["all", ...Array.from(new Set(cats))];
+    const cats = resources.map((r) => r.category).filter(Boolean);
+    const unique = Array.from(new Set(cats));
+    return ["all", ...unique];
   }, [resources]);
 
   const filteredResources = useMemo(() => {
-    if (selectedCategory === "all") return resources;
-    return resources.filter((r) => r.category === selectedCategory);
+    const list = [...resources].sort((a, b) => {
+      const ca = (a.category || "").toString().localeCompare((b.category || "").toString());
+      if (ca !== 0) return ca;
+      return (a.title || "").localeCompare(b.title || "");
+    });
+
+    if (selectedCategory === "all") return list;
+    return list.filter((r) => r.category === selectedCategory);
   }, [resources, selectedCategory]);
+
+  const resetForm = () => {
+    setTitle("");
+    setDescription("");
+    setUrl("");
+    setCategory("Seguretat");
+    setCustomCategory("");
+    setError("");
+  };
+
+  const onCreate = async () => {
+    setError("");
+
+    const t = title.trim();
+    const d = description.trim();
+    const u = url.trim();
+    const cat = (customCategory.trim() || category).trim();
+
+    if (!t) return setError("Falta el títol.");
+    if (!u) return setError("Falta l’enllaç (URL).");
+    if (!/^https?:\/\//i.test(u)) return setError("L’URL ha de començar per http:// o https://");
+    if (!cat) return setError("Falta la categoria.");
+
+    setSaving(true);
+    try {
+      await createResource({
+        title: t,
+        description: d,
+        url: u,
+        category: cat,
+      });
+      setOpen(false);
+      resetForm();
+    } catch {
+      setError("No s’ha pogut guardar el material.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-10">
       <div className="flex justify-between items-center flex-wrap gap-4 mb-8">
-        <h1 className="text-3xl font-extrabold">Material del club</h1>
+        <div>
+          <h1 className="text-3xl font-extrabold text-slate-900">Material del club</h1>
+          <p className="text-gray-600 mt-1">
+            Documents, protocols, enllaços i recursos útils per a socis/es.
+          </p>
+        </div>
 
         {canManageTrips() && (
           <button
-            onClick={() => alert("Formulari d’alta de material (seguent pas)")}
+            onClick={() => setOpen(true)}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-yellow-400 font-extrabold hover:bg-yellow-300"
           >
             <Plus size={18} /> Afegir material
@@ -33,25 +104,206 @@ export const ResourcesPage: React.FC = () => {
 
       {/* Categories */}
       <div className="flex flex-wrap gap-2 mb-8">
-        {categories.map((cat) => (
-          <button
-            key={cat}
-            onClick={() => setSelectedCategory(cat)}
-            className={`px-4 py-2 rounded-full text-sm font-bold transition ${
-              selectedCategory === cat
-                ? "bg-black text-white"
-                : "bg-gray-100 hover:bg-gray-200"
-            }`}
-          >
-            {cat === "all" ? "Totes" : cat}
-          </button>
-        ))}
+        <button
+          onClick={() => setSelectedCategory("all")}
+          className={`px-4 py-2 rounded-full text-sm font-bold transition ${
+            selectedCategory === "all"
+              ? "bg-black text-white"
+              : "bg-gray-100 hover:bg-gray-200"
+          }`}
+        >
+          Totes
+        </button>
+
+        {categories
+          .filter((c) => c !== "all")
+          .map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-4 py-2 rounded-full text-sm font-bold transition ${
+                selectedCategory === cat
+                  ? "bg-black text-white"
+                  : "bg-gray-100 hover:bg-gray-200"
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
       </div>
 
       {/* Llistat */}
       {filteredResources.length === 0 ? (
-        <div className="text-gray-500">
+        <div className="bg-white border rounded-2xl p-8 text-center text-gray-500 shadow-sm">
           No hi ha material en aquesta categoria.
         </div>
       ) : (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredResources.map((res) => (
+            <ResourceCard key={res.id} res={res} />
+          ))}
+        </div>
+      )}
 
+      {/* MODAL */}
+      {open && (
+        <div className="fixed inset-0 z-[999]">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => {
+              if (!saving) {
+                setOpen(false);
+                resetForm();
+              }
+            }}
+          />
+          <div className="absolute inset-0 flex items-center justify-center p-4">
+            <div className="w-full max-w-xl bg-white rounded-2xl shadow-xl border overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b">
+                <div>
+                  <div className="text-lg font-extrabold text-slate-900">Afegir material</div>
+                  <div className="text-sm text-gray-600">Apareixerà al material del club.</div>
+                </div>
+                <button
+                  onClick={() => {
+                    if (!saving) {
+                      setOpen(false);
+                      resetForm();
+                    }
+                  }}
+                  className="p-2 rounded-xl hover:bg-gray-100"
+                  title="Tancar"
+                >
+                  <X />
+                </button>
+              </div>
+
+              <div className="px-6 py-5 space-y-4">
+                <div>
+                  <label className="text-sm font-bold text-slate-700">Títol</label>
+                  <input
+                    className="mt-1 w-full rounded-xl border px-3 py-2"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Ex: Protocol de seguretat a l’embarcació"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-bold text-slate-700">Descripció (opcional)</label>
+                  <textarea
+                    className="mt-1 w-full rounded-xl border px-3 py-2 min-h-[90px]"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Una breu explicació del contingut..."
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-bold text-slate-700">Enllaç (URL)</label>
+                  <input
+                    className="mt-1 w-full rounded-xl border px-3 py-2"
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    placeholder="https://..."
+                  />
+                  <div className="text-xs text-gray-500 mt-1">
+                    Pot ser un PDF, Google Drive, web, vídeo, etc.
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                      <Tag size={16} /> Categoria
+                    </label>
+                    <select
+                      className="mt-1 w-full rounded-xl border px-3 py-2"
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                    >
+                      {PRESET_CATEGORIES.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-bold text-slate-700">Categoria personalitzada (opcional)</label>
+                    <input
+                      className="mt-1 w-full rounded-xl border px-3 py-2"
+                      value={customCategory}
+                      onChange={(e) => setCustomCategory(e.target.value)}
+                      placeholder="Ex: Navegació"
+                    />
+                  </div>
+                </div>
+
+                {error && <div className="text-sm text-red-600 font-bold">{error}</div>}
+              </div>
+
+              <div className="px-6 py-4 border-t flex items-center justify-end gap-3">
+                <button
+                  onClick={() => {
+                    if (!saving) {
+                      setOpen(false);
+                      resetForm();
+                    }
+                  }}
+                  className="px-4 py-2 rounded-xl border font-extrabold hover:bg-gray-50"
+                  disabled={saving}
+                >
+                  Cancel·lar
+                </button>
+
+                <button
+                  onClick={onCreate}
+                  disabled={saving}
+                  className={`px-5 py-2 rounded-xl font-extrabold ${
+                    saving
+                      ? "bg-gray-300 text-gray-600 cursor-not-allowed"
+                      : "bg-yellow-400 hover:bg-yellow-300 text-black"
+                  }`}
+                >
+                  {saving ? "Guardant..." : "Guardar material"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ResourceCard = ({ res }: { res: ResourceItem }) => {
+  return (
+    <div className="bg-white border rounded-2xl shadow-sm p-6 flex flex-col justify-between">
+      <div>
+        <div className="flex items-center gap-2 text-yellow-500 mb-2">
+          <FileText />
+          <span className="text-sm font-bold text-slate-700">{res.category}</span>
+        </div>
+
+        <h2 className="font-extrabold text-lg text-slate-900">{res.title}</h2>
+
+        {res.description ? (
+          <p className="text-sm text-gray-600 mt-2">{res.description}</p>
+        ) : (
+          <p className="text-sm text-gray-400 mt-2">Sense descripció.</p>
+        )}
+      </div>
+
+      <a
+        href={res.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-4 inline-flex items-center gap-2 text-blue-600 font-extrabold hover:underline"
+      >
+        Obrir material <ExternalLink size={16} />
+      </a>
+    </div>
+  );
+};
