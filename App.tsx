@@ -17,6 +17,7 @@ import { ResourcesPage } from "./pages/ResourcesPage";
 import { SocialEvents } from "./pages/SocialEvents";
 import { Profile } from "./pages/Profile";
 import { SocialWall } from "./pages/SocialWall";
+import { PendingApproval } from "./pages/PendingApproval";
 import { GeminiDiveGuide } from "./components/GeminiDiveGuide";
 
 import { Admin } from "./pages/Admin";
@@ -24,7 +25,6 @@ import { AdminCourses } from "./pages/AdminCourses";
 import { AdminEvents } from "./pages/AdminEvents";
 import { AdminTrips } from "./pages/AdminTrips";
 
-// ✅ NOVES PÀGINES “CLUB READY”
 import { Help } from "./pages/Help";
 import { Privacy } from "./pages/Privacy";
 import { Terms } from "./pages/Terms";
@@ -37,6 +37,13 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   if (!currentUser) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
+
+  // si està pending → cap a /pending (excepte si ja hi és)
+  const isPending = currentUser.status !== "active" || currentUser.role === "pending";
+  if (isPending && location.pathname !== "/pending" && location.pathname !== "/profile") {
+    return <Navigate to="/pending" replace />;
+  }
+
   return <>{children}</>;
 };
 
@@ -72,7 +79,7 @@ const AppContent = () => {
           <Route path="/courses-public" element={<CoursesPublic />} />
           <Route path="/login" element={<Login />} />
 
-          {/* ✅ Public “Club Ready” */}
+          {/* Public “Club Ready” */}
           <Route path="/help" element={<Help />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
@@ -84,6 +91,14 @@ const AppContent = () => {
             element={
               <PrivateRoute>
                 <Dashboard />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/pending"
+            element={
+              <PrivateRoute>
+                <PendingApproval />
               </PrivateRoute>
             }
           />
