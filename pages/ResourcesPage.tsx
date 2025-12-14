@@ -10,6 +10,8 @@ import {
   Pencil,
   Trash2,
   Search,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 
 const PRESET_CATEGORIES: ResourceCategory[] = [
@@ -24,7 +26,14 @@ const PRESET_CATEGORIES: ResourceCategory[] = [
 type ModalMode = "create" | "edit";
 
 export const ResourcesPage: React.FC = () => {
-  const { resources, canManageTrips, createResource, updateResource, deleteResource } = useApp();
+  const {
+    resources,
+    canManageTrips,
+    createResource,
+    updateResource,
+    deleteResource,
+    swapResourceOrder,
+  } = useApp();
 
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [q, setQ] = useState("");
@@ -52,9 +61,13 @@ export const ResourcesPage: React.FC = () => {
   const filteredResources = useMemo(() => {
     const needle = q.trim().toLowerCase();
 
+    // ja venen ordenats per category+order, però fem safe sort també
     const list = [...resources].sort((a, b) => {
       const ca = (a.category || "").toString().localeCompare((b.category || "").toString());
       if (ca !== 0) return ca;
+      const oa = typeof a.order === "number" ? a.order : 999999;
+      const ob = typeof b.order === "number" ? b.order : 999999;
+      if (oa !== ob) return oa - ob;
       return (a.title || "").localeCompare(b.title || "");
     });
 
@@ -96,7 +109,6 @@ export const ResourcesPage: React.FC = () => {
     setDescription(res.description || "");
     setUrl(res.url || "");
 
-    // si la categoria està dins presets -> select, si no -> custom
     const isPreset = PRESET_CATEGORIES.includes(res.category);
     setCategory(isPreset ? res.category : "Altres");
     setCustomCategory(isPreset ? "" : (res.category || ""));
@@ -112,7 +124,6 @@ export const ResourcesPage: React.FC = () => {
 
   const validate = () => {
     const t = title.trim();
-    const d = description.trim();
     const u = url.trim();
     const cat = (customCategory.trim() || category).trim();
 
@@ -120,8 +131,13 @@ export const ResourcesPage: React.FC = () => {
     if (!u) return "Falta l’enllaç (URL).";
     if (!/^https?:\/\//i.test(u)) return "L’URL ha de començar per http:// o https://";
     if (!cat) return "Falta la categoria.";
-
     return "";
+  };
+
+  const nextOrderForCategory = (cat: string) => {
+    const inCat = resources.filter((r) => r.category === cat);
+    const max = inCat.reduce((m, r) => Math.max(m, typeof r.order === "number" ? r.order : 0), 0);
+    return max + 1;
   };
 
   const onSave = async () => {
@@ -129,20 +145,26 @@ export const ResourcesPage: React.FC = () => {
     const err = validate();
     if (err) return setError(err);
 
-    const payload = {
+    const finalCategory = (customCategory.trim() || category).trim();
+
+    const payloadBase = {
       title: title.trim(),
       description: description.trim(),
       url: url.trim(),
-      category: (customCategory.trim() || category).trim(),
+      category: finalCategory,
     };
 
     setSaving(true);
     try {
       if (mode === "create") {
-        await createResource(payload);
+        // ✅ assignem ordre al final de la categoria
+        await createResource({
+          ...payloadBase,
+          order: nextOrderForCategory(finalCategory),
+        });
       } else {
         if (!editing) throw new Error("No editing item");
-        await updateResource(editing.id, payload);
+        await updateResource(editing.id, payloadBase);
       }
 
       setOpen(false);
@@ -165,6 +187,29 @@ export const ResourcesPage: React.FC = () => {
     }
   };
 
+  // ✅ ordre manual dins categoria (amb swap)
+  const moveUp = async (res: ResourceItem) => {
+    const listCat = filteredResources
+      .filter((x) => x.category === res.category)
+      .sort((a, b) => (a.order ?? 999999) - (b.order ?? 999999));
+
+    const idx = listCat.findIndex((x) => x.id === res.id);
+    if (idx <= 0) return;
+    const prev = listCat[idx - 1];
+    await swapResourceOrder(res.id, prev.id);
+  };
+
+  const moveDown = async (res: ResourceItem) => {
+    const listCat = filteredResources
+      .filter((x) => x.category === res.category)
+      .sort((a, b) => (a.order ?? 999999) - (b.order ?? 999999));
+
+    const idx = listCat.findIndex((x) => x.id === res.id);
+    if (idx < 0 || idx >= listCat.length - 1) return;
+    const next = listCat[idx + 1];
+    await swapResourceOrder(res.id, next.id);
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-10">
       <div className="flex justify-between items-start flex-wrap gap-4 mb-6">
@@ -185,7 +230,6 @@ export const ResourcesPage: React.FC = () => {
         )}
       </div>
 
-      {/* Barra de cerca + categories */}
       <div className="bg-white border rounded-2xl shadow-sm p-4 mb-8">
         <div className="flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between">
           <div className="w-full lg:w-[420px]">
@@ -232,7 +276,6 @@ export const ResourcesPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Llistat */}
       {filteredResources.length === 0 ? (
         <div className="bg-white border rounded-2xl p-8 text-center text-gray-500 shadow-sm">
           No hi ha material amb aquests filtres.
@@ -246,12 +289,13 @@ export const ResourcesPage: React.FC = () => {
               canManage={canManageTrips()}
               onEdit={() => openEdit(res)}
               onDelete={() => onDelete(res)}
+              onUp={() => moveUp(res)}
+              onDown={() => moveDown(res)}
             />
           ))}
         </div>
       )}
 
-      {/* MODAL */}
       {open && (
         <div className="fixed inset-0 z-[999]">
           <div className="absolute inset-0 bg-black/40" onClick={closeModal} />
@@ -268,11 +312,7 @@ export const ResourcesPage: React.FC = () => {
                       : "Actualitza el contingut i guarda els canvis."}
                   </div>
                 </div>
-                <button
-                  onClick={closeModal}
-                  className="p-2 rounded-xl hover:bg-gray-100"
-                  title="Tancar"
-                >
+                <button onClick={closeModal} className="p-2 rounded-xl hover:bg-gray-100" title="Tancar">
                   <X />
                 </button>
               </div>
@@ -306,9 +346,7 @@ export const ResourcesPage: React.FC = () => {
                     onChange={(e) => setUrl(e.target.value)}
                     placeholder="https://..."
                   />
-                  <div className="text-xs text-gray-500 mt-1">
-                    Pot ser un PDF, Google Drive, web, vídeo, etc.
-                  </div>
+                  <div className="text-xs text-gray-500 mt-1">Pot ser un PDF, Google Drive, web, vídeo, etc.</div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -330,9 +368,7 @@ export const ResourcesPage: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="text-sm font-bold text-slate-700">
-                      Categoria personalitzada (opcional)
-                    </label>
+                    <label className="text-sm font-bold text-slate-700">Categoria personalitzada (opcional)</label>
                     <input
                       className="mt-1 w-full rounded-xl border px-3 py-2"
                       value={customCategory}
@@ -346,11 +382,7 @@ export const ResourcesPage: React.FC = () => {
               </div>
 
               <div className="px-6 py-4 border-t flex items-center justify-end gap-3">
-                <button
-                  onClick={closeModal}
-                  className="px-4 py-2 rounded-xl border font-extrabold hover:bg-gray-50"
-                  disabled={saving}
-                >
+                <button onClick={closeModal} className="px-4 py-2 rounded-xl border font-extrabold hover:bg-gray-50" disabled={saving}>
                   Cancel·lar
                 </button>
 
@@ -358,9 +390,7 @@ export const ResourcesPage: React.FC = () => {
                   onClick={onSave}
                   disabled={saving}
                   className={`px-5 py-2 rounded-xl font-extrabold ${
-                    saving
-                      ? "bg-gray-300 text-gray-600 cursor-not-allowed"
-                      : "bg-yellow-400 hover:bg-yellow-300 text-black"
+                    saving ? "bg-gray-300 text-gray-600 cursor-not-allowed" : "bg-yellow-400 hover:bg-yellow-300 text-black"
                   }`}
                 >
                   {saving ? "Guardant..." : mode === "create" ? "Guardar material" : "Guardar canvis"}
@@ -379,28 +409,30 @@ const ResourceCard = ({
   canManage,
   onEdit,
   onDelete,
+  onUp,
+  onDown,
 }: {
   res: ResourceItem;
   canManage: boolean;
   onEdit: () => void;
   onDelete: () => void;
+  onUp: () => void;
+  onDown: () => void;
 }) => {
   return (
     <div className="bg-white border rounded-2xl shadow-sm p-6 flex flex-col justify-between relative">
       {canManage && (
         <div className="absolute top-3 right-3 flex gap-2">
-          <button
-            onClick={onEdit}
-            className="p-2 rounded-xl bg-gray-100 hover:bg-gray-200"
-            title="Editar"
-          >
+          <button onClick={onUp} className="p-2 rounded-xl bg-gray-100 hover:bg-gray-200" title="Pujar">
+            <ArrowUp size={16} />
+          </button>
+          <button onClick={onDown} className="p-2 rounded-xl bg-gray-100 hover:bg-gray-200" title="Baixar">
+            <ArrowDown size={16} />
+          </button>
+          <button onClick={onEdit} className="p-2 rounded-xl bg-gray-100 hover:bg-gray-200" title="Editar">
             <Pencil size={16} />
           </button>
-          <button
-            onClick={onDelete}
-            className="p-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-700"
-            title="Eliminar"
-          >
+          <button onClick={onDelete} className="p-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-700" title="Eliminar">
             <Trash2 size={16} />
           </button>
         </div>
@@ -412,7 +444,7 @@ const ResourceCard = ({
           <span className="text-sm font-bold text-slate-700">{res.category}</span>
         </div>
 
-        <h2 className="font-extrabold text-lg text-slate-900 pr-20">{res.title}</h2>
+        <h2 className="font-extrabold text-lg text-slate-900 pr-28">{res.title}</h2>
 
         {res.description ? (
           <p className="text-sm text-gray-600 mt-2">{res.description}</p>
