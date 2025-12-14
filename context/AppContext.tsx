@@ -40,8 +40,9 @@ export interface User {
   status: Status;
   certification?: string;
 
+  // UI
   level: string;
-  avatarUrl: string;
+  avatarUrl: string; // buit si no hi ha foto
 }
 
 export interface Trip {
@@ -79,28 +80,16 @@ export interface Course {
 export interface SocialEvent {
   id: string;
   title: string;
-  date: string;
-  time?: string;
+  date: string; // "2025-12-14"
+  time?: string; // "19:00"
   location?: string;
   description?: string;
   imageUrl?: string;
   locationUrl?: string;
   maxSpots?: number;
 
-  createdBy: string;
+  createdBy: string; // user id
   participants: string[];
-}
-
-export interface EventItem {
-  id: string;
-  title: string;
-  date: string;        // "2025-12-14"
-  time?: string;       // "19:00"
-  location?: string;
-  description?: string;
-  createdBy: string;   // user id
-  participants: string[];
-  imageUrl?: string;
 }
 
 export interface ClubSettings {
@@ -114,16 +103,18 @@ interface AppState {
   users: User[];
   trips: Trip[];
   courses: Course[];
-  events: EventItem[];
+  socialEvents: SocialEvent[];
   currentUser: User | null;
   clubSettings: ClubSettings;
 }
 
 interface AppContextValue extends AppState {
+  // auth
   loginAsDemoAdmin: () => void;
   loginWithEmail: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 
+  // persones sòcies
   registerUser: (data: {
     name: string;
     email: string;
@@ -134,13 +125,18 @@ interface AppContextValue extends AppState {
   approveUser: (userId: string) => void;
   setUserRole: (userId: string, role: Role) => void;
 
+  // permisos
   canManageTrips: () => boolean;
   canManageSystem: () => boolean;
 
+  // crear
   createTrip: (data: Omit<Trip, "id" | "createdBy" | "participants">) => void;
   createCourse: (data: Omit<Course, "id" | "createdBy" | "participants">) => void;
-  createSocialEvent: (data: Omit<SocialEvent, "id" | "createdBy" | "participants">) => void;
+  createSocialEvent: (
+    data: Omit<SocialEvent, "id" | "createdBy" | "participants">
+  ) => void;
 
+  // apuntar/desapuntar
   joinTrip: (tripId: string) => void;
   leaveTrip: (tripId: string) => void;
 
@@ -177,7 +173,7 @@ const initialState: AppState = {
   trips: [],
   courses: [],
   socialEvents: [],
-  currentUser: null,
+  currentUser: null, // Firebase mana
   clubSettings: defaultClubSettings,
 };
 
@@ -198,13 +194,13 @@ function roleToLevel(role: Role) {
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [state, setState] = useState<AppState>(initialState);
 
-  // carregar estat guardat
+  // carregar estat guardat (localStorage)
   useEffect(() => {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return;
 
     try {
-      const parsed = JSON.parse(raw) as Partial<AppState>;
+      const parsed = JSON.parse(raw) as any;
 
       const safeUsers = (parsed.users ?? initialState.users).map((u: any) => ({
         ...u,
@@ -213,13 +209,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         certification: u.certification ?? "",
       }));
 
+      // ✅ Migració: si abans havies guardat "events", els passem a "socialEvents"
+      const migratedSocialEvents: SocialEvent[] =
+        parsed.socialEvents ??
+        parsed.events ?? // per si algun fitxer antic feia servir "events"
+        [];
+
       setState((prev) => ({
         ...prev,
-        ...parsed,
         users: safeUsers,
         trips: parsed.trips ?? [],
         courses: parsed.courses ?? [],
-        socialEvents: parsed.socialEvents ?? [],
+        socialEvents: migratedSocialEvents,
         clubSettings: {
           ...defaultClubSettings,
           ...(parsed.clubSettings ?? {}),
@@ -249,6 +250,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       setState((prev) => {
         let found = prev.users.find((u) => u.email.toLowerCase() === email);
 
+        // si no existeix a "users", el creem pending
         if (!found) {
           const newUser: User = {
             id: fbUser.uid,
@@ -263,11 +265,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           return { ...prev, users: [...prev.users, newUser], currentUser: newUser };
         }
 
+        // assegurar que l'id coincideix amb uid
         if (found.id !== fbUser.uid) {
           found = { ...found, id: fbUser.uid };
           return {
             ...prev,
-            users: prev.users.map((u) => (u.email.toLowerCase() === email ? found! : u)),
+            users: prev.users.map((u) =>
+              u.email.toLowerCase() === email ? found! : u
+            ),
             currentUser: found,
           };
         }
@@ -279,6 +284,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     return () => unsub();
   }, []);
 
+  // DEMO admin (sense Firebase) - útil per proves
   const loginAsDemoAdmin = () => {
     setState((prev) => ({ ...prev, currentUser: initialAdmin }));
   };
@@ -383,7 +389,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return false;
     }
     if (state.currentUser.role !== "admin" && state.currentUser.role !== "instructor") {
-      alert("Només administració o instructors poden crear això.");
+      alert("Només administració o equip instructor poden crear això.");
       return false;
     }
     return true;
@@ -497,7 +503,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       ...prev,
       socialEvents: prev.socialEvents.map((ev) =>
         ev.id === eventId
-          ? { ...ev, participants: ev.participants.filter((id) => id !== prev.currentUser!.id) }
+          ? {
+              ...ev,
+              participants: ev.participants.filter((id) => id !== prev.currentUser!.id),
+            }
           : ev
       ),
     }));
