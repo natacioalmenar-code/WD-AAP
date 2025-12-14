@@ -15,89 +15,33 @@ import {
   signOut,
 } from "firebase/auth";
 
-import { auth } from "../firebase/firebase";
+import {
+  collection,
+  doc,
+  setDoc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  onSnapshot,
+  query,
+  orderBy,
+  serverTimestamp,
+  getDoc,
+  arrayUnion,
+  arrayRemove,
+} from "firebase/firestore";
 
-export const FECDAS_LEVELS = [
-  "B1E",
-  "B2E",
-  "B3E",
-  "GG",
-  "IN1E",
-  "IN2E",
-  "IN3E",
-] as const;
-
-export type FecdAsLevel = (typeof FECDAS_LEVELS)[number];
-
-export type Role = "admin" | "instructor" | "member" | "pending";
-export type Status = "pending" | "active";
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: Role;
-  status: Status;
-  certification?: string;
-
-  // UI
-  level: string;
-  avatarUrl: string; // buit si no hi ha foto
-}
-
-export interface Trip {
-  id: string;
-  title: string;
-  date: string;
-  location: string;
-  levelRequired: string;
-  maxSpots: number;
-  createdBy: string;
-  participants: string[];
-
-  time?: string;
-  depth?: string;
-  description?: string;
-  imageUrl?: string;
-  locationUrl?: string;
-}
-
-export interface Course {
-  id: string;
-  title: string;
-  date: string;
-  schedule: string;
-  description: string;
-  price: string;
-  levelRequired: string;
-  createdBy: string;
-  participants: string[];
-
-  maxSpots?: number;
-  imageUrl?: string;
-}
-
-export interface SocialEvent {
-  id: string;
-  title: string;
-  date: string; // "2025-12-14"
-  time?: string; // "19:00"
-  location?: string;
-  description?: string;
-  imageUrl?: string;
-  locationUrl?: string;
-  maxSpots?: number;
-
-  createdBy: string; // user id
-  participants: string[];
-}
-
-export interface ClubSettings {
-  logoUrl: string;
-  navbarPreTitle: string;
-  heroTitle: string;
-  appBackgroundUrl?: string;
-}
+import { auth, db } from "../firebase/firebase";
+import type {
+  User,
+  Role,
+  Status,
+  Trip,
+  Course,
+  SocialEvent,
+  ClubSettings,
+  PublishableStatus,
+} from "../types";
 
 interface AppState {
   users: User[];
@@ -110,11 +54,10 @@ interface AppState {
 
 interface AppContextValue extends AppState {
   // auth
-  loginAsDemoAdmin: () => void;
   loginWithEmail: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 
-  // persones sòcies
+  // registre socis/es
   registerUser: (data: {
     name: string;
     email: string;
@@ -122,32 +65,62 @@ interface AppContextValue extends AppState {
     certification: string;
   }) => Promise<void>;
 
-  approveUser: (userId: string) => void;
-  setUserRole: (userId: string, role: Role) => void;
+  // admins
+  approveUser: (userId: string) => Promise<void>;
+  setUserRole: (userId: string, role: Role) => Promise<void>;
 
   // permisos
-  canManageTrips: () => boolean;
-  canManageSystem: () => boolean;
+  canManageTrips: () => boolean; // admin o instructor
+  canManageSystem: () => boolean; // admin
+  isActiveMember: () => boolean; // status active i role != pending
 
-  // crear
-  createTrip: (data: Omit<Trip, "id" | "createdBy" | "participants">) => void;
-  createCourse: (data: Omit<Course, "id" | "createdBy" | "participants">) => void;
-  createSocialEvent: (
-    data: Omit<SocialEvent, "id" | "createdBy" | "participants">
-  ) => void;
+  // CRUD Trips/Courses/Events
+  createTrip: (data: Omit<Trip, "id" | "createdBy" | "participants" | "pendingParticipants" | "published" | "status">) => Promise<void>;
+  updateTrip: (tripId: string, data: Partial<Trip>) => Promise<void>;
+  deleteTrip: (tripId: string) => Promise<void>;
+  setTripPublished: (tripId: string, published: boolean) => Promise<void>;
+  cancelTrip: (tripId: string, reason?: string) => Promise<void>;
 
-  // apuntar/desapuntar
-  joinTrip: (tripId: string) => void;
-  leaveTrip: (tripId: string) => void;
+  createCourse: (data: Omit<Course, "id" | "createdBy" | "participants" | "pendingParticipants" | "published" | "status">) => Promise<void>;
+  updateCourse: (courseId: string, data: Partial<Course>) => Promise<void>;
+  deleteCourse: (courseId: string) => Promise<void>;
+  setCoursePublished: (courseId: string, published: boolean) => Promise<void>;
+  cancelCourse: (courseId: string, reason?: string) => Promise<void>;
 
-  joinCourse: (courseId: string) => void;
-  leaveCourse: (courseId: string) => void;
+  createSocialEvent: (data: Omit<SocialEvent, "id" | "createdBy" | "participants" | "pendingParticipants" | "published" | "status">) => Promise<void>;
+  updateSocialEvent: (eventId: string, data: Partial<SocialEvent>) => Promise<void>;
+  deleteSocialEvent: (eventId: string) => Promise<void>;
+  setSocialEventPublished: (eventId: string, published: boolean) => Promise<void>;
+  cancelSocialEvent: (eventId: string, reason?: string) => Promise<void>;
 
-  joinSocialEvent: (eventId: string) => void;
-  leaveSocialEvent: (eventId: string) => void;
+  // inscripcions (amb aprovació)
+  requestJoinTrip: (tripId: string) => Promise<void>;
+  cancelJoinRequestTrip: (tripId: string) => Promise<void>;
+  approveTripRequest: (tripId: string, userId: string) => Promise<void>;
+  rejectTripRequest: (tripId: string, userId: string) => Promise<void>;
+  leaveTrip: (tripId: string) => Promise<void>;
+
+  requestJoinCourse: (courseId: string) => Promise<void>;
+  cancelJoinRequestCourse: (courseId: string) => Promise<void>;
+  approveCourseRequest: (courseId: string, userId: string) => Promise<void>;
+  rejectCourseRequest: (courseId: string, userId: string) => Promise<void>;
+  leaveCourse: (courseId: string) => Promise<void>;
+
+  requestJoinSocialEvent: (eventId: string) => Promise<void>;
+  cancelJoinRequestSocialEvent: (eventId: string) => Promise<void>;
+  approveSocialEventRequest: (eventId: string, userId: string) => Promise<void>;
+  rejectSocialEventRequest: (eventId: string, userId: string) => Promise<void>;
+  leaveSocialEvent: (eventId: string) => Promise<void>;
+
+  // compatibilitat amb codi antic (si hi ha pàgines que encara ho criden)
+  joinTrip: (tripId: string) => Promise<void>;
+  joinCourse: (courseId: string) => Promise<void>;
+  joinSocialEvent: (eventId: string) => Promise<void>;
+
+  // settings
+  updateClubSettings: (data: Partial<ClubSettings>) => Promise<void>;
 }
 
-const STORAGE_KEY = "westdivers-app-state-v6";
 const AppContext = createContext<AppContextValue | undefined>(undefined);
 
 const defaultClubSettings: ClubSettings = {
@@ -157,30 +130,6 @@ const defaultClubSettings: ClubSettings = {
   appBackgroundUrl: "",
 };
 
-const initialAdmin: User = {
-  id: "admin-1",
-  name: "Administració West Divers",
-  email: "admin@westdivers.local",
-  role: "admin",
-  status: "active",
-  level: "ADMIN",
-  avatarUrl: "",
-  certification: "ADMIN",
-};
-
-const initialState: AppState = {
-  users: [initialAdmin],
-  trips: [],
-  courses: [],
-  socialEvents: [],
-  currentUser: null, // Firebase mana
-  clubSettings: defaultClubSettings,
-};
-
-function createId() {
-  return Math.random().toString(36).slice(2) + Date.now().toString(36);
-}
-
 function roleToLevel(role: Role) {
   return role === "admin"
     ? "ADMIN"
@@ -188,114 +137,183 @@ function roleToLevel(role: Role) {
     ? "INSTRUCTOR"
     : role === "pending"
     ? "PENDENT"
-    : "B1";
+    : "B1E";
+}
+
+function assertAuthed(currentUser: User | null): asserts currentUser is User {
+  if (!currentUser) throw new Error("No autenticat/da.");
 }
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
-  const [state, setState] = useState<AppState>(initialState);
+  const [state, setState] = useState<AppState>({
+    users: [],
+    trips: [],
+    courses: [],
+    socialEvents: [],
+    currentUser: null,
+    clubSettings: defaultClubSettings,
+  });
 
-  // carregar estat guardat (localStorage)
+  /**
+   * 1) Subscriptions Firestore: users, trips, courses, events, settings
+   */
   useEffect(() => {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
+    const unsubUsers = onSnapshot(
+      query(collection(db, "users"), orderBy("createdAt", "asc")),
+      (snap) => {
+        const users = snap.docs.map((d) => d.data() as User);
+        setState((prev) => {
+          // refresca currentUser si existeix
+          const cur = prev.currentUser
+            ? users.find((u) => u.id === prev.currentUser!.id) ?? prev.currentUser
+            : null;
 
-    try {
-      const parsed = JSON.parse(raw) as any;
+          return { ...prev, users, currentUser: cur };
+        });
+      }
+    );
 
-      const safeUsers = (parsed.users ?? initialState.users).map((u: any) => ({
-        ...u,
-        level: u.level ?? roleToLevel(u.role),
-        avatarUrl: u.avatarUrl ?? "",
-        certification: u.certification ?? "",
-      }));
+    const unsubTrips = onSnapshot(
+      query(collection(db, "trips"), orderBy("date", "asc")),
+      (snap) => {
+        const trips = snap.docs.map((d) => ({ ...(d.data() as any), id: d.id })) as Trip[];
+        setState((prev) => ({ ...prev, trips }));
+      }
+    );
 
-      // ✅ Migració: si abans havies guardat "events", els passem a "socialEvents"
-      const migratedSocialEvents: SocialEvent[] =
-        parsed.socialEvents ??
-        parsed.events ?? // per si algun fitxer antic feia servir "events"
-        [];
+    const unsubCourses = onSnapshot(
+      query(collection(db, "courses"), orderBy("date", "asc")),
+      (snap) => {
+        const courses = snap.docs.map((d) => ({ ...(d.data() as any), id: d.id })) as Course[];
+        setState((prev) => ({ ...prev, courses }));
+      }
+    );
 
-      setState((prev) => ({
-        ...prev,
-        users: safeUsers,
-        trips: parsed.trips ?? [],
-        courses: parsed.courses ?? [],
-        socialEvents: migratedSocialEvents,
-        clubSettings: {
-          ...defaultClubSettings,
-          ...(parsed.clubSettings ?? {}),
-        },
-      }));
-    } catch {
-      // ignorem errors
-    }
+    const unsubEvents = onSnapshot(
+      query(collection(db, "socialEvents"), orderBy("date", "asc")),
+      (snap) => {
+        const socialEvents = snap.docs.map((d) => ({ ...(d.data() as any), id: d.id })) as SocialEvent[];
+        setState((prev) => ({ ...prev, socialEvents }));
+      }
+    );
+
+    const settingsRef = doc(db, "clubSettings", "main");
+    const unsubSettings = onSnapshot(settingsRef, (snap) => {
+      if (!snap.exists()) {
+        // crea settings per defecte si no existeix
+        setDoc(settingsRef, { ...defaultClubSettings, updatedAt: serverTimestamp() }).catch(() => {});
+        setState((prev) => ({ ...prev, clubSettings: defaultClubSettings }));
+        return;
+      }
+      setState((prev) => ({ ...prev, clubSettings: snap.data() as ClubSettings }));
+    });
+
+    return () => {
+      unsubUsers();
+      unsubTrips();
+      unsubCourses();
+      unsubEvents();
+      unsubSettings();
+    };
   }, []);
 
-  // guardar estat (excepte currentUser)
+  /**
+   * 2) Auth listener -> assegura doc user a Firestore
+   */
   useEffect(() => {
-    const { currentUser, ...rest } = state;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(rest));
-  }, [state.users, state.trips, state.courses, state.socialEvents, state.clubSettings]);
-
-  // Firebase Auth listener
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (fbUser) => {
+    const unsub = onAuthStateChanged(auth, async (fbUser) => {
       if (!fbUser?.email) {
         setState((prev) => ({ ...prev, currentUser: null }));
         return;
       }
 
       const email = fbUser.email.toLowerCase();
+      const uid = fbUser.uid;
 
-      setState((prev) => {
-        let found = prev.users.find((u) => u.email.toLowerCase() === email);
+      // Intenta trobar user existent en estat (per velocitat)
+      const localFound = state.users.find((u) => u.id === uid || u.email?.toLowerCase() === email);
 
-        // si no existeix a "users", el creem pending
-        if (!found) {
-          const newUser: User = {
-            id: fbUser.uid,
-            name: fbUser.displayName || "Nou/va soci/a",
-            email,
-            role: "pending",
-            status: "pending",
-            level: "PENDENT",
-            avatarUrl: "",
-            certification: "",
-          };
-          return { ...prev, users: [...prev.users, newUser], currentUser: newUser };
-        }
+      // Si no està en estat encara, consulta Firestore
+      let userDocData: User | null = localFound ?? null;
 
-        // assegurar que l'id coincideix amb uid
-        if (found.id !== fbUser.uid) {
-          found = { ...found, id: fbUser.uid };
-          return {
-            ...prev,
-            users: prev.users.map((u) =>
-              u.email.toLowerCase() === email ? found! : u
-            ),
-            currentUser: found,
-          };
-        }
+      if (!userDocData) {
+        const userRef = doc(db, "users", uid);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) userDocData = userSnap.data() as User;
+      }
 
-        return { ...prev, currentUser: found };
-      });
+      // Si no existeix userDoc, crea'l com pending
+      if (!userDocData) {
+        const newUser: User = {
+          id: uid,
+          name: fbUser.displayName || "Nou/va soci/a",
+          email,
+          role: "pending",
+          status: "pending",
+          level: "PENDENT",
+          avatarUrl: "",
+          certification: "",
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        };
+
+        await setDoc(doc(db, "users", uid), newUser, { merge: true }).catch(() => {});
+        setState((prev) => ({ ...prev, currentUser: newUser }));
+        return;
+      }
+
+      // Normalitza camps mínims (per migracions)
+      const patched: Partial<User> = {};
+      if (!userDocData.level) patched.level = roleToLevel(userDocData.role);
+      if (userDocData.avatarUrl === undefined) patched.avatarUrl = "";
+      if (!userDocData.email) patched.email = email;
+      if (Object.keys(patched).length) {
+        await updateDoc(doc(db, "users", uid), { ...patched, updatedAt: serverTimestamp() }).catch(() => {});
+        userDocData = { ...userDocData, ...patched } as User;
+      }
+
+      setState((prev) => ({ ...prev, currentUser: userDocData }));
     });
 
+    // IMPORTANT: depenem de state.users, però no volem resubscribe constant.
+    // Es gestiona bé perquè el listener s'executa quan canvia auth.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     return () => unsub();
-  }, []);
+  }, [state.users]);
 
-  // DEMO admin (sense Firebase) - útil per proves
-  const loginAsDemoAdmin = () => {
-    setState((prev) => ({ ...prev, currentUser: initialAdmin }));
-  };
+  /**
+   * Permisos
+   */
+  const canManageTrips = useMemo(() => {
+    return () =>
+      !!state.currentUser &&
+      state.currentUser.status === "active" &&
+      (state.currentUser.role === "admin" || state.currentUser.role === "instructor");
+  }, [state.currentUser]);
 
+  const canManageSystem = useMemo(() => {
+    return () =>
+      !!state.currentUser &&
+      state.currentUser.status === "active" &&
+      state.currentUser.role === "admin";
+  }, [state.currentUser]);
+
+  const isActiveMember = useMemo(() => {
+    return () =>
+      !!state.currentUser &&
+      state.currentUser.status === "active" &&
+      state.currentUser.role !== "pending";
+  }, [state.currentUser]);
+
+  /**
+   * AUTH
+   */
   const loginWithEmail: AppContextValue["loginWithEmail"] = async (email, password) => {
     const trimmed = email.trim().toLowerCase();
     if (!trimmed || !password) {
       alert("Falten dades (correu i contrasenya).");
       return;
     }
-
     try {
       await signInWithEmailAndPassword(auth, trimmed, password);
     } catch {
@@ -312,6 +330,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  /**
+   * REGISTRE
+   */
   const registerUser: AppContextValue["registerUser"] = async ({
     name,
     email,
@@ -331,23 +352,20 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const cred = await createUserWithEmailAndPassword(auth, trimmedEmail, password);
       await updateProfile(cred.user, { displayName: trimmedName });
 
-      setState((prev) => {
-        if (prev.users.some((u) => u.email.toLowerCase() === trimmedEmail)) return prev;
+      const newUser: User = {
+        id: cred.user.uid,
+        name: trimmedName,
+        email: trimmedEmail,
+        role: "pending",
+        status: "pending",
+        level: "PENDENT",
+        avatarUrl: "",
+        certification: trimmedCert,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
 
-        const newUser: User = {
-          id: cred.user.uid,
-          name: trimmedName,
-          email: trimmedEmail,
-          role: "pending",
-          status: "pending",
-          level: "PENDENT",
-          avatarUrl: "",
-          certification: trimmedCert,
-        };
-
-        return { ...prev, users: [...prev.users, newUser] };
-      });
-
+      await setDoc(doc(db, "users", cred.user.uid), newUser, { merge: true });
       alert("Compte creat. Ara l’administració ha d’aprovar el teu accés.");
       await signOut(auth);
     } catch {
@@ -355,182 +373,409 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const approveUser: AppContextValue["approveUser"] = (userId) => {
-    setState((prev) => ({
-      ...prev,
-      users: prev.users.map((u) =>
-        u.id === userId ? { ...u, status: "active", role: "member", level: "B1" } : u
-      ),
-    }));
-  };
-
-  const setUserRole: AppContextValue["setUserRole"] = (userId, role) => {
-    setState((prev) => ({
-      ...prev,
-      users: prev.users.map((u) =>
-        u.id === userId ? { ...u, role, level: roleToLevel(role) } : u
-      ),
-    }));
-  };
-
-  const canManageTrips = useMemo(() => {
-    return () =>
-      !!state.currentUser &&
-      (state.currentUser.role === "admin" || state.currentUser.role === "instructor");
-  }, [state.currentUser]);
-
-  const canManageSystem = useMemo(() => {
-    return () => !!state.currentUser && state.currentUser.role === "admin";
-  }, [state.currentUser]);
-
-  const canCreate = () => {
-    if (!state.currentUser) {
-      alert("Has d’iniciar sessió.");
-      return false;
+  /**
+   * ADMINS: aprovar usuari / canviar rol
+   */
+  const approveUser: AppContextValue["approveUser"] = async (userId) => {
+    if (!canManageSystem()) {
+      alert("Només administració pot aprovar persones sòcies.");
+      return;
     }
-    if (state.currentUser.role !== "admin" && state.currentUser.role !== "instructor") {
-      alert("Només administració o equip instructor poden crear això.");
+    await updateDoc(doc(db, "users", userId), {
+      status: "active" as Status,
+      role: "member" as Role,
+      level: "B1E",
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  const setUserRole: AppContextValue["setUserRole"] = async (userId, role) => {
+    if (!canManageSystem()) {
+      alert("Només administració pot canviar rols.");
+      return;
+    }
+    await updateDoc(doc(db, "users", userId), {
+      role,
+      level: roleToLevel(role),
+      // si li dones rol admin/instructor, normalment ha d'estar actiu
+      status: "active" as Status,
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  /**
+   * Helpers CRUD publishable
+   */
+  const ensureCanCreateOrEdit = () => {
+    if (!canManageTrips()) {
+      alert("Només administració o instructors poden gestionar això.");
       return false;
     }
     return true;
   };
 
-  const createTrip: AppContextValue["createTrip"] = (data) => {
-    if (!canCreate()) return;
-    setState((prev) => ({
-      ...prev,
-      trips: [
-        ...prev.trips,
-        { ...data, id: createId(), createdBy: prev.currentUser!.id, participants: [] },
-      ],
-    }));
+  const baseDefaults = (currentUserId: string) => ({
+    createdBy: currentUserId,
+    participants: [] as string[],
+    pendingParticipants: [] as string[],
+    published: false,
+    status: "active" as PublishableStatus,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+
+  /**
+   * TRIPS
+   */
+  const createTrip: AppContextValue["createTrip"] = async (data) => {
+    if (!ensureCanCreateOrEdit()) return;
+    assertAuthed(state.currentUser);
+
+    await addDoc(collection(db, "trips"), {
+      ...baseDefaults(state.currentUser.id),
+      ...data,
+    });
   };
 
-  const createCourse: AppContextValue["createCourse"] = (data) => {
-    if (!canCreate()) return;
-    setState((prev) => ({
-      ...prev,
-      courses: [
-        ...prev.courses,
-        { ...data, id: createId(), createdBy: prev.currentUser!.id, participants: [] },
-      ],
-    }));
+  const updateTrip: AppContextValue["updateTrip"] = async (tripId, data) => {
+    if (!ensureCanCreateOrEdit()) return;
+    await updateDoc(doc(db, "trips", tripId), { ...data, updatedAt: serverTimestamp() });
   };
 
-  const createSocialEvent: AppContextValue["createSocialEvent"] = (data) => {
-    if (!canCreate()) return;
-    setState((prev) => ({
-      ...prev,
-      socialEvents: [
-        ...prev.socialEvents,
-        { ...data, id: createId(), createdBy: prev.currentUser!.id, participants: [] },
-      ],
-    }));
-  };
-
-  const joinTrip: AppContextValue["joinTrip"] = (tripId) => {
-    if (!state.currentUser) {
-      alert("Has d’iniciar sessió per apuntar-te.");
+  const deleteTrip: AppContextValue["deleteTrip"] = async (tripId) => {
+    if (!canManageSystem()) {
+      alert("Només administració pot esborrar definitivament.");
       return;
     }
-    setState((prev) => ({
-      ...prev,
-      trips: prev.trips.map((t) =>
-        t.id === tripId && !t.participants.includes(prev.currentUser!.id)
-          ? { ...t, participants: [...t.participants, prev.currentUser!.id] }
-          : t
-      ),
-    }));
+    await deleteDoc(doc(db, "trips", tripId));
   };
 
-  const leaveTrip: AppContextValue["leaveTrip"] = (tripId) => {
-    if (!state.currentUser) return;
-    setState((prev) => ({
-      ...prev,
-      trips: prev.trips.map((t) =>
-        t.id === tripId
-          ? { ...t, participants: t.participants.filter((id) => id !== prev.currentUser!.id) }
-          : t
-      ),
-    }));
+  const setTripPublished: AppContextValue["setTripPublished"] = async (tripId, published) => {
+    if (!ensureCanCreateOrEdit()) return;
+    await updateDoc(doc(db, "trips", tripId), { published, updatedAt: serverTimestamp() });
   };
 
-  const joinCourse: AppContextValue["joinCourse"] = (courseId) => {
-    if (!state.currentUser) {
-      alert("Has d’iniciar sessió per apuntar-te.");
+  const cancelTrip: AppContextValue["cancelTrip"] = async (tripId, reason) => {
+    if (!ensureCanCreateOrEdit()) return;
+    await updateDoc(doc(db, "trips", tripId), {
+      status: "cancelled",
+      cancelledAt: serverTimestamp(),
+      cancelledReason: reason || "",
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  /**
+   * COURSES
+   */
+  const createCourse: AppContextValue["createCourse"] = async (data) => {
+    if (!ensureCanCreateOrEdit()) return;
+    assertAuthed(state.currentUser);
+
+    await addDoc(collection(db, "courses"), {
+      ...baseDefaults(state.currentUser.id),
+      ...data,
+    });
+  };
+
+  const updateCourse: AppContextValue["updateCourse"] = async (courseId, data) => {
+    if (!ensureCanCreateOrEdit()) return;
+    await updateDoc(doc(db, "courses", courseId), { ...data, updatedAt: serverTimestamp() });
+  };
+
+  const deleteCourse: AppContextValue["deleteCourse"] = async (courseId) => {
+    if (!canManageSystem()) {
+      alert("Només administració pot esborrar definitivament.");
       return;
     }
-    setState((prev) => ({
-      ...prev,
-      courses: prev.courses.map((c) =>
-        c.id === courseId && !c.participants.includes(prev.currentUser!.id)
-          ? { ...c, participants: [...c.participants, prev.currentUser!.id] }
-          : c
-      ),
-    }));
+    await deleteDoc(doc(db, "courses", courseId));
   };
 
-  const leaveCourse: AppContextValue["leaveCourse"] = (courseId) => {
-    if (!state.currentUser) return;
-    setState((prev) => ({
-      ...prev,
-      courses: prev.courses.map((c) =>
-        c.id === courseId
-          ? { ...c, participants: c.participants.filter((id) => id !== prev.currentUser!.id) }
-          : c
-      ),
-    }));
+  const setCoursePublished: AppContextValue["setCoursePublished"] = async (courseId, published) => {
+    if (!ensureCanCreateOrEdit()) return;
+    await updateDoc(doc(db, "courses", courseId), { published, updatedAt: serverTimestamp() });
   };
 
-  const joinSocialEvent: AppContextValue["joinSocialEvent"] = (eventId) => {
-    if (!state.currentUser) {
-      alert("Has d’iniciar sessió per apuntar-te.");
+  const cancelCourse: AppContextValue["cancelCourse"] = async (courseId, reason) => {
+    if (!ensureCanCreateOrEdit()) return;
+    await updateDoc(doc(db, "courses", courseId), {
+      status: "cancelled",
+      cancelledAt: serverTimestamp(),
+      cancelledReason: reason || "",
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  /**
+   * SOCIAL EVENTS
+   */
+  const createSocialEvent: AppContextValue["createSocialEvent"] = async (data) => {
+    if (!ensureCanCreateOrEdit()) return;
+    assertAuthed(state.currentUser);
+
+    await addDoc(collection(db, "socialEvents"), {
+      ...baseDefaults(state.currentUser.id),
+      ...data,
+    });
+  };
+
+  const updateSocialEvent: AppContextValue["updateSocialEvent"] = async (eventId, data) => {
+    if (!ensureCanCreateOrEdit()) return;
+    await updateDoc(doc(db, "socialEvents", eventId), { ...data, updatedAt: serverTimestamp() });
+  };
+
+  const deleteSocialEvent: AppContextValue["deleteSocialEvent"] = async (eventId) => {
+    if (!canManageSystem()) {
+      alert("Només administració pot esborrar definitivament.");
       return;
     }
-    setState((prev) => ({
-      ...prev,
-      socialEvents: prev.socialEvents.map((ev) =>
-        ev.id === eventId && !ev.participants.includes(prev.currentUser!.id)
-          ? { ...ev, participants: [...ev.participants, prev.currentUser!.id] }
-          : ev
-      ),
-    }));
+    await deleteDoc(doc(db, "socialEvents", eventId));
   };
 
-  const leaveSocialEvent: AppContextValue["leaveSocialEvent"] = (eventId) => {
+  const setSocialEventPublished: AppContextValue["setSocialEventPublished"] = async (eventId, published) => {
+    if (!ensureCanCreateOrEdit()) return;
+    await updateDoc(doc(db, "socialEvents", eventId), { published, updatedAt: serverTimestamp() });
+  };
+
+  const cancelSocialEvent: AppContextValue["cancelSocialEvent"] = async (eventId, reason) => {
+    if (!ensureCanCreateOrEdit()) return;
+    await updateDoc(doc(db, "socialEvents", eventId), {
+      status: "cancelled",
+      cancelledAt: serverTimestamp(),
+      cancelledReason: reason || "",
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  /**
+   * Inscripcions: patró comú
+   * - membres actius: requestJoin -> pendingParticipants
+   * - instructors/admin: approve/reject pendents
+   * - leave: treure de participants (aprovats)
+   */
+  const ensureCanRequest = () => {
+    if (!isActiveMember()) {
+      alert("Has d’estar aprovat/da per a apuntar-te.");
+      return false;
+    }
+    return true;
+  };
+
+  const requestJoinTrip: AppContextValue["requestJoinTrip"] = async (tripId) => {
+    if (!ensureCanRequest()) return;
+    assertAuthed(state.currentUser);
+
+    await updateDoc(doc(db, "trips", tripId), {
+      pendingParticipants: arrayUnion(state.currentUser.id),
+      // per si estava dins participants i volia re-sol·licitar (casos raros)
+      participants: arrayRemove(state.currentUser.id),
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  const cancelJoinRequestTrip: AppContextValue["cancelJoinRequestTrip"] = async (tripId) => {
     if (!state.currentUser) return;
-    setState((prev) => ({
-      ...prev,
-      socialEvents: prev.socialEvents.map((ev) =>
-        ev.id === eventId
-          ? {
-              ...ev,
-              participants: ev.participants.filter((id) => id !== prev.currentUser!.id),
-            }
-          : ev
-      ),
-    }));
+    await updateDoc(doc(db, "trips", tripId), {
+      pendingParticipants: arrayRemove(state.currentUser.id),
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  const approveTripRequest: AppContextValue["approveTripRequest"] = async (tripId, userId) => {
+    if (!ensureCanCreateOrEdit()) return;
+    await updateDoc(doc(db, "trips", tripId), {
+      pendingParticipants: arrayRemove(userId),
+      participants: arrayUnion(userId),
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  const rejectTripRequest: AppContextValue["rejectTripRequest"] = async (tripId, userId) => {
+    if (!ensureCanCreateOrEdit()) return;
+    await updateDoc(doc(db, "trips", tripId), {
+      pendingParticipants: arrayRemove(userId),
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  const leaveTrip: AppContextValue["leaveTrip"] = async (tripId) => {
+    if (!state.currentUser) return;
+    await updateDoc(doc(db, "trips", tripId), {
+      participants: arrayRemove(state.currentUser.id),
+      pendingParticipants: arrayRemove(state.currentUser.id),
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  const requestJoinCourse: AppContextValue["requestJoinCourse"] = async (courseId) => {
+    if (!ensureCanRequest()) return;
+    assertAuthed(state.currentUser);
+
+    await updateDoc(doc(db, "courses", courseId), {
+      pendingParticipants: arrayUnion(state.currentUser.id),
+      participants: arrayRemove(state.currentUser.id),
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  const cancelJoinRequestCourse: AppContextValue["cancelJoinRequestCourse"] = async (courseId) => {
+    if (!state.currentUser) return;
+    await updateDoc(doc(db, "courses", courseId), {
+      pendingParticipants: arrayRemove(state.currentUser.id),
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  const approveCourseRequest: AppContextValue["approveCourseRequest"] = async (courseId, userId) => {
+    if (!ensureCanCreateOrEdit()) return;
+    await updateDoc(doc(db, "courses", courseId), {
+      pendingParticipants: arrayRemove(userId),
+      participants: arrayUnion(userId),
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  const rejectCourseRequest: AppContextValue["rejectCourseRequest"] = async (courseId, userId) => {
+    if (!ensureCanCreateOrEdit()) return;
+    await updateDoc(doc(db, "courses", courseId), {
+      pendingParticipants: arrayRemove(userId),
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  const leaveCourse: AppContextValue["leaveCourse"] = async (courseId) => {
+    if (!state.currentUser) return;
+    await updateDoc(doc(db, "courses", courseId), {
+      participants: arrayRemove(state.currentUser.id),
+      pendingParticipants: arrayRemove(state.currentUser.id),
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  const requestJoinSocialEvent: AppContextValue["requestJoinSocialEvent"] = async (eventId) => {
+    if (!ensureCanRequest()) return;
+    assertAuthed(state.currentUser);
+
+    await updateDoc(doc(db, "socialEvents", eventId), {
+      pendingParticipants: arrayUnion(state.currentUser.id),
+      participants: arrayRemove(state.currentUser.id),
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  const cancelJoinRequestSocialEvent: AppContextValue["cancelJoinRequestSocialEvent"] = async (eventId) => {
+    if (!state.currentUser) return;
+    await updateDoc(doc(db, "socialEvents", eventId), {
+      pendingParticipants: arrayRemove(state.currentUser.id),
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  const approveSocialEventRequest: AppContextValue["approveSocialEventRequest"] = async (eventId, userId) => {
+    if (!ensureCanCreateOrEdit()) return;
+    await updateDoc(doc(db, "socialEvents", eventId), {
+      pendingParticipants: arrayRemove(userId),
+      participants: arrayUnion(userId),
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  const rejectSocialEventRequest: AppContextValue["rejectSocialEventRequest"] = async (eventId, userId) => {
+    if (!ensureCanCreateOrEdit()) return;
+    await updateDoc(doc(db, "socialEvents", eventId), {
+      pendingParticipants: arrayRemove(userId),
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  const leaveSocialEvent: AppContextValue["leaveSocialEvent"] = async (eventId) => {
+    if (!state.currentUser) return;
+    await updateDoc(doc(db, "socialEvents", eventId), {
+      participants: arrayRemove(state.currentUser.id),
+      pendingParticipants: arrayRemove(state.currentUser.id),
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  /**
+   * Compatibilitat amb codi antic:
+   * - abans joinX afegia directe a participants
+   * - ara joinX = requestJoinX (passa a pending)
+   */
+  const joinTrip: AppContextValue["joinTrip"] = (tripId) => requestJoinTrip(tripId);
+  const joinCourse: AppContextValue["joinCourse"] = (courseId) => requestJoinCourse(courseId);
+  const joinSocialEvent: AppContextValue["joinSocialEvent"] = (eventId) => requestJoinSocialEvent(eventId);
+
+  /**
+   * Settings
+   */
+  const updateClubSettings: AppContextValue["updateClubSettings"] = async (data) => {
+    if (!canManageSystem()) {
+      alert("Només administració pot modificar la web/app.");
+      return;
+    }
+    await setDoc(
+      doc(db, "clubSettings", "main"),
+      { ...data, updatedAt: serverTimestamp() },
+      { merge: true }
+    );
   };
 
   const value: AppContextValue = {
     ...state,
-    loginAsDemoAdmin,
+
     loginWithEmail,
     logout,
+
     registerUser,
     approveUser,
     setUserRole,
+
     canManageTrips,
     canManageSystem,
+    isActiveMember,
+
     createTrip,
+    updateTrip,
+    deleteTrip,
+    setTripPublished,
+    cancelTrip,
+
     createCourse,
+    updateCourse,
+    deleteCourse,
+    setCoursePublished,
+    cancelCourse,
+
     createSocialEvent,
-    joinTrip,
+    updateSocialEvent,
+    deleteSocialEvent,
+    setSocialEventPublished,
+    cancelSocialEvent,
+
+    requestJoinTrip,
+    cancelJoinRequestTrip,
+    approveTripRequest,
+    rejectTripRequest,
     leaveTrip,
-    joinCourse,
+
+    requestJoinCourse,
+    cancelJoinRequestCourse,
+    approveCourseRequest,
+    rejectCourseRequest,
     leaveCourse,
-    joinSocialEvent,
+
+    requestJoinSocialEvent,
+    cancelJoinRequestSocialEvent,
+    approveSocialEventRequest,
+    rejectSocialEventRequest,
     leaveSocialEvent,
+
+    joinTrip,
+    joinCourse,
+    joinSocialEvent,
+
+    updateClubSettings,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
