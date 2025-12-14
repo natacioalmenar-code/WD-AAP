@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { useAppContext as useApp } from '../context/AppContext';
-import { Menu, X, LogOut, Users, PenTool } from 'lucide-react';
+import React, { useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { useAppContext as useApp } from "../context/AppContext";
+import { Menu, X, LogOut } from "lucide-react";
 
 export const Navbar: React.FC = () => {
   const { currentUser, logout, canManageSystem, canManageTrips, clubSettings } = useApp();
@@ -10,7 +10,7 @@ export const Navbar: React.FC = () => {
 
   const isPublic = !currentUser;
   const showAdmin = canManageSystem();
-  const showManagement = canManageTrips();
+  const showManagement = canManageTrips(); // ✅ admin o instructor
 
   const NavItem = ({ to, label }: { to: string; label: string }) => {
     const isActive = location.pathname === to;
@@ -20,8 +20,8 @@ export const Navbar: React.FC = () => {
         onClick={() => setIsMenuOpen(false)}
         className={`px-3 py-2 rounded-md text-sm font-bold tracking-wide transition-colors ${
           isActive
-            ? 'bg-yellow-400 text-black shadow-md'
-            : 'text-gray-300 hover:text-yellow-400 hover:bg-slate-800'
+            ? "bg-yellow-400 text-black shadow-md"
+            : "text-gray-300 hover:text-yellow-400 hover:bg-slate-800"
         }`}
       >
         {label}
@@ -44,9 +44,7 @@ export const Navbar: React.FC = () => {
                   {clubSettings.navbarPreTitle}
                 </div>
               )}
-              <div className="text-white text-xl font-extrabold">
-                {clubSettings.heroTitle}
-              </div>
+              <div className="text-white text-xl font-extrabold">{clubSettings.heroTitle}</div>
             </div>
           </Link>
 
@@ -69,8 +67,10 @@ export const Navbar: React.FC = () => {
                 <NavItem to="/social-wall" label="MUR SOCIAL" />
                 <NavItem to="/resources" label="MATERIAL" />
 
+                {/* ✅ GESTIÓ per admin + instructor */}
                 {showManagement && <NavItem to="/admin" label="GESTIÓ" />}
 
+                {/* ✅ Només admin */}
                 {showAdmin && (
                   <>
                     <NavItem to="/admin-users" label="SOCIS/ES" />
@@ -81,16 +81,13 @@ export const Navbar: React.FC = () => {
                 <div className="ml-4 flex items-center gap-3 border-l border-slate-700 pl-4">
                   <Link to="/profile" className="flex items-center gap-2">
                     <div className="hidden 2xl:block text-right">
-                      <div className="text-xs text-yellow-400 font-bold">
-                        {currentUser.name}
-                      </div>
-                      <div className="text-[10px] text-gray-400">
-                        {currentUser.level}
-                      </div>
+                      <div className="text-xs text-yellow-400 font-bold">{currentUser.name}</div>
+                      <div className="text-[10px] text-gray-400">{currentUser.level}</div>
                     </div>
                     <img
                       src={currentUser.avatarUrl}
                       className="h-9 w-9 rounded-full border-2 border-slate-600"
+                      alt="avatar"
                     />
                   </Link>
 
@@ -133,8 +130,10 @@ export const Navbar: React.FC = () => {
               <NavItem to="/resources" label="MATERIAL" />
               <NavItem to="/profile" label="EL MEU PERFIL" />
 
+              {/* ✅ GESTIÓ per admin + instructor */}
               {showManagement && <NavItem to="/admin" label="GESTIÓ" />}
 
+              {/* ✅ Només admin */}
               {showAdmin && (
                 <>
                   <NavItem to="/admin-users" label="SOCIS/ES" />
