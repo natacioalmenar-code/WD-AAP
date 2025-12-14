@@ -377,12 +377,45 @@ export const Dashboard: React.FC = () => {
               </h3>
 
               <div className="flex flex-col gap-2">
-                <Link
-                  to="/admin-trips"
-                  className="w-full px-3 py-2 rounded-lg bg-slate-900 text-yellow-400 font-extrabold text-sm hover:bg-slate-800"
-                >
-                  Gestionar activitat (sortides / cursos)
-                </Link>
+  <Link
+    to="/trips"
+    className="w-full px-3 py-2 rounded-lg bg-slate-900 text-yellow-400 font-extrabold text-sm hover:bg-slate-800"
+  >
+    Gestionar sortides
+  </Link>
+
+  <Link
+    to="/courses-private"
+    className="w-full px-3 py-2 rounded-lg bg-slate-900 text-yellow-400 font-extrabold text-sm hover:bg-slate-800"
+  >
+    Gestionar formació
+  </Link>
+
+  <Link
+    to="/social-events"
+    className="w-full px-3 py-2 rounded-lg bg-slate-900 text-yellow-400 font-extrabold text-sm hover:bg-slate-800"
+  >
+    Gestionar esdeveniments
+  </Link>
+
+  {isAdmin && (
+    <Link
+      to="/admin-users"
+      className="w-full px-3 py-2 rounded-lg bg-purple-100 text-purple-800 font-extrabold text-sm hover:bg-purple-200"
+    >
+      Gestionar socis/es (aprovacions)
+    </Link>
+  )}
+
+  {isAdmin && (
+    <Link
+      to="/admin-settings"
+      className="w-full px-3 py-2 rounded-lg bg-cyan-100 text-cyan-800 font-extrabold text-sm hover:bg-cyan-200"
+    >
+      Configuració web
+    </Link>
+  )}
+</div>
 
                 {isAdmin && (
                   <Link
