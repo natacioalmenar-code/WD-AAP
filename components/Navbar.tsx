@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAppContext as useApp } from '../context/AppContext';
-import { Menu, X, LogOut, Settings, Users, PenTool } from 'lucide-react';
+import { Menu, X, LogOut, Users, PenTool, ClipboardList, GraduationCap, CalendarDays } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
   const { currentUser, logout, canManageTrips, canManageSystem, clubSettings } = useApp();
@@ -9,8 +9,8 @@ export const Navbar: React.FC = () => {
   const location = useLocation();
 
   const isPublic = !currentUser;
-  const showInstructor = canManageTrips();
-  const showAdmin = canManageSystem();
+  const showInstructor = canManageTrips(); // admin o instructor
+  const showAdmin = canManageSystem();     // només admin
 
   const NavItem = ({ to, label }: { to: string; label: string }) => {
     const isActive = location.pathname === to;
@@ -51,6 +51,7 @@ export const Navbar: React.FC = () => {
             </Link>
           </div>
 
+          {/* DESKTOP */}
           <div className="hidden xl:block">
             <div className="ml-10 flex items-baseline space-x-2">
               <NavItem to="/" label="INICI" />
@@ -70,15 +71,36 @@ export const Navbar: React.FC = () => {
                   <NavItem to="/social-wall" label="MUR SOCIAL" />
                   <NavItem to="/resources" label="MATERIAL" />
 
+                  {/* ✅ Gestió (Instructor/Admin) */}
                   {showInstructor && (
-                    <Link
-                      to="/admin-trips"
-                      className="px-3 py-2 rounded-md text-sm font-bold text-red-400 hover:text-red-300 flex items-center gap-1 border border-transparent hover:border-red-900"
-                    >
-                      <Settings size={16} /> ACTIVITAT
-                    </Link>
+                    <>
+                      <Link
+                        to="/admin-trips"
+                        className="px-3 py-2 rounded-md text-sm font-bold text-yellow-300 hover:text-yellow-200 flex items-center gap-1 border border-transparent hover:border-yellow-900"
+                        title="Gestionar sortides"
+                      >
+                        <ClipboardList size={16} /> GESTIÓ SORTIDES
+                      </Link>
+
+                      <Link
+                        to="/courses-private"
+                        className="px-3 py-2 rounded-md text-sm font-bold text-yellow-300 hover:text-yellow-200 flex items-center gap-1 border border-transparent hover:border-yellow-900"
+                        title="Gestionar formació"
+                      >
+                        <GraduationCap size={16} /> GESTIÓ FORMACIÓ
+                      </Link>
+
+                      <Link
+                        to="/social-events"
+                        className="px-3 py-2 rounded-md text-sm font-bold text-yellow-300 hover:text-yellow-200 flex items-center gap-1 border border-transparent hover:border-yellow-900"
+                        title="Gestionar esdeveniments"
+                      >
+                        <CalendarDays size={16} /> GESTIÓ ESDEV.
+                      </Link>
+                    </>
                   )}
 
+                  {/* ✅ Admin extra */}
                   {showAdmin && (
                     <>
                       <Link
@@ -122,6 +144,7 @@ export const Navbar: React.FC = () => {
             </div>
           </div>
 
+          {/* MOBILE BUTTON */}
           <div className="-mr-2 flex xl:hidden">
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -133,7 +156,7 @@ export const Navbar: React.FC = () => {
         </div>
       </div>
 
-      {/* Mobile Menu */}
+      {/* MOBILE MENU */}
       {isMenuOpen && (
         <div className="xl:hidden bg-slate-900 pb-3 pt-2 border-t border-slate-800">
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 flex flex-col">
@@ -156,7 +179,13 @@ export const Navbar: React.FC = () => {
 
                 <div className="border-t border-slate-800 my-2 pt-2">
                   <NavItem to="/profile" label="EL MEU PERFIL" />
+
+                  {/* ✅ Gestió (Instructor/Admin) */}
                   {showInstructor && <NavItem to="/admin-trips" label="GESTIÓ SORTIDES" />}
+                  {showInstructor && <NavItem to="/courses-private" label="GESTIÓ FORMACIÓ" />}
+                  {showInstructor && <NavItem to="/social-events" label="GESTIÓ ESDEVENIMENTS" />}
+
+                  {/* ✅ Admin extra */}
                   {showAdmin && <NavItem to="/admin-users" label="GESTIÓ SOCIS/ES" />}
                   {showAdmin && <NavItem to="/admin-settings" label="CONFIGURACIÓ WEB" />}
 
