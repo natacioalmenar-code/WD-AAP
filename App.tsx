@@ -2,25 +2,28 @@ import React from "react";
 import { HashRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AppProvider, useApp } from "./context/AppContext";
 import { Navbar } from "./components/Navbar";
+
 import { Home } from "./pages/Home";
 import { Login } from "./pages/Login";
 import { Dashboard } from "./pages/Dashboard";
 import { Trips } from "./pages/Trips";
-import { CoursesPublic } from "./pages/CoursesPublic";
-import { AdminUsers } from "./pages/AdminUsers";
-import { AdminSettings } from "./pages/AdminSettings";
 import { CalendarPage } from "./pages/CalendarPage";
 import { PrivateCourses } from "./pages/PrivateCourses";
 import { ResourcesPage } from "./pages/ResourcesPage";
 import { SocialEvents } from "./pages/SocialEvents";
-import { Profile } from "./pages/Profile";
 import { SocialWall } from "./pages/SocialWall";
-import { GeminiDiveGuide } from "./components/GeminiDiveGuide";
+import { Profile } from "./pages/Profile";
+
+import { CoursesPublic } from "./pages/CoursesPublic";
 
 import { Admin } from "./pages/Admin";
+import { AdminTrips } from "./pages/AdminTrips";
 import { AdminCourses } from "./pages/AdminCourses";
 import { AdminEvents } from "./pages/AdminEvents";
-import { AdminTrips } from "./pages/AdminTrips";
+import { AdminUsers } from "./pages/AdminUsers";
+import { AdminSettings } from "./pages/AdminSettings";
+
+import { GeminiDiveGuide } from "./components/GeminiDiveGuide";
 
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const { currentUser } = useApp();
@@ -160,37 +163,3 @@ const AppContent = () => {
             <InstructorRoute>
               <AdminEvents />
             </InstructorRoute>
-          }
-        />
-        <Route
-          path="/admin-users"
-          element={
-            <AdminRoute>
-              <AdminUsers />
-            </AdminRoute>
-          }
-        />
-        <Route
-          path="/admin-settings"
-          element={
-            <AdminRoute>
-              <AdminSettings />
-            </AdminRoute>
-          }
-        />
-      </Routes>
-
-      {currentUser && <GeminiDiveGuide />}
-    </div>
-  );
-};
-
-const App = () => (
-  <AppProvider>
-    <HashRouter>
-      <AppContent />
-    </HashRouter>
-  </AppProvider>
-);
-
-export default App;
