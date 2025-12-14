@@ -41,6 +41,7 @@ import type {
   SocialEvent,
   ClubSettings,
   PublishableStatus,
+  ResourceItem,
 } from "../types";
 
 interface AppState {
@@ -48,16 +49,15 @@ interface AppState {
   trips: Trip[];
   courses: Course[];
   socialEvents: SocialEvent[];
+  resources: ResourceItem[];
   currentUser: User | null;
   clubSettings: ClubSettings;
 }
 
 interface AppContextValue extends AppState {
-  // auth
   loginWithEmail: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 
-  // registre socis/es
   registerUser: (data: {
     name: string;
     email: string;
@@ -65,16 +65,14 @@ interface AppContextValue extends AppState {
     certification: string;
   }) => Promise<void>;
 
-  // admins
   approveUser: (userId: string) => Promise<void>;
   setUserRole: (userId: string, role: Role) => Promise<void>;
 
-  // permisos
   canManageTrips: () => boolean; // admin o instructor
   canManageSystem: () => boolean; // admin
-  isActiveMember: () => boolean; // status active i role != pending
+  isActiveMember: () => boolean; // active i role != pending
 
-  // CRUD Trips/Courses/Events
+  // Trips
   createTrip: (
     data: Omit<
       Trip,
@@ -91,6 +89,7 @@ interface AppContextValue extends AppState {
   setTripPublished: (tripId: string, published: boolean) => Promise<void>;
   cancelTrip: (tripId: string, reason?: string) => Promise<void>;
 
+  // Courses
   createCourse: (
     data: Omit<
       Course,
@@ -107,6 +106,7 @@ interface AppContextValue extends AppState {
   setCoursePublished: (courseId: string, published: boolean) => Promise<void>;
   cancelCourse: (courseId: string, reason?: string) => Promise<void>;
 
+  // Social
   createSocialEvent: (
     data: Omit<
       SocialEvent,
@@ -123,18 +123,21 @@ interface AppContextValue extends AppState {
   setSocialEventPublished: (eventId: string, published: boolean) => Promise<void>;
   cancelSocialEvent: (eventId: string, reason?: string) => Promise<void>;
 
-  // inscripcions DIRECTES
+  // Inscripcions directes
   joinTrip: (tripId: string) => Promise<void>;
   leaveTrip: (tripId: string) => Promise<void>;
-
   joinCourse: (courseId: string) => Promise<void>;
   leaveCourse: (courseId: string) => Promise<void>;
-
   joinSocialEvent: (eventId: string) => Promise<void>;
   leaveSocialEvent: (eventId: string) => Promise<void>;
 
-  // settings
+  // Settings
   updateClubSettings: (data: Partial<ClubSettings>) => Promise<void>;
+
+  // ✅ MATERIAL
+  createResource: (data: Omit<ResourceItem, "id" | "createdBy" | "createdAt" | "updatedAt">) => Promise<void>;
+  updateResource: (resourceId: string, data: Partial<ResourceItem>) => Promise<void>;
+  deleteResource: (resourceId: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
@@ -166,6 +169,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     trips: [],
     courses: [],
     socialEvents: [],
+    resources: [],
     currentUser: null,
     clubSettings: defaultClubSettings,
   });
@@ -211,6 +215,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
     );
 
+    // ✅ Resources
+    const unsubResources = onSnapshot(
+      query(collection(db, "resources"), orderBy("category", "asc")),
+      (snap) => {
+        const resources = snap.docs.map((d) => ({ ...(d.data() as any), id: d.id })) as ResourceItem[];
+        setState((prev) => ({ ...prev, resources }));
+      }
+    );
+
     const settingsRef = doc(db, "clubSettings", "main");
     const unsubSettings = onSnapshot(settingsRef, (snap) => {
       if (!snap.exists()) {
@@ -226,12 +239,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       unsubTrips();
       unsubCourses();
       unsubEvents();
+      unsubResources();
       unsubSettings();
     };
   }, []);
 
   /**
-   * Auth listener -> assegura doc user a Firestore
+   * Auth listener
    */
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (fbUser) => {
@@ -422,7 +436,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const baseDefaults = (currentUserId: string) => ({
     createdBy: currentUserId,
     participants: [] as string[],
-    // mantenim el camp per compatibilitat, però ja no s'usa
     pendingParticipants: [] as string[],
     published: false,
     status: "active" as PublishableStatus,
@@ -627,6 +640,34 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     );
   };
 
+  /**
+   * ✅ MATERIAL
+   */
+  const createResource: AppContextValue["createResource"] = async (data) => {
+    if (!ensureCanCreateOrEdit()) return;
+    assertAuthed(state.currentUser);
+
+    await addDoc(collection(db, "resources"), {
+      ...data,
+      createdBy: state.currentUser.id,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  const updateResource: AppContextValue["updateResource"] = async (resourceId, data) => {
+    if (!ensureCanCreateOrEdit()) return;
+    await updateDoc(doc(db, "resources", resourceId), { ...data, updatedAt: serverTimestamp() });
+  };
+
+  const deleteResource: AppContextValue["deleteResource"] = async (resourceId) => {
+    if (!canManageSystem()) {
+      alert("Només administració pot esborrar material.");
+      return;
+    }
+    await deleteDoc(doc(db, "resources", resourceId));
+  };
+
   const value: AppContextValue = {
     ...state,
 
@@ -661,14 +702,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     joinTrip,
     leaveTrip,
-
     joinCourse,
     leaveCourse,
-
     joinSocialEvent,
     leaveSocialEvent,
 
     updateClubSettings,
+
+    createResource,
+    updateResource,
+    deleteResource,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
