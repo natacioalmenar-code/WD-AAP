@@ -12,6 +12,7 @@ import {
   Search,
   ArrowUp,
   ArrowDown,
+  Wrench,
 } from "lucide-react";
 
 const PRESET_CATEGORIES: ResourceCategory[] = [
@@ -48,6 +49,7 @@ export const ResourcesPage: React.FC = () => {
   const [category, setCategory] = useState<ResourceCategory>("Seguretat");
   const [customCategory, setCustomCategory] = useState("");
   const [saving, setSaving] = useState(false);
+  const [fixing, setFixing] = useState(false);
   const [error, setError] = useState("");
 
   const categories = useMemo(() => {
@@ -61,7 +63,6 @@ export const ResourcesPage: React.FC = () => {
   const filteredResources = useMemo(() => {
     const needle = q.trim().toLowerCase();
 
-    // ja venen ordenats per category+order, però fem safe sort també
     const list = [...resources].sort((a, b) => {
       const ca = (a.category || "").toString().localeCompare((b.category || "").toString());
       if (ca !== 0) return ca;
@@ -157,7 +158,6 @@ export const ResourcesPage: React.FC = () => {
     setSaving(true);
     try {
       if (mode === "create") {
-        // ✅ assignem ordre al final de la categoria
         await createResource({
           ...payloadBase,
           order: nextOrderForCategory(finalCategory),
@@ -170,7 +170,11 @@ export const ResourcesPage: React.FC = () => {
       setOpen(false);
       resetForm();
     } catch {
-      setError(mode === "create" ? "No s’ha pogut guardar el material." : "No s’ha pogut actualitzar el material.");
+      setError(
+        mode === "create"
+          ? "No s’ha pogut guardar el material."
+          : "No s’ha pogut actualitzar el material."
+      );
     } finally {
       setSaving(false);
     }
@@ -187,7 +191,6 @@ export const ResourcesPage: React.FC = () => {
     }
   };
 
-  // ✅ ordre manual dins categoria (amb swap)
   const moveUp = async (res: ResourceItem) => {
     const listCat = filteredResources
       .filter((x) => x.category === res.category)
@@ -210,6 +213,53 @@ export const ResourcesPage: React.FC = () => {
     await swapResourceOrder(res.id, next.id);
   };
 
+  // ✅ Reparar ordre: assigna order si falta (per categoria)
+  const fixOrder = async () => {
+    if (!canManageTrips()) return;
+
+    const ok = confirm(
+      "Això assignarà un ordre automàtic a tots els materials que no tinguen 'order'.\n\nVols continuar?"
+    );
+    if (!ok) return;
+
+    setFixing(true);
+    try {
+      // agrupem per categoria
+      const byCat = new Map<string, ResourceItem[]>();
+      for (const r of resources) {
+        const cat = (r.category || "Altres").toString();
+        if (!byCat.has(cat)) byCat.set(cat, []);
+        byCat.get(cat)!.push(r);
+      }
+
+      // per cada categoria, ordenem per title i donem order als que no en tinguen
+      for (const [cat, items] of byCat.entries()) {
+        const sorted = [...items].sort((a, b) => (a.title || "").localeCompare(b.title || ""));
+        let counter = 1;
+
+        // si ja hi ha orders, comencem després del màxim
+        const maxExisting = sorted.reduce(
+          (m, r) => Math.max(m, typeof r.order === "number" ? r.order : 0),
+          0
+        );
+        counter = maxExisting > 0 ? maxExisting + 1 : 1;
+
+        for (const item of sorted) {
+          if (typeof item.order !== "number" || item.order === 999999) {
+            await updateResource(item.id, { order: counter });
+            counter++;
+          }
+        }
+      }
+
+      alert("Ordre reparat ✅");
+    } catch {
+      alert("No s’ha pogut reparar l’ordre.");
+    } finally {
+      setFixing(false);
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-10">
       <div className="flex justify-between items-start flex-wrap gap-4 mb-6">
@@ -221,12 +271,25 @@ export const ResourcesPage: React.FC = () => {
         </div>
 
         {canManageTrips() && (
-          <button
-            onClick={openCreate}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-yellow-400 font-extrabold hover:bg-yellow-300"
-          >
-            <Plus size={18} /> Afegir material
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={fixOrder}
+              disabled={fixing}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl border font-extrabold ${
+                fixing ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "hover:bg-gray-50"
+              }`}
+              title="Assigna ordre als materials antics"
+            >
+              <Wrench size={18} /> {fixing ? "Reparant..." : "Reparar ordre"}
+            </button>
+
+            <button
+              onClick={openCreate}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-yellow-400 font-extrabold hover:bg-yellow-300"
+            >
+              <Plus size={18} /> Afegir material
+            </button>
+          </div>
         )}
       </div>
 
@@ -444,7 +507,7 @@ const ResourceCard = ({
           <span className="text-sm font-bold text-slate-700">{res.category}</span>
         </div>
 
-        <h2 className="font-extrabold text-lg text-slate-900 pr-28">{res.title}</h2>
+        <h2 className="font-extrabold text-lg text-slate-900 pr-40">{res.title}</h2>
 
         {res.description ? (
           <p className="text-sm text-gray-600 mt-2">{res.description}</p>
