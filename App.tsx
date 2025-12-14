@@ -2,36 +2,55 @@ import React from "react";
 import { HashRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AppProvider, useApp } from "./context/AppContext";
 import { Navbar } from "./components/Navbar";
-
 import { Home } from "./pages/Home";
 import { Login } from "./pages/Login";
 import { Dashboard } from "./pages/Dashboard";
 import { Trips } from "./pages/Trips";
+import { CoursesPublic } from "./pages/CoursesPublic";
+import { AdminUsers } from "./pages/AdminUsers";
+import { AdminSettings } from "./pages/AdminSettings";
 import { CalendarPage } from "./pages/CalendarPage";
 import { PrivateCourses } from "./pages/PrivateCourses";
 import { ResourcesPage } from "./pages/ResourcesPage";
 import { SocialEvents } from "./pages/SocialEvents";
-import { SocialWall } from "./pages/SocialWall";
 import { Profile } from "./pages/Profile";
-
-import { CoursesPublic } from "./pages/CoursesPublic";
-
-import { Admin } from "./pages/Admin";
-import { AdminTrips } from "./pages/AdminTrips";
-import { AdminCourses } from "./pages/AdminCourses";
-import { AdminEvents } from "./pages/AdminEvents";
-import { AdminUsers } from "./pages/AdminUsers";
-import { AdminSettings } from "./pages/AdminSettings";
-
+import { SocialWall } from "./pages/SocialWall";
 import { GeminiDiveGuide } from "./components/GeminiDiveGuide";
 
-const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
+import { Admin } from "./pages/Admin";
+import { AdminCourses } from "./pages/AdminCourses";
+import { AdminEvents } from "./pages/AdminEvents";
+import { AdminTrips } from "./pages/AdminTrips";
+import { PendingApproval } from "./pages/PendingApproval";
+
+// Només necessita estar loguejat/da (encara que estiga pending)
+const AuthRoute = ({ children }: { children: React.ReactNode }) => {
   const { currentUser } = useApp();
   const location = useLocation();
 
   if (!currentUser) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
+  return <>{children}</>;
+};
+
+// Necessita estar loguejat/da i APROVAT/DA (active)
+const ActiveRoute = ({ children }: { children: React.ReactNode }) => {
+  const { currentUser } = useApp();
+  const location = useLocation();
+
+  if (!currentUser) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // Si està pendent, el deixem veure públic però NO privat
+  if (currentUser.status !== "active") {
+    // Evitem bucle
+    if (location.pathname !== "/pending") {
+      return <Navigate to="/pending" replace />;
+    }
+  }
+
   return <>{children}</>;
 };
 
@@ -66,73 +85,83 @@ const AppContent = () => {
         <Route path="/courses-public" element={<CoursesPublic />} />
         <Route path="/login" element={<Login />} />
 
-        {/* Private */}
+        {/* Pending page (només loguejat/da) */}
+        <Route
+          path="/pending"
+          element={
+            <AuthRoute>
+              <PendingApproval />
+            </AuthRoute>
+          }
+        />
+
+        {/* Private (només ACTIVE) */}
         <Route
           path="/dashboard"
           element={
-            <PrivateRoute>
+            <ActiveRoute>
               <Dashboard />
-            </PrivateRoute>
+            </ActiveRoute>
           }
         />
         <Route
           path="/trips"
           element={
-            <PrivateRoute>
+            <ActiveRoute>
               <Trips />
-            </PrivateRoute>
+            </ActiveRoute>
           }
         />
         <Route
           path="/calendar"
           element={
-            <PrivateRoute>
+            <ActiveRoute>
               <CalendarPage />
-            </PrivateRoute>
+            </ActiveRoute>
           }
         />
         <Route
           path="/courses-private"
           element={
-            <PrivateRoute>
+            <ActiveRoute>
               <PrivateCourses />
-            </PrivateRoute>
+            </ActiveRoute>
           }
         />
         <Route
           path="/resources"
           element={
-            <PrivateRoute>
+            <ActiveRoute>
               <ResourcesPage />
-            </PrivateRoute>
+            </ActiveRoute>
           }
         />
         <Route
           path="/social-events"
           element={
-            <PrivateRoute>
+            <ActiveRoute>
               <SocialEvents />
-            </PrivateRoute>
+            </ActiveRoute>
           }
         />
         <Route
           path="/social-wall"
           element={
-            <PrivateRoute>
+            <ActiveRoute>
               <SocialWall />
-            </PrivateRoute>
+            </ActiveRoute>
           }
         />
         <Route
           path="/profile"
           element={
-            <PrivateRoute>
+            <ActiveRoute>
               <Profile />
-            </PrivateRoute>
+            </ActiveRoute>
           }
         />
 
-        {/* Admin / Instructor */}
+        {/* Admin / Instructor (ja impliquen active perquè canManage... ho demana) */}
         <Route
           path="/admin"
           element={
@@ -183,7 +212,7 @@ const AppContent = () => {
         />
       </Routes>
 
-      {currentUser && <GeminiDiveGuide />}
+      {currentUser && currentUser.status === "active" && <GeminiDiveGuide />}
     </div>
   );
 };
