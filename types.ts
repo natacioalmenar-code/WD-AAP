@@ -1,105 +1,139 @@
-// WD-AAP-main/types.ts
+// types.ts
 
-export const FECDAS_LEVELS = [
+export type Role = "admin" | "instructor" | "member" | "pending";
+export type Status = "active" | "pending";
+export type PublishableStatus = "active" | "cancelled";
+
+export type FecdAsLevel =
+  | "B1E"
+  | "B2E"
+  | "B3E"
+  | "AOWD"
+  | "RESCUE"
+  | "DIVEMASTER"
+  | "INSTRUCTOR"
+  | "ADMIN"
+  | "PENDENT";
+
+export const FECDAS_LEVELS: FecdAsLevel[] = [
   "B1E",
   "B2E",
   "B3E",
-  "GG",
-  "IN1E",
-  "IN2E",
-  "IN3E",
-] as const;
-
-export type FecdAsLevel = (typeof FECDAS_LEVELS)[number];
-
-export type Role = "admin" | "instructor" | "member" | "pending";
-export type Status = "pending" | "active";
-
-export type PublishableStatus = "active" | "cancelled";
+  "AOWD",
+  "RESCUE",
+  "DIVEMASTER",
+  "INSTRUCTOR",
+  "ADMIN",
+  "PENDENT",
+];
 
 export interface User {
-  id: string; // Firebase uid
+  id: string;
   name: string;
-  email: string;
-
+  email?: string;
   role: Role;
   status: Status;
-
-  // perfil bàsic actual
-  level: string; // per UI (ex: B1E, INSTRUCTOR, ADMIN...)
+  level: FecdAsLevel | string;
   avatarUrl: string;
-
   certification?: string;
-
   createdAt?: any;
   updatedAt?: any;
 }
 
-export interface PublishableBase {
+export interface Trip {
   id: string;
   title: string;
-  date: string; // "YYYY-MM-DD"
-  createdBy: string; // uid
-  published: boolean;
-  status: PublishableStatus;
-
-  // participants aprovats
-  participants: string[];
-
-  // sol·licituds pendents
-  pendingParticipants: string[];
-
-  createdAt?: any;
-  updatedAt?: any;
-  cancelledAt?: any;
-  cancelledReason?: string;
-}
-
-export interface Trip extends PublishableBase {
+  date: string;
   location: string;
   levelRequired: string;
   maxSpots: number;
+  price?: string;
+  notes?: string;
 
-  time?: string;
-  depth?: string;
-  description?: string;
-  imageUrl?: string;
-  locationUrl?: string;
+  createdBy: string;
+  participants: string[];
+  pendingParticipants?: string[]; // compat
+
+  published: boolean;
+  status: PublishableStatus;
+  cancelledReason?: string;
+  cancelledAt?: any;
+
+  createdAt?: any;
+  updatedAt?: any;
 }
 
-export interface Course extends PublishableBase {
+export interface Course {
+  id: string;
+  title: string;
+  date: string;
   schedule: string;
-  description: string;
-  price: string;
   levelRequired: string;
-
   maxSpots?: number;
-  imageUrl?: string;
-  endDate?: string;
+  price?: string;
+  notes?: string;
+
+  createdBy: string;
+  participants: string[];
+  pendingParticipants?: string[]; // compat
+
+  published: boolean;
+  status: PublishableStatus;
+  cancelledReason?: string;
+  cancelledAt?: any;
+
+  createdAt?: any;
+  updatedAt?: any;
 }
 
-export interface SocialEvent extends PublishableBase {
+export interface SocialEvent {
+  id: string;
+  title: string;
+  date: string;
   time?: string;
   location?: string;
-  description?: string;
-  imageUrl?: string;
-  locationUrl?: string;
   maxSpots?: number;
+  notes?: string;
 
-  type?: "talk" | "workshop" | "gathering";
+  createdBy: string;
+  participants: string[];
+  pendingParticipants?: string[]; // compat
+
+  published: boolean;
+  status: PublishableStatus;
+  cancelledReason?: string;
+  cancelledAt?: any;
+
+  createdAt?: any;
+  updatedAt?: any;
 }
 
 export interface ClubSettings {
   logoUrl: string;
   navbarPreTitle: string;
   heroTitle: string;
-
   appBackgroundUrl?: string;
-
-  // opcional si el tens a altres pantalles
-  homeHeroImageUrl?: string;
-  heroSubtitle?: string;
-
   updatedAt?: any;
 }
 
+/** ✅ MATERIAL / RESOURCES */
+export type ResourceCategory =
+  | "Seguretat"
+  | "Formació"
+  | "Protocols"
+  | "Equip"
+  | "Medi ambient"
+  | "Altres"
+  | string;
+
+export interface ResourceItem {
+  id: string;
+  title: string;
+  description: string;
+  url: string;
+  category: ResourceCategory;
+
+  createdBy: string;
+  createdAt?: any;
+  updatedAt?: any;
+}
