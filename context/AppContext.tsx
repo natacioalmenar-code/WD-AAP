@@ -135,7 +135,9 @@ interface AppContextValue extends AppState {
   updateClubSettings: (data: Partial<ClubSettings>) => Promise<void>;
 
   // ✅ MATERIAL
-  createResource: (data: Omit<ResourceItem, "id" | "createdBy" | "createdAt" | "updatedAt">) => Promise<void>;
+  createResource: (
+    data: Omit<ResourceItem, "id" | "createdBy" | "createdAt" | "updatedAt">
+  ) => Promise<void>;
   updateResource: (resourceId: string, data: Partial<ResourceItem>) => Promise<void>;
   deleteResource: (resourceId: string) => Promise<void>;
 }
@@ -657,12 +659,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const updateResource: AppContextValue["updateResource"] = async (resourceId, data) => {
     if (!ensureCanCreateOrEdit()) return;
-    await updateDoc(doc(db, "resources", resourceId), { ...data, updatedAt: serverTimestamp() });
+    await updateDoc(doc(db, "resources", resourceId), {
+      ...data,
+      updatedAt: serverTimestamp(),
+    });
   };
 
+  // ✅ canvi: abans només admin. Ara admin + instructor
   const deleteResource: AppContextValue["deleteResource"] = async (resourceId) => {
-    if (!canManageSystem()) {
-      alert("Només administració pot esborrar material.");
+    if (!canManageTrips()) {
+      alert("Només administració o instructors poden eliminar material.");
       return;
     }
     await deleteDoc(doc(db, "resources", resourceId));
