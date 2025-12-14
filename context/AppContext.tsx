@@ -75,47 +75,63 @@ interface AppContextValue extends AppState {
   isActiveMember: () => boolean; // status active i role != pending
 
   // CRUD Trips/Courses/Events
-  createTrip: (data: Omit<Trip, "id" | "createdBy" | "participants" | "pendingParticipants" | "published" | "status">) => Promise<void>;
+  createTrip: (
+    data: Omit<
+      Trip,
+      | "id"
+      | "createdBy"
+      | "participants"
+      | "pendingParticipants"
+      | "published"
+      | "status"
+    >
+  ) => Promise<void>;
   updateTrip: (tripId: string, data: Partial<Trip>) => Promise<void>;
   deleteTrip: (tripId: string) => Promise<void>;
   setTripPublished: (tripId: string, published: boolean) => Promise<void>;
   cancelTrip: (tripId: string, reason?: string) => Promise<void>;
 
-  createCourse: (data: Omit<Course, "id" | "createdBy" | "participants" | "pendingParticipants" | "published" | "status">) => Promise<void>;
+  createCourse: (
+    data: Omit<
+      Course,
+      | "id"
+      | "createdBy"
+      | "participants"
+      | "pendingParticipants"
+      | "published"
+      | "status"
+    >
+  ) => Promise<void>;
   updateCourse: (courseId: string, data: Partial<Course>) => Promise<void>;
   deleteCourse: (courseId: string) => Promise<void>;
   setCoursePublished: (courseId: string, published: boolean) => Promise<void>;
   cancelCourse: (courseId: string, reason?: string) => Promise<void>;
 
-  createSocialEvent: (data: Omit<SocialEvent, "id" | "createdBy" | "participants" | "pendingParticipants" | "published" | "status">) => Promise<void>;
+  createSocialEvent: (
+    data: Omit<
+      SocialEvent,
+      | "id"
+      | "createdBy"
+      | "participants"
+      | "pendingParticipants"
+      | "published"
+      | "status"
+    >
+  ) => Promise<void>;
   updateSocialEvent: (eventId: string, data: Partial<SocialEvent>) => Promise<void>;
   deleteSocialEvent: (eventId: string) => Promise<void>;
   setSocialEventPublished: (eventId: string, published: boolean) => Promise<void>;
   cancelSocialEvent: (eventId: string, reason?: string) => Promise<void>;
 
-  // inscripcions (amb aprovació)
-  requestJoinTrip: (tripId: string) => Promise<void>;
-  cancelJoinRequestTrip: (tripId: string) => Promise<void>;
-  approveTripRequest: (tripId: string, userId: string) => Promise<void>;
-  rejectTripRequest: (tripId: string, userId: string) => Promise<void>;
+  // inscripcions DIRECTES
+  joinTrip: (tripId: string) => Promise<void>;
   leaveTrip: (tripId: string) => Promise<void>;
 
-  requestJoinCourse: (courseId: string) => Promise<void>;
-  cancelJoinRequestCourse: (courseId: string) => Promise<void>;
-  approveCourseRequest: (courseId: string, userId: string) => Promise<void>;
-  rejectCourseRequest: (courseId: string, userId: string) => Promise<void>;
+  joinCourse: (courseId: string) => Promise<void>;
   leaveCourse: (courseId: string) => Promise<void>;
 
-  requestJoinSocialEvent: (eventId: string) => Promise<void>;
-  cancelJoinRequestSocialEvent: (eventId: string) => Promise<void>;
-  approveSocialEventRequest: (eventId: string, userId: string) => Promise<void>;
-  rejectSocialEventRequest: (eventId: string, userId: string) => Promise<void>;
-  leaveSocialEvent: (eventId: string) => Promise<void>;
-
-  // compatibilitat amb codi antic (si hi ha pàgines que encara ho criden)
-  joinTrip: (tripId: string) => Promise<void>;
-  joinCourse: (courseId: string) => Promise<void>;
   joinSocialEvent: (eventId: string) => Promise<void>;
+  leaveSocialEvent: (eventId: string) => Promise<void>;
 
   // settings
   updateClubSettings: (data: Partial<ClubSettings>) => Promise<void>;
@@ -155,7 +171,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   });
 
   /**
-   * 1) Subscriptions Firestore: users, trips, courses, events, settings
+   * Subscriptions Firestore
    */
   useEffect(() => {
     const unsubUsers = onSnapshot(
@@ -163,11 +179,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       (snap) => {
         const users = snap.docs.map((d) => d.data() as User);
         setState((prev) => {
-          // refresca currentUser si existeix
           const cur = prev.currentUser
             ? users.find((u) => u.id === prev.currentUser!.id) ?? prev.currentUser
             : null;
-
           return { ...prev, users, currentUser: cur };
         });
       }
@@ -200,7 +214,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const settingsRef = doc(db, "clubSettings", "main");
     const unsubSettings = onSnapshot(settingsRef, (snap) => {
       if (!snap.exists()) {
-        // crea settings per defecte si no existeix
         setDoc(settingsRef, { ...defaultClubSettings, updatedAt: serverTimestamp() }).catch(() => {});
         setState((prev) => ({ ...prev, clubSettings: defaultClubSettings }));
         return;
@@ -218,7 +231,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   /**
-   * 2) Auth listener -> assegura doc user a Firestore
+   * Auth listener -> assegura doc user a Firestore
    */
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (fbUser) => {
@@ -230,10 +243,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const email = fbUser.email.toLowerCase();
       const uid = fbUser.uid;
 
-      // Intenta trobar user existent en estat (per velocitat)
       const localFound = state.users.find((u) => u.id === uid || u.email?.toLowerCase() === email);
 
-      // Si no està en estat encara, consulta Firestore
       let userDocData: User | null = localFound ?? null;
 
       if (!userDocData) {
@@ -242,7 +253,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         if (userSnap.exists()) userDocData = userSnap.data() as User;
       }
 
-      // Si no existeix userDoc, crea'l com pending
       if (!userDocData) {
         const newUser: User = {
           id: uid,
@@ -262,11 +272,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
 
-      // Normalitza camps mínims (per migracions)
       const patched: Partial<User> = {};
       if (!userDocData.level) patched.level = roleToLevel(userDocData.role);
       if (userDocData.avatarUrl === undefined) patched.avatarUrl = "";
       if (!userDocData.email) patched.email = email;
+
       if (Object.keys(patched).length) {
         await updateDoc(doc(db, "users", uid), { ...patched, updatedAt: serverTimestamp() }).catch(() => {});
         userDocData = { ...userDocData, ...patched } as User;
@@ -275,8 +285,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       setState((prev) => ({ ...prev, currentUser: userDocData }));
     });
 
-    // IMPORTANT: depenem de state.users, però no volem resubscribe constant.
-    // Es gestiona bé perquè el listener s'executa quan canvia auth.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     return () => unsub();
   }, [state.users]);
@@ -325,9 +333,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     try {
       await signOut(auth);
       setState((prev) => ({ ...prev, currentUser: null }));
-    } catch {
-      // ignore
-    }
+    } catch {}
   };
 
   /**
@@ -374,7 +380,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   /**
-   * ADMINS: aprovar usuari / canviar rol
+   * ADMINS
    */
   const approveUser: AppContextValue["approveUser"] = async (userId) => {
     if (!canManageSystem()) {
@@ -397,14 +403,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     await updateDoc(doc(db, "users", userId), {
       role,
       level: roleToLevel(role),
-      // si li dones rol admin/instructor, normalment ha d'estar actiu
       status: "active" as Status,
       updatedAt: serverTimestamp(),
     });
   };
 
   /**
-   * Helpers CRUD publishable
+   * Helpers CRUD
    */
   const ensureCanCreateOrEdit = () => {
     if (!canManageTrips()) {
@@ -417,6 +422,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const baseDefaults = (currentUserId: string) => ({
     createdBy: currentUserId,
     participants: [] as string[],
+    // mantenim el camp per compatibilitat, però ja no s'usa
     pendingParticipants: [] as string[],
     published: false,
     status: "active" as PublishableStatus,
@@ -430,7 +436,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const createTrip: AppContextValue["createTrip"] = async (data) => {
     if (!ensureCanCreateOrEdit()) return;
     assertAuthed(state.currentUser);
-
     await addDoc(collection(db, "trips"), {
       ...baseDefaults(state.currentUser.id),
       ...data,
@@ -471,7 +476,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const createCourse: AppContextValue["createCourse"] = async (data) => {
     if (!ensureCanCreateOrEdit()) return;
     assertAuthed(state.currentUser);
-
     await addDoc(collection(db, "courses"), {
       ...baseDefaults(state.currentUser.id),
       ...data,
@@ -512,7 +516,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const createSocialEvent: AppContextValue["createSocialEvent"] = async (data) => {
     if (!ensureCanCreateOrEdit()) return;
     assertAuthed(state.currentUser);
-
     await addDoc(collection(db, "socialEvents"), {
       ...baseDefaults(state.currentUser.id),
       ...data,
@@ -548,12 +551,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   /**
-   * Inscripcions: patró comú
-   * - membres actius: requestJoin -> pendingParticipants
-   * - instructors/admin: approve/reject pendents
-   * - leave: treure de participants (aprovats)
+   * INSCRIPCIÓ DIRECTA
    */
-  const ensureCanRequest = () => {
+  const ensureCanJoin = () => {
     if (!isActiveMember()) {
       alert("Has d’estar aprovat/da per a apuntar-te.");
       return false;
@@ -561,39 +561,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     return true;
   };
 
-  const requestJoinTrip: AppContextValue["requestJoinTrip"] = async (tripId) => {
-    if (!ensureCanRequest()) return;
+  const joinTrip: AppContextValue["joinTrip"] = async (tripId) => {
+    if (!ensureCanJoin()) return;
     assertAuthed(state.currentUser);
-
     await updateDoc(doc(db, "trips", tripId), {
-      pendingParticipants: arrayUnion(state.currentUser.id),
-      // per si estava dins participants i volia re-sol·licitar (casos raros)
-      participants: arrayRemove(state.currentUser.id),
-      updatedAt: serverTimestamp(),
-    });
-  };
-
-  const cancelJoinRequestTrip: AppContextValue["cancelJoinRequestTrip"] = async (tripId) => {
-    if (!state.currentUser) return;
-    await updateDoc(doc(db, "trips", tripId), {
-      pendingParticipants: arrayRemove(state.currentUser.id),
-      updatedAt: serverTimestamp(),
-    });
-  };
-
-  const approveTripRequest: AppContextValue["approveTripRequest"] = async (tripId, userId) => {
-    if (!ensureCanCreateOrEdit()) return;
-    await updateDoc(doc(db, "trips", tripId), {
-      pendingParticipants: arrayRemove(userId),
-      participants: arrayUnion(userId),
-      updatedAt: serverTimestamp(),
-    });
-  };
-
-  const rejectTripRequest: AppContextValue["rejectTripRequest"] = async (tripId, userId) => {
-    if (!ensureCanCreateOrEdit()) return;
-    await updateDoc(doc(db, "trips", tripId), {
-      pendingParticipants: arrayRemove(userId),
+      participants: arrayUnion(state.currentUser.id),
       updatedAt: serverTimestamp(),
     });
   };
@@ -602,43 +574,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (!state.currentUser) return;
     await updateDoc(doc(db, "trips", tripId), {
       participants: arrayRemove(state.currentUser.id),
-      pendingParticipants: arrayRemove(state.currentUser.id),
       updatedAt: serverTimestamp(),
     });
   };
 
-  const requestJoinCourse: AppContextValue["requestJoinCourse"] = async (courseId) => {
-    if (!ensureCanRequest()) return;
+  const joinCourse: AppContextValue["joinCourse"] = async (courseId) => {
+    if (!ensureCanJoin()) return;
     assertAuthed(state.currentUser);
-
     await updateDoc(doc(db, "courses", courseId), {
-      pendingParticipants: arrayUnion(state.currentUser.id),
-      participants: arrayRemove(state.currentUser.id),
-      updatedAt: serverTimestamp(),
-    });
-  };
-
-  const cancelJoinRequestCourse: AppContextValue["cancelJoinRequestCourse"] = async (courseId) => {
-    if (!state.currentUser) return;
-    await updateDoc(doc(db, "courses", courseId), {
-      pendingParticipants: arrayRemove(state.currentUser.id),
-      updatedAt: serverTimestamp(),
-    });
-  };
-
-  const approveCourseRequest: AppContextValue["approveCourseRequest"] = async (courseId, userId) => {
-    if (!ensureCanCreateOrEdit()) return;
-    await updateDoc(doc(db, "courses", courseId), {
-      pendingParticipants: arrayRemove(userId),
-      participants: arrayUnion(userId),
-      updatedAt: serverTimestamp(),
-    });
-  };
-
-  const rejectCourseRequest: AppContextValue["rejectCourseRequest"] = async (courseId, userId) => {
-    if (!ensureCanCreateOrEdit()) return;
-    await updateDoc(doc(db, "courses", courseId), {
-      pendingParticipants: arrayRemove(userId),
+      participants: arrayUnion(state.currentUser.id),
       updatedAt: serverTimestamp(),
     });
   };
@@ -647,43 +591,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (!state.currentUser) return;
     await updateDoc(doc(db, "courses", courseId), {
       participants: arrayRemove(state.currentUser.id),
-      pendingParticipants: arrayRemove(state.currentUser.id),
       updatedAt: serverTimestamp(),
     });
   };
 
-  const requestJoinSocialEvent: AppContextValue["requestJoinSocialEvent"] = async (eventId) => {
-    if (!ensureCanRequest()) return;
+  const joinSocialEvent: AppContextValue["joinSocialEvent"] = async (eventId) => {
+    if (!ensureCanJoin()) return;
     assertAuthed(state.currentUser);
-
     await updateDoc(doc(db, "socialEvents", eventId), {
-      pendingParticipants: arrayUnion(state.currentUser.id),
-      participants: arrayRemove(state.currentUser.id),
-      updatedAt: serverTimestamp(),
-    });
-  };
-
-  const cancelJoinRequestSocialEvent: AppContextValue["cancelJoinRequestSocialEvent"] = async (eventId) => {
-    if (!state.currentUser) return;
-    await updateDoc(doc(db, "socialEvents", eventId), {
-      pendingParticipants: arrayRemove(state.currentUser.id),
-      updatedAt: serverTimestamp(),
-    });
-  };
-
-  const approveSocialEventRequest: AppContextValue["approveSocialEventRequest"] = async (eventId, userId) => {
-    if (!ensureCanCreateOrEdit()) return;
-    await updateDoc(doc(db, "socialEvents", eventId), {
-      pendingParticipants: arrayRemove(userId),
-      participants: arrayUnion(userId),
-      updatedAt: serverTimestamp(),
-    });
-  };
-
-  const rejectSocialEventRequest: AppContextValue["rejectSocialEventRequest"] = async (eventId, userId) => {
-    if (!ensureCanCreateOrEdit()) return;
-    await updateDoc(doc(db, "socialEvents", eventId), {
-      pendingParticipants: arrayRemove(userId),
+      participants: arrayUnion(state.currentUser.id),
       updatedAt: serverTimestamp(),
     });
   };
@@ -692,19 +608,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (!state.currentUser) return;
     await updateDoc(doc(db, "socialEvents", eventId), {
       participants: arrayRemove(state.currentUser.id),
-      pendingParticipants: arrayRemove(state.currentUser.id),
       updatedAt: serverTimestamp(),
     });
   };
-
-  /**
-   * Compatibilitat amb codi antic:
-   * - abans joinX afegia directe a participants
-   * - ara joinX = requestJoinX (passa a pending)
-   */
-  const joinTrip: AppContextValue["joinTrip"] = (tripId) => requestJoinTrip(tripId);
-  const joinCourse: AppContextValue["joinCourse"] = (courseId) => requestJoinCourse(courseId);
-  const joinSocialEvent: AppContextValue["joinSocialEvent"] = (eventId) => requestJoinSocialEvent(eventId);
 
   /**
    * Settings
@@ -753,27 +659,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setSocialEventPublished,
     cancelSocialEvent,
 
-    requestJoinTrip,
-    cancelJoinRequestTrip,
-    approveTripRequest,
-    rejectTripRequest,
+    joinTrip,
     leaveTrip,
 
-    requestJoinCourse,
-    cancelJoinRequestCourse,
-    approveCourseRequest,
-    rejectCourseRequest,
+    joinCourse,
     leaveCourse,
 
-    requestJoinSocialEvent,
-    cancelJoinRequestSocialEvent,
-    approveSocialEventRequest,
-    rejectSocialEventRequest,
-    leaveSocialEvent,
-
-    joinTrip,
-    joinCourse,
     joinSocialEvent,
+    leaveSocialEvent,
 
     updateClubSettings,
   };
