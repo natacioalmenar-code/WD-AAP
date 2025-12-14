@@ -1,224 +1,238 @@
 import React, { useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import { useApp } from "../context/AppContext";
 import {
   Menu,
   X,
-  Home,
-  Users,
-  Calendar,
-  FileText,
-  BookOpen,
   LogOut,
+  Home,
+  Calendar,
+  Users,
+  BookOpen,
+  FileText,
+  MessageSquare,
   Shield,
+  HelpCircle,
+  User,
 } from "lucide-react";
 
-const navItemBase =
-  "flex items-center gap-2 px-3 py-2 rounded-xl font-extrabold transition";
+const navBase =
+  "flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-extrabold tracking-wide transition";
+
+const activeCls = "bg-white text-black";
+const idleCls = "text-gray-200 hover:bg-white/10 hover:text-white";
 
 export const Navbar: React.FC = () => {
-  const { currentUser, logout, canManageTrips, canManageSystem } = useApp();
+  const { currentUser, logout, canManageTrips, canManageSystem, clubSettings } = useApp();
   const [open, setOpen] = useState(false);
-  const navigate = useNavigate();
+  const location = useLocation();
 
-  if (!currentUser) return null;
+  const isPublic = !currentUser;
 
-  const go = (path: string) => {
-    navigate(path);
-    setOpen(false);
-  };
+  const close = () => setOpen(false);
 
-  return (
-    <header className="bg-black text-white sticky top-0 z-50 shadow">
-      <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-        {/* LOGO + NOM */}
-        <div
-          className="flex items-center gap-3 cursor-pointer"
-          onClick={() => go("/")}
-        >
-          <img
-            src="/westdivers-logo.png"
-            alt="West Divers"
-            className="h-9 w-9 object-contain"
-          />
-          <span className="font-extrabold tracking-wide">WEST DIVERS</span>
-        </div>
-
-        {/* DESKTOP */}
-        <nav className="hidden lg:flex items-center gap-1">
-          <NavItem to="/social" icon={<Home size={18} />} label="Mur social" />
-          <NavItem to="/trips" icon={<Users size={18} />} label="Sortides" />
-          <NavItem to="/courses" icon={<BookOpen size={18} />} label="Cursos" />
-          <NavItem
-            to="/resources"
-            icon={<FileText size={18} />}
-            label="Material"
-          />
-          <NavItem
-            to="/calendar"
-            icon={<Calendar size={18} />}
-            label="Calendari"
-          />
-
-          {canManageTrips() && (
-            <NavItem
-              to="/dashboard"
-              icon={<Shield size={18} />}
-              label="Administració"
-            />
-          )}
-        </nav>
-
-        {/* USUARI */}
-        <div className="hidden lg:flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-xl">
-            <div className="h-7 w-7 rounded-full bg-white/20 flex items-center justify-center font-extrabold">
-              {currentUser.name?.slice(0, 1).toUpperCase()}
-            </div>
-            <span className="text-sm">{currentUser.name}</span>
+  const Brand = (
+    <Link to="/" className="flex items-center gap-3" onClick={close}>
+      <img
+        src={clubSettings.logoUrl || "/westdivers-logo.png"}
+        className="h-10 w-10 object-contain"
+        alt="logo"
+      />
+      <div className="leading-tight">
+        {clubSettings.navbarPreTitle ? (
+          <div className="text-[10px] text-gray-300 font-extrabold uppercase">
+            {clubSettings.navbarPreTitle}
           </div>
-
-          <button
-            onClick={logout}
-            title="Tancar sessió"
-            className="p-2 rounded-xl hover:bg-white/10"
-          >
-            <LogOut size={18} />
-          </button>
+        ) : null}
+        <div className="text-white text-lg font-extrabold tracking-wide">
+          {clubSettings.heroTitle || "WEST DIVERS"}
         </div>
-
-        {/* BOTÓ MÒBIL */}
-        <button
-          className="lg:hidden p-2 rounded-xl hover:bg-white/10"
-          onClick={() => setOpen(true)}
-        >
-          <Menu />
-        </button>
       </div>
-
-      {/* MENÚ MÒBIL */}
-      {open && (
-        <div className="fixed inset-0 z-50 bg-black/90 text-white">
-          <div className="p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <img
-                src="/westdivers-logo.png"
-                className="h-8 w-8"
-                alt="logo"
-              />
-              <span className="font-extrabold">WEST DIVERS</span>
-            </div>
-            <button
-              onClick={() => setOpen(false)}
-              className="p-2 rounded-xl hover:bg-white/10"
-            >
-              <X />
-            </button>
-          </div>
-
-          <div className="px-4 pt-4 space-y-2">
-            <MobileItem
-              icon={<Home />}
-              label="Mur social"
-              onClick={() => go("/social")}
-            />
-            <MobileItem
-              icon={<Users />}
-              label="Sortides"
-              onClick={() => go("/trips")}
-            />
-            <MobileItem
-              icon={<BookOpen />}
-              label="Cursos"
-              onClick={() => go("/courses")}
-            />
-            <MobileItem
-              icon={<FileText />}
-              label="Material"
-              onClick={() => go("/resources")}
-            />
-            <MobileItem
-              icon={<Calendar />}
-              label="Calendari"
-              onClick={() => go("/calendar")}
-            />
-
-            {canManageTrips() && (
-              <MobileItem
-                icon={<Shield />}
-                label="Administració"
-                onClick={() => go("/dashboard")}
-              />
-            )}
-
-            <div className="border-t border-white/20 my-4" />
-
-            <div className="flex items-center gap-3 px-3 py-2">
-              <div className="h-9 w-9 rounded-full bg-white/20 flex items-center justify-center font-extrabold">
-                {currentUser.name?.slice(0, 1).toUpperCase()}
-              </div>
-              <div>
-                <div className="font-extrabold">{currentUser.name}</div>
-                <div className="text-xs text-white/70">
-                  {currentUser.role}
-                </div>
-              </div>
-            </div>
-
-            <button
-              onClick={logout}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-red-600 hover:bg-red-500 font-extrabold"
-            >
-              <LogOut />
-              Tancar sessió
-            </button>
-          </div>
-        </div>
-      )}
-    </header>
+    </Link>
   );
-};
 
-const NavItem = ({
-  to,
-  icon,
-  label,
-}: {
-  to: string;
-  icon: React.ReactNode;
-  label: string;
-}) => {
-  return (
+  const NavItem = ({
+    to,
+    icon,
+    label,
+    onClick,
+  }: {
+    to: string;
+    icon: React.ReactNode;
+    label: string;
+    onClick?: () => void;
+  }) => (
     <NavLink
       to={to}
+      onClick={() => {
+        onClick?.();
+        close();
+      }}
       className={({ isActive }) =>
-        `${navItemBase} ${
-          isActive
-            ? "bg-white text-black"
-            : "hover:bg-white/10 text-white"
-        }`
+        `${navBase} ${isActive ? activeCls : idleCls}`
       }
     >
       {icon}
       <span>{label}</span>
     </NavLink>
   );
-};
 
-const MobileItem = ({
-  icon,
-  label,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-}) => (
-  <button
-    onClick={onClick}
-    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/10 font-extrabold text-left"
-  >
-    {icon}
-    {label}
-  </button>
-);
+  const MobileItem = ({
+    to,
+    icon,
+    label,
+  }: {
+    to: string;
+    icon: React.ReactNode;
+    label: string;
+  }) => (
+    <Link
+      to={to}
+      onClick={close}
+      className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-white/10 font-extrabold"
+    >
+      {icon}
+      {label}
+    </Link>
+  );
+
+  return (
+    <nav className="bg-black sticky top-0 z-50 shadow border-b border-white/10">
+      <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+        {Brand}
+
+        {/* DESKTOP */}
+        <div className="hidden xl:flex items-center gap-1">
+          {isPublic ? (
+            <>
+              <NavItem to="/" icon={<Home size={18} />} label="Inici" />
+              <NavItem to="/courses-public" icon={<BookOpen size={18} />} label="Cursos" />
+              <NavItem to="/login" icon={<Users size={18} />} label="Accés socis/es" />
+              <NavItem to="/help" icon={<HelpCircle size={18} />} label="Ajuda" />
+            </>
+          ) : (
+            <>
+              <NavItem to="/dashboard" icon={<Home size={18} />} label="Panell" />
+              <NavItem to="/social-wall" icon={<MessageSquare size={18} />} label="Mur social" />
+              <NavItem to="/trips" icon={<Users size={18} />} label="Sortides" />
+              <NavItem to="/courses-private" icon={<BookOpen size={18} />} label="Cursos" />
+              <NavItem to="/social-events" icon={<MessageSquare size={18} />} label="Esdeveniments" />
+              <NavItem to="/resources" icon={<FileText size={18} />} label="Material" />
+              <NavItem to="/calendar" icon={<Calendar size={18} />} label="Calendari" />
+              <NavItem to="/help" icon={<HelpCircle size={18} />} label="Ajuda" />
+
+              {canManageTrips() && (
+                <NavItem to="/admin" icon={<Shield size={18} />} label="Gestió" />
+              )}
+              {canManageSystem() && (
+                <>
+                  <NavItem to="/admin-users" icon={<Shield size={18} />} label="Socis/es" />
+                  <NavItem to="/admin-settings" icon={<Shield size={18} />} label="Web" />
+                </>
+              )}
+
+              <div className="ml-3 flex items-center gap-2 pl-3 border-l border-white/10">
+                <Link
+                  to="/profile"
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10"
+                  title="El meu perfil"
+                >
+                  <div className="h-8 w-8 rounded-full bg-white/15 flex items-center justify-center font-extrabold">
+                    {(currentUser?.name || "W").slice(0, 1).toUpperCase()}
+                  </div>
+                  <div className="hidden 2xl:block leading-tight">
+                    <div className="text-xs font-extrabold text-white">
+                      {currentUser?.name}
+                    </div>
+                    <div className="text-[10px] text-gray-300">
+                      {currentUser?.role}
+                    </div>
+                  </div>
+                </Link>
+
+                <button
+                  onClick={logout}
+                  className="p-2 rounded-xl hover:bg-white/10"
+                  title="Tancar sessió"
+                >
+                  <LogOut size={18} />
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* MOBILE BUTTON */}
+        <button
+          onClick={() => setOpen(true)}
+          className="xl:hidden p-2 rounded-xl hover:bg-white/10 text-white"
+          aria-label="Obrir menú"
+        >
+          <Menu />
+        </button>
+      </div>
+
+      {/* MOBILE OVERLAY */}
+      {open && (
+        <div className="fixed inset-0 z-[9999] bg-black/90 text-white">
+          <div className="p-4 flex items-center justify-between border-b border-white/10">
+            {Brand}
+            <button
+              onClick={() => setOpen(false)}
+              className="p-2 rounded-xl hover:bg-white/10"
+              aria-label="Tancar menú"
+            >
+              <X />
+            </button>
+          </div>
+
+          <div className="p-4 space-y-2">
+            {isPublic ? (
+              <>
+                <MobileItem to="/" icon={<Home />} label="Inici" />
+                <MobileItem to="/courses-public" icon={<BookOpen />} label="Cursos" />
+                <MobileItem to="/login" icon={<Users />} label="Accés socis/es" />
+                <MobileItem to="/help" icon={<HelpCircle />} label="Ajuda" />
+              </>
+            ) : (
+              <>
+                <MobileItem to="/dashboard" icon={<Home />} label="Panell" />
+                <MobileItem to="/social-wall" icon={<MessageSquare />} label="Mur social" />
+                <MobileItem to="/trips" icon={<Users />} label="Sortides" />
+                <MobileItem to="/courses-private" icon={<BookOpen />} label="Cursos" />
+                <MobileItem to="/social-events" icon={<MessageSquare />} label="Esdeveniments" />
+                <MobileItem to="/resources" icon={<FileText />} label="Material" />
+                <MobileItem to="/calendar" icon={<Calendar />} label="Calendari" />
+                <MobileItem to="/profile" icon={<User />} label="El meu perfil" />
+                <MobileItem to="/help" icon={<HelpCircle />} label="Ajuda" />
+
+                {canManageTrips() && <MobileItem to="/admin" icon={<Shield />} label="Gestió" />}
+                {canManageSystem() && (
+                  <>
+                    <MobileItem to="/admin-users" icon={<Shield />} label="Socis/es" />
+                    <MobileItem to="/admin-settings" icon={<Shield />} label="Web" />
+                  </>
+                )}
+
+                <div className="border-t border-white/10 my-3" />
+
+                <button
+                  onClick={logout}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl bg-red-600 hover:bg-red-500 font-extrabold"
+                >
+                  <LogOut />
+                  Tancar sessió
+                </button>
+              </>
+            )}
+
+            {/* nota útil per a saber on estàs */}
+            <div className="pt-4 text-xs text-white/60">
+              Ruta actual: <span className="font-bold">{location.pathname}</span>
+            </div>
+          </div>
+        </div>
+      )}
+    </nav>
+  );
+};
