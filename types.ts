@@ -4,6 +4,10 @@ export type Role = "admin" | "instructor" | "member" | "pending";
 export type Status = "active" | "pending";
 export type PublishableStatus = "active" | "cancelled";
 
+/**
+ * ✅ Titulacions FECDAS / CMAS que vols usar
+ * (PENDENT és estat intern del sistema)
+ */
 export type FecdAsLevel =
   | "B1E"
   | "B2E"
@@ -25,6 +29,27 @@ export const FECDAS_LEVELS: FecdAsLevel[] = [
   "PENDENT",
 ];
 
+/**
+ * ✅ Llista inicial d’especialitats (editable quan vulgues)
+ * Pots afegir-ne més sense tocar la DB.
+ */
+export const FECDAS_SPECIALTIES: string[] = [
+  "Nitrox",
+  "Administració d’oxigen",
+  "Suport vital bàsic (SVB/RCP)",
+  "Rescat subaquàtic",
+  "Navegació subaquàtica",
+  "Busseig nocturn",
+  "Vestit sec",
+  "Busseig en derelictes",
+  "Busseig en grutes",
+  "Busseig en corrents",
+  "Fotografia subaquàtica",
+  "Vídeo subaquàtic",
+  "Flotabilitat avançada",
+  "Identificació de fauna i flora",
+  "Busseig adaptat",
+];
 
 export interface User {
   id: string;
@@ -32,7 +57,23 @@ export interface User {
   email?: string;
   role: Role;
   status: Status;
+
+  /**
+   * ✅ Camp històric (es manté per compatibilitat amb pantalles ja fetes)
+   * Ex: "B2E"
+   */
   level: FecdAsLevel | string;
+
+  /**
+   * ✅ Nou (multi-selecció)
+   */
+  levels?: FecdAsLevel[];
+
+  /**
+   * ✅ Nou (multi-selecció)
+   */
+  specialties?: string[];
+
   avatarUrl: string;
   certification?: string;
   createdAt?: any;
@@ -131,11 +172,7 @@ export interface ResourceItem {
   description: string;
   url: string;
   category: ResourceCategory;
-
-  /** ⭐ destacat (apareix sempre dalt) */
   featured?: boolean;
-
-  /** ordre manual dins de cada categoria (1,2,3...) */
   order: number;
 
   createdBy: string;
@@ -155,7 +192,6 @@ export interface PostComment {
 
 export interface SocialPost {
   id: string;
-
   text: string;
   imageUrl?: string;
 
