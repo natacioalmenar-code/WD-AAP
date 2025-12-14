@@ -1,167 +1,225 @@
-import React, { useState } from 'react';
-import { useApp } from '../context/AppContext';
-import { Trip } from '../types';
-import { Trash2, Plus, Calendar, MapPin } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import React, { useMemo, useState } from "react";
+import { useApp } from "../context/AppContext";
+import type { Trip } from "../types";
 
 export const AdminTrips: React.FC = () => {
-  const { trips, addTrip, deleteTrip } = useApp();
-  const navigate = useNavigate();
-  
-  const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState<Partial<Trip>>({
-    title: '',
-    date: '',
-    time: '09:00',
-    location: '',
-    depth: '',
-    levelRequired: 'B1E',
-    description: '',
-    maxSpots: 10,
-    imageUrl: 'https://picsum.photos/seed/new/800/400',
-  });
+  const {
+    trips,
+    users,
+    canManageSystem,
+    setTripPublished,
+    cancelTrip,
+    deleteTrip,
+    approveTripRequest,
+    rejectTripRequest,
+  } = useApp();
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
+  const [q, setQ] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.title || !formData.date || !formData.location) return;
+  const list = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return [...trips]
+      .filter((t) => {
+        if (!needle) return true;
+        return (
+          t.title.toLowerCase().includes(needle) ||
+          (t.location || "").toLowerCase().includes(needle) ||
+          (t.date || "").includes(needle)
+        );
+      })
+      .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  }, [trips, q]);
 
-    const newTrip: Trip = {
-      id: `t${Date.now()}`,
-      title: formData.title!,
-      date: formData.date!,
-      time: formData.time!,
-      location: formData.location!,
-      depth: formData.depth || 'N/A',
-      levelRequired: formData.levelRequired!,
-      description: formData.description || '',
-      maxSpots: Number(formData.maxSpots),
-      imageUrl: formData.imageUrl || 'https://picsum.photos/seed/default/800/400',
-      participants: []
-    };
-
-    addTrip(newTrip);
-    setShowForm(false);
-    // Reset minimal form data
-    setFormData({
-       title: '', date: '', time: '09:00', location: '', depth: '', levelRequired: 'B1E', description: '', maxSpots: 10, imageUrl: 'https://picsum.photos/seed/new/800/400'
-    });
-  };
+  const userName = (uid: string) => users.find((u) => u.id === uid)?.name || uid;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-8">
+    <div className="max-w-7xl mx-auto px-4 py-10">
+      <div className="mb-6 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
-           <h1 className="text-3xl font-bold text-gray-900">Gestió de Sortides</h1>
-           <p className="text-gray-500">Afegeix o elimina activitats del club.</p>
+          <h1 className="text-3xl font-extrabold text-slate-900">Gestió de Sortides</h1>
+          <p className="text-gray-600 mt-1">
+            Publicar/ocultar, cancel·lar i aprovar sol·licituds.
+          </p>
         </div>
-        <button 
-          onClick={() => setShowForm(!showForm)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700"
-        >
-          <Plus size={20} /> Nova Sortida
-        </button>
+
+        <div className="w-full md:w-80">
+          <label className="text-sm font-bold text-slate-700">Cerca</label>
+          <input
+            className="mt-1 w-full rounded-xl border px-3 py-2"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Títol, ubicació o data…"
+          />
+        </div>
       </div>
 
-      {showForm && (
-        <div className="bg-white p-6 rounded-xl shadow-lg border border-blue-100 mb-8 animate-fade-in-down">
-          <h2 className="text-xl font-bold mb-4">Crear Nova Sortida</h2>
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700">Títol</label>
-              <input name="title" value={formData.title} onChange={handleInputChange} required className="w-full border rounded p-2" placeholder="Ex: Immersió a la Foradada" />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Data</label>
-              <input type="date" name="date" value={formData.date} onChange={handleInputChange} required className="w-full border rounded p-2" />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Hora</label>
-              <input type="time" name="time" value={formData.time} onChange={handleInputChange} required className="w-full border rounded p-2" />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Lloc</label>
-              <input name="location" value={formData.location} onChange={handleInputChange} required className="w-full border rounded p-2" placeholder="Ex: Palamós" />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Profunditat</label>
-              <input name="depth" value={formData.depth} onChange={handleInputChange} className="w-full border rounded p-2" placeholder="Ex: 20m" />
-            </div>
-            
-            <div>
-                <label className="block text-sm font-medium text-gray-700">Places Màximes</label>
-                <input type="number" name="maxSpots" value={formData.maxSpots} onChange={handleInputChange} className="w-full border rounded p-2" />
-            </div>
-
-            <div>
-                <label className="block text-sm font-medium text-gray-700">Nivell Mínim</label>
-                <input name="levelRequired" value={formData.levelRequired} onChange={handleInputChange} className="w-full border rounded p-2" placeholder="Ex: B1E / B2E" />
-            </div>
-
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700">Descripció</label>
-              <textarea name="description" value={formData.description} onChange={handleInputChange} className="w-full border rounded p-2 h-24" placeholder="Detalls de la sortida..." />
-            </div>
-
-            <div className="col-span-2 flex justify-end gap-2 mt-4">
-              <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded">Cancel·lar</button>
-              <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Publicar Sortida</button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      <div className="bg-white rounded-xl shadow overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sortida</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Inscrits</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Accions</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {trips.map(trip => (
-              <tr key={trip.id}>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <div className="h-10 w-10 flex-shrink-0">
-                      <img className="h-10 w-10 rounded-full object-cover" src={trip.imageUrl} alt="" />
-                    </div>
-                    <div className="ml-4">
-                      <div className="text-sm font-medium text-gray-900">{trip.title}</div>
-                      <div className="text-sm text-gray-500">{trip.location}</div>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900 flex items-center gap-1"><Calendar size={14}/> {trip.date}</div>
-                  <div className="text-sm text-gray-500">{trip.time}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                    {trip.participants.length} / {trip.maxSpots}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <button onClick={() => deleteTrip(trip.id)} className="text-red-600 hover:text-red-900 flex items-center ml-auto gap-1">
-                    <Trash2 size={16} /> Eliminar
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="space-y-4">
+        {list.length === 0 ? (
+          <div className="bg-white border rounded-2xl shadow-sm p-8 text-center text-gray-500">
+            No hi ha sortides.
+          </div>
+        ) : (
+          list.map((t) => <TripCard key={t.id} trip={t} userName={userName} />)
+        )}
       </div>
     </div>
   );
+
+  function TripCard({
+    trip,
+    userName,
+  }: {
+    trip: Trip;
+    userName: (uid: string) => string;
+  }) {
+    const pending = trip.pendingParticipants || [];
+    const approved = trip.participants || [];
+
+    const isCancelled = trip.status === "cancelled";
+
+    const togglePublish = async () => {
+      await setTripPublished(trip.id, !trip.published);
+    };
+
+    const doCancel = async () => {
+      const reason = prompt("Motiu de cancel·lació (opcional):") || "";
+      await cancelTrip(trip.id, reason);
+    };
+
+    const doDelete = async () => {
+      if (!canManageSystem()) return;
+      const ok = confirm("Segur que vols ESBORRAR definitivament esta sortida?");
+      if (ok) await deleteTrip(trip.id);
+    };
+
+    return (
+      <div className="bg-white border rounded-2xl shadow-sm p-5">
+        <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex items-center gap-3 flex-wrap">
+              <h2 className="text-lg font-extrabold text-slate-900">{trip.title}</h2>
+
+              <span
+                className={`text-xs font-bold px-2 py-1 rounded-full ${
+                  isCancelled
+                    ? "bg-red-100 text-red-700"
+                    : trip.published
+                    ? "bg-green-100 text-green-700"
+                    : "bg-gray-100 text-gray-700"
+                }`}
+              >
+                {isCancelled ? "CANCEL·LADA" : trip.published ? "PUBLICADA" : "OCULTA"}
+              </span>
+            </div>
+
+            <div className="text-sm text-gray-600 mt-1">
+              {trip.date} · {trip.location} · Nivell: {trip.levelRequired} · Places:{" "}
+              {approved.length}/{trip.maxSpots}
+            </div>
+
+            {isCancelled && trip.cancelledReason ? (
+              <div className="mt-2 text-sm text-red-700">
+                <span className="font-bold">Motiu:</span> {trip.cancelledReason}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {!isCancelled && (
+              <button
+                onClick={togglePublish}
+                className={`px-4 py-2 rounded-xl font-extrabold text-sm ${
+                  trip.published
+                    ? "bg-gray-100 hover:bg-gray-200"
+                    : "bg-yellow-400 hover:bg-yellow-300"
+                }`}
+              >
+                {trip.published ? "Ocultar" : "Publicar"}
+              </button>
+            )}
+
+            {!isCancelled && (
+              <button
+                onClick={doCancel}
+                className="px-4 py-2 rounded-xl font-extrabold text-sm border hover:bg-gray-50"
+              >
+                Cancel·lar
+              </button>
+            )}
+
+            {canManageSystem() && (
+              <button
+                onClick={doDelete}
+                className="px-4 py-2 rounded-xl font-extrabold text-sm bg-red-600 text-white hover:bg-red-700"
+              >
+                Esborrar
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* PENDENTS */}
+        <div className="mt-5 grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <div className="border rounded-2xl p-4">
+            <div className="font-extrabold text-slate-900 mb-2">
+              Sol·licituds pendents ({pending.length})
+            </div>
+
+            {pending.length === 0 ? (
+              <div className="text-sm text-gray-500">Cap pendent.</div>
+            ) : (
+              <div className="space-y-2">
+                {pending.map((uid) => (
+                  <div
+                    key={uid}
+                    className="flex items-center justify-between gap-2 border rounded-xl p-2"
+                  >
+                    <div className="text-sm font-bold text-slate-900 truncate">
+                      {userName(uid)}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => approveTripRequest(trip.id, uid)}
+                        className="px-3 py-1.5 rounded-lg bg-green-600 text-white font-bold text-xs hover:bg-green-700"
+                      >
+                        Aprovar
+                      </button>
+                      <button
+                        onClick={() => rejectTripRequest(trip.id, uid)}
+                        className="px-3 py-1.5 rounded-lg bg-gray-100 font-bold text-xs hover:bg-gray-200"
+                      >
+                        Denegar
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* APROVATS */}
+          <div className="border rounded-2xl p-4">
+            <div className="font-extrabold text-slate-900 mb-2">
+              Participants aprovats ({approved.length})
+            </div>
+
+            {approved.length === 0 ? (
+              <div className="text-sm text-gray-500">Encara ningú.</div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {approved.map((uid) => (
+                  <span
+                    key={uid}
+                    className="text-xs font-bold px-2 py-1 rounded-full bg-slate-900 text-yellow-300"
+                  >
+                    {userName(uid)}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 };
