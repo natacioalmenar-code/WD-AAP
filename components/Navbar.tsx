@@ -10,7 +10,7 @@ export const Navbar: React.FC = () => {
 
   const isPublic = !currentUser;
   const showAdmin = canManageSystem();
-  const showManagement = canManageTrips(); // ✅ admin o instructor
+  const showManagement = canManageTrips();
 
   const NavItem = ({ to, label }: { to: string; label: string }) => {
     const isActive = location.pathname === to;
@@ -21,7 +21,7 @@ export const Navbar: React.FC = () => {
         className={`px-3 py-2 rounded-md text-sm font-bold tracking-wide transition-colors ${
           isActive
             ? "bg-yellow-400 text-black shadow-md"
-            : "text-gray-300 hover:text-yellow-400 hover:bg-slate-800"
+            : "text-gray-300 hover:text-yellow-400 hover:bg-neutral-900"
         }`}
       >
         {label}
@@ -30,7 +30,7 @@ export const Navbar: React.FC = () => {
   };
 
   return (
-    <nav className="bg-slate-900 sticky top-0 z-50 shadow-xl border-b border-slate-800">
+    <nav className="bg-black sticky top-0 z-50 shadow-xl border-b border-neutral-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* LOGO */}
@@ -67,10 +67,8 @@ export const Navbar: React.FC = () => {
                 <NavItem to="/social-wall" label="MUR SOCIAL" />
                 <NavItem to="/resources" label="MATERIAL" />
 
-                {/* ✅ GESTIÓ per admin + instructor */}
                 {showManagement && <NavItem to="/admin" label="GESTIÓ" />}
 
-                {/* ✅ Només admin */}
                 {showAdmin && (
                   <>
                     <NavItem to="/admin-users" label="SOCIS/ES" />
@@ -78,7 +76,7 @@ export const Navbar: React.FC = () => {
                   </>
                 )}
 
-                <div className="ml-4 flex items-center gap-3 border-l border-slate-700 pl-4">
+                <div className="ml-4 flex items-center gap-3 border-l border-neutral-800 pl-4">
                   <Link to="/profile" className="flex items-center gap-2">
                     <div className="hidden 2xl:block text-right">
                       <div className="text-xs text-yellow-400 font-bold">{currentUser.name}</div>
@@ -86,13 +84,12 @@ export const Navbar: React.FC = () => {
                     </div>
                     <img
                       src={currentUser.avatarUrl}
-                      className="h-9 w-9 rounded-full border-2 border-slate-600"
-                      alt="avatar"
+                      className="h-9 w-9 rounded-full border-2 border-neutral-700"
                     />
                   </Link>
 
                   <button onClick={logout} title="Tancar sessió">
-                    <LogOut className="text-slate-400 hover:text-white" />
+                    <LogOut className="text-gray-400 hover:text-white" />
                   </button>
                 </div>
               </>
@@ -111,7 +108,7 @@ export const Navbar: React.FC = () => {
 
       {/* MOBILE MENU */}
       {isMenuOpen && (
-        <div className="xl:hidden bg-slate-900 border-t border-slate-800 p-3 space-y-1">
+        <div className="xl:hidden bg-black border-t border-neutral-900 p-3 space-y-1">
           <NavItem to="/" label="INICI" />
 
           {isPublic ? (
@@ -130,10 +127,8 @@ export const Navbar: React.FC = () => {
               <NavItem to="/resources" label="MATERIAL" />
               <NavItem to="/profile" label="EL MEU PERFIL" />
 
-              {/* ✅ GESTIÓ per admin + instructor */}
               {showManagement && <NavItem to="/admin" label="GESTIÓ" />}
 
-              {/* ✅ Només admin */}
               {showAdmin && (
                 <>
                   <NavItem to="/admin-users" label="SOCIS/ES" />
