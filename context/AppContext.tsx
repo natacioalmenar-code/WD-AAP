@@ -43,6 +43,8 @@ import type {
   ClubSettings,
   PublishableStatus,
   ResourceItem,
+  SocialPost,
+  PostComment,
 } from "../types";
 
 interface AppState {
@@ -51,6 +53,7 @@ interface AppState {
   courses: Course[];
   socialEvents: SocialEvent[];
   resources: ResourceItem[];
+  socialPosts: SocialPost[];
   currentUser: User | null;
   clubSettings: ClubSettings;
 }
@@ -69,10 +72,11 @@ interface AppContextValue extends AppState {
   approveUser: (userId: string) => Promise<void>;
   setUserRole: (userId: string, role: Role) => Promise<void>;
 
-  canManageTrips: () => boolean;
-  canManageSystem: () => boolean;
-  isActiveMember: () => boolean;
+  canManageTrips: () => boolean; // admin o instructor
+  canManageSystem: () => boolean; // admin
+  isActiveMember: () => boolean; // active i role != pending
 
+  // Trips
   createTrip: (
     data: Omit<
       Trip,
@@ -89,6 +93,7 @@ interface AppContextValue extends AppState {
   setTripPublished: (tripId: string, published: boolean) => Promise<void>;
   cancelTrip: (tripId: string, reason?: string) => Promise<void>;
 
+  // Courses
   createCourse: (
     data: Omit<
       Course,
@@ -105,6 +110,7 @@ interface AppContextValue extends AppState {
   setCoursePublished: (courseId: string, published: boolean) => Promise<void>;
   cancelCourse: (courseId: string, reason?: string) => Promise<void>;
 
+  // Social events
   createSocialEvent: (
     data: Omit<
       SocialEvent,
@@ -121,6 +127,7 @@ interface AppContextValue extends AppState {
   setSocialEventPublished: (eventId: string, published: boolean) => Promise<void>;
   cancelSocialEvent: (eventId: string, reason?: string) => Promise<void>;
 
+  // Inscripcions directes
   joinTrip: (tripId: string) => Promise<void>;
   leaveTrip: (tripId: string) => Promise<void>;
   joinCourse: (courseId: string) => Promise<void>;
@@ -128,6 +135,7 @@ interface AppContextValue extends AppState {
   joinSocialEvent: (eventId: string) => Promise<void>;
   leaveSocialEvent: (eventId: string) => Promise<void>;
 
+  // Settings
   updateClubSettings: (data: Partial<ClubSettings>) => Promise<void>;
 
   // ✅ MATERIAL
@@ -136,9 +144,13 @@ interface AppContextValue extends AppState {
   ) => Promise<void>;
   updateResource: (resourceId: string, data: Partial<ResourceItem>) => Promise<void>;
   deleteResource: (resourceId: string) => Promise<void>;
-
-  // ✅ ordre manual (swap segur)
   swapResourceOrder: (aId: string, bId: string) => Promise<void>;
+
+  // ✅ MUR SOCIAL
+  createSocialPost: (data: { text: string; imageUrl?: string }) => Promise<void>;
+  togglePostLike: (postId: string) => Promise<void>;
+  addPostComment: (postId: string, text: string) => Promise<void>;
+  deleteSocialPost: (postId: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
@@ -171,6 +183,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     courses: [],
     socialEvents: [],
     resources: [],
+    socialPosts: [],
     currentUser: null,
     clubSettings: defaultClubSettings,
   });
@@ -213,17 +226,30 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
     );
 
-    // ✅ Resources: category + order (ordre manual)
+    // ✅ Resources: category + order
     const unsubResources = onSnapshot(
       query(collection(db, "resources"), orderBy("category", "asc"), orderBy("order", "asc")),
       (snap) => {
         const resources = snap.docs.map((d) => ({ ...(d.data() as any), id: d.id })) as ResourceItem[];
-        // si algun vell no té order, el posem al final a nivell UI
         const safe = resources.map((r) => ({
           ...r,
           order: typeof (r as any).order === "number" ? (r as any).order : 999999,
         }));
         setState((prev) => ({ ...prev, resources: safe }));
+      }
+    );
+
+    // ✅ Mur social: posts per data (últims primer)
+    const unsubPosts = onSnapshot(
+      query(collection(db, "socialPosts"), orderBy("createdAt", "desc")),
+      (snap) => {
+        const socialPosts = snap.docs.map((d) => ({ ...(d.data() as any), id: d.id })) as SocialPost[];
+        const safe = socialPosts.map((p) => ({
+          ...p,
+          likes: Array.isArray((p as any).likes) ? (p as any).likes : [],
+          comments: Array.isArray((p as any).comments) ? (p as any).comments : [],
+        }));
+        setState((prev) => ({ ...prev, socialPosts: safe }));
       }
     );
 
@@ -243,6 +269,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       unsubCourses();
       unsubEvents();
       unsubResources();
+      unsubPosts();
       unsubSettings();
     };
   }, []);
@@ -577,7 +604,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     await deleteDoc(doc(db, "resources", resourceId));
   };
 
-  // ✅ swap d’ordre (dos docs) amb transacció
   const swapResourceOrder: AppContextValue["swapResourceOrder"] = async (aId, bId) => {
     if (!canManageTrips()) {
       alert("Només administració o instructors poden ordenar material.");
@@ -601,6 +627,97 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       tx.update(aRef, { order: bOrder, updatedAt: serverTimestamp() });
       tx.update(bRef, { order: aOrder, updatedAt: serverTimestamp() });
     });
+  };
+
+  // ✅ MUR SOCIAL
+  const createSocialPost: AppContextValue["createSocialPost"] = async ({ text, imageUrl }) => {
+    if (!isActiveMember()) {
+      alert("Has d’estar aprovat/da per publicar.");
+      return;
+    }
+    assertAuthed(state.currentUser);
+
+    const t = text.trim();
+    const img = (imageUrl || "").trim();
+
+    if (!t) {
+      alert("Escriu algun text per publicar.");
+      return;
+    }
+    if (img && !/^https?:\/\//i.test(img)) {
+      alert("La URL de la imatge ha de començar per http:// o https://");
+      return;
+    }
+
+    await addDoc(collection(db, "socialPosts"), {
+      text: t,
+      imageUrl: img || "",
+      createdBy: state.currentUser.id,
+      createdByName: state.currentUser.name,
+      createdByAvatarUrl: state.currentUser.avatarUrl || "",
+      likes: [],
+      comments: [],
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  const togglePostLike: AppContextValue["togglePostLike"] = async (postId) => {
+    if (!isActiveMember()) return;
+    assertAuthed(state.currentUser);
+
+    const ref = doc(db, "socialPosts", postId);
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists()) throw new Error("Post missing");
+      const data = snap.data() as any;
+      const likes: string[] = Array.isArray(data.likes) ? data.likes : [];
+      const uid = state.currentUser.id;
+
+      const has = likes.includes(uid);
+      tx.update(ref, {
+        likes: has ? likes.filter((x) => x !== uid) : [...likes, uid],
+        updatedAt: serverTimestamp(),
+      });
+    });
+  };
+
+  const addPostComment: AppContextValue["addPostComment"] = async (postId, text) => {
+    if (!isActiveMember()) return;
+    assertAuthed(state.currentUser);
+
+    const t = text.trim();
+    if (!t) return;
+
+    const comment: PostComment = {
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      userId: state.currentUser.id,
+      userName: state.currentUser.name,
+      userAvatarUrl: state.currentUser.avatarUrl || "",
+      text: t,
+      createdAt: serverTimestamp(),
+    };
+
+    await updateDoc(doc(db, "socialPosts", postId), {
+      comments: arrayUnion(comment as any),
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  const deleteSocialPost: AppContextValue["deleteSocialPost"] = async (postId) => {
+    if (!isActiveMember()) return;
+    assertAuthed(state.currentUser);
+
+    const post = state.socialPosts.find((p) => p.id === postId);
+    if (!post) return;
+
+    const allowed = canManageTrips() || post.createdBy === state.currentUser.id;
+    if (!allowed) {
+      alert("No tens permisos per eliminar aquesta publicació.");
+      return;
+    }
+
+    await deleteDoc(doc(db, "socialPosts", postId));
   };
 
   const value: AppContextValue = {
@@ -648,6 +765,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     updateResource,
     deleteResource,
     swapResourceOrder,
+
+    createSocialPost,
+    togglePostLike,
+    addPostComment,
+    deleteSocialPost,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
