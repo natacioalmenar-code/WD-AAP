@@ -110,15 +110,18 @@ export const Trips: React.FC = () => {
                         className="px-4 py-2 rounded-lg bg-orange-600 text-white hover:bg-orange-700 font-bold"
                       >
                         Apuntar-me
-                      </button>
-                    )
-                  )}
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
+                      <button
+  onClick={() => joinTrip(t.id)}
+  disabled={isFull}
+  className={`px-4 py-2 rounded-lg font-bold ${
+    isFull
+      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+      : "bg-orange-600 text-white hover:bg-orange-700"
+  }`}
+>
+  {isFull ? "COMPLET" : "Apuntar-me"}
+</button>
+
 
       {/* MODAL CREAR */}
       {open && (
