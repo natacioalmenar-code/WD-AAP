@@ -18,7 +18,7 @@ export const Trips: React.FC = () => {
     [trips]
   );
 
-  const canCreateHere = currentUser && canManageTrips();
+  const canCreateHere = !!currentUser && canManageTrips();
 
   const resetForm = () => {
     setTitle("");
@@ -42,12 +42,6 @@ export const Trips: React.FC = () => {
       location: location.trim(),
       levelRequired,
       maxSpots: Number(maxSpots) || 0,
-      // si el teu Trip té més camps obligatoris, posa'ls aquí:
-      // time: "",
-      // depth: "",
-      // description: "",
-      // imageUrl: "",
-      // locationUrl: "",
     });
 
     resetForm();
@@ -85,18 +79,18 @@ export const Trips: React.FC = () => {
             const spotsLeft = t.maxSpots - t.participants.length;
             const isFull = spotsLeft <= 0;
 
-
             return (
               <div key={t.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h2 className="text-xl font-extrabold text-slate-900">{t.title}</h2>
                     <p className="text-sm text-gray-600 mt-1">
-                      {t.date} · {t.location} · Nivell: {t.levelRequired} · Places: {t.participants.length}/{t.maxSpots}
+                      {t.date} · {t.location} · Nivell: {t.levelRequired} · Places:{" "}
+                      {t.participants.length}/{t.maxSpots}
                     </p>
                   </div>
 
-                  {currentUser && (
+                  {currentUser ? (
                     isSignedUp ? (
                       <button
                         onClick={() => leaveTrip(t.id)}
@@ -107,21 +101,23 @@ export const Trips: React.FC = () => {
                     ) : (
                       <button
                         onClick={() => joinTrip(t.id)}
-                        className="px-4 py-2 rounded-lg bg-orange-600 text-white hover:bg-orange-700 font-bold"
+                        disabled={isFull}
+                        className={`px-4 py-2 rounded-lg font-bold ${
+                          isFull
+                            ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                            : "bg-orange-600 text-white hover:bg-orange-700"
+                        }`}
                       >
-                        Apuntar-me
-                      <button
-  onClick={() => joinTrip(t.id)}
-  disabled={isFull}
-  className={`px-4 py-2 rounded-lg font-bold ${
-    isFull
-      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-      : "bg-orange-600 text-white hover:bg-orange-700"
-  }`}
->
-  {isFull ? "COMPLET" : "Apuntar-me"}
-</button>
-
+                        {isFull ? "COMPLET" : "Apuntar-me"}
+                      </button>
+                    )
+                  ) : null}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
 
       {/* MODAL CREAR */}
       {open && (
@@ -130,7 +126,10 @@ export const Trips: React.FC = () => {
             <div className="flex items-center justify-between p-5 border-b">
               <h3 className="text-lg font-extrabold text-slate-900">Crear nova sortida</h3>
               <button
-                onClick={() => { resetForm(); setOpen(false); }}
+                onClick={() => {
+                  resetForm();
+                  setOpen(false);
+                }}
                 className="p-2 rounded-lg hover:bg-gray-100"
                 aria-label="Tancar"
               >
@@ -196,7 +195,10 @@ export const Trips: React.FC = () => {
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => { resetForm(); setOpen(false); }}
+                  onClick={() => {
+                    resetForm();
+                    setOpen(false);
+                  }}
                   className="px-5 py-2 rounded-xl border font-semibold"
                 >
                   Cancel·lar
