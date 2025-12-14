@@ -351,18 +351,21 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       state.currentUser.role !== "pending";
   }, [state.currentUser]);
 
-  const loginWithEmail: AppContextValue["loginWithEmail"] = async (email, password) => {
-    const trimmed = email.trim().toLowerCase();
-    if (!trimmed || !password) {
-      alert("Falten dades (correu i contrasenya).");
-      return;
-    }
-    try {
-      await signInWithEmailAndPassword(auth, trimmed, password);
-    } catch {
-      alert("No s’ha pogut iniciar sessió. Revisa correu/contrasenya.");
-    }
-  };
+ const loginWithEmail: AppContextValue["loginWithEmail"] = async (email, password) => {
+  const trimmed = email.trim().toLowerCase();
+  if (!trimmed || !password) {
+    // deixem que la UI ho gestione
+    throw new Error("missing_credentials");
+  }
+
+  try {
+    await signInWithEmailAndPassword(auth, trimmed, password);
+  } catch (err) {
+    // re-llancem perquè Login.tsx puga mostrar el missatge correcte
+    throw err;
+  }
+};
+
 
   const logout: AppContextValue["logout"] = async () => {
     try {
