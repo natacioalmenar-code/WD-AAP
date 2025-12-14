@@ -1,147 +1,171 @@
 import React, { useMemo, useState } from "react";
 import { useApp } from "../context/AppContext";
-import { PlusCircle, CalendarDays, MapPin, Users } from "lucide-react";
-
-type AdminEvent = {
-  id: string;
-  title: string;
-  date: string;
-  location: string;
-  description: string;
-  createdBy: string;
-  participants: string[];
-};
+import { CalendarDays, PlusCircle } from "lucide-react";
 
 export const AdminEvents: React.FC = () => {
-  const { currentUser } = useApp();
+  const { socialEvents, createSocialEvent, canManageTrips } = useApp();
 
-  const [events, setEvents] = useState<AdminEvent[]>(() => {
-    const raw = localStorage.getItem("westdivers-events-v1");
-    return raw ? (JSON.parse(raw) as AdminEvent[]) : [];
-  });
+  if (!canManageTrips()) {
+    return <div className="p-8 text-center text-red-600">Accés denegat.</div>;
+  }
 
   const [form, setForm] = useState({
     title: "",
     date: "",
+    time: "",
     location: "",
+    locationUrl: "",
     description: "",
+    maxSpots: 0,
+    imageUrl: "",
   });
 
   const sorted = useMemo(
-    () => [...events].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
-    [events]
+    () => [...socialEvents].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+    [socialEvents]
   );
-
-  if (!currentUser) return null;
-
-  const save = (next: AdminEvent[]) => {
-    setEvents(next);
-    localStorage.setItem("westdivers-events-v1", JSON.stringify(next));
-  };
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.title.trim()) return alert("Falta el títol.");
-    if (!form.date.trim()) return alert("Falta la data.");
-    if (!form.location.trim()) return alert("Falta la ubicació.");
-    if (!form.description.trim()) return alert("Falta la descripció.");
 
-    const newEvent: AdminEvent = {
-      id: Math.random().toString(36).slice(2) + Date.now().toString(36),
-      title: form.title.trim(),
-      date: form.date.trim(),
-      location: form.location.trim(),
-      description: form.description.trim(),
-      createdBy: currentUser.id,
-      participants: [],
-    };
+    if (!form.title || !form.date) {
+      alert("Falten camps obligatoris (títol i data).");
+      return;
+    }
 
-    save([...events, newEvent]);
+    const maxSpots = Number(form.maxSpots);
+    createSocialEvent({
+      title: form.title,
+      date: form.date,
+      time: form.time || "",
+      location: form.location || "",
+      locationUrl: form.locationUrl || "",
+      description: form.description || "",
+      imageUrl: form.imageUrl || "",
+      maxSpots: maxSpots > 0 ? maxSpots : undefined,
+    } as any);
 
-    setForm({ title: "", date: "", location: "", description: "" });
-    alert("✅ Esdeveniment creat!");
+    setForm({
+      title: "",
+      date: "",
+      time: "",
+      location: "",
+      locationUrl: "",
+      description: "",
+      maxSpots: 0,
+      imageUrl: "",
+    });
+
+    alert("Esdeveniment creat!");
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-10">
-      <div className="mb-8 border-b border-gray-200 pb-4">
-        <h1 className="text-3xl font-extrabold text-slate-900 uppercase tracking-tight">
-          Gestió Esdeveniments
+    <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="mb-6 border-b pb-4">
+        <h1 className="text-3xl font-extrabold text-slate-900 flex items-center gap-2">
+          <CalendarDays /> Gestió d’esdeveniments
         </h1>
-        <p className="text-gray-600 mt-2">Crea esdeveniments socials del club.</p>
+        <p className="text-gray-600 mt-2">Crea esdeveniments socials perquè la gent s’hi apunti.</p>
       </div>
 
-      {/* FORM */}
-      <div className="bg-white rounded-2xl border shadow-sm p-6 mb-10">
-        <div className="flex items-center gap-2 mb-4">
-          <PlusCircle className="text-yellow-500" />
-          <h2 className="text-xl font-bold text-slate-900">Crear nou esdeveniment</h2>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Create */}
+        <div className="bg-white rounded-2xl border shadow-sm p-6">
+          <h2 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+            <PlusCircle className="text-orange-600" /> Crear esdeveniment
+          </h2>
+
+          <form onSubmit={submit} className="space-y-3">
+            <input
+              className="w-full border rounded px-3 py-2"
+              placeholder="Títol"
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+            />
+
+            <div className="grid grid-cols-2 gap-3">
+              <input
+                type="date"
+                className="w-full border rounded px-3 py-2"
+                value={form.date}
+                onChange={(e) => setForm({ ...form, date: e.target.value })}
+              />
+              <input
+                className="w-full border rounded px-3 py-2"
+                placeholder="Hora (opcional)"
+                value={form.time}
+                onChange={(e) => setForm({ ...form, time: e.target.value })}
+              />
+            </div>
+
+            <input
+              className="w-full border rounded px-3 py-2"
+              placeholder="Lloc (opcional)"
+              value={form.location}
+              onChange={(e) => setForm({ ...form, location: e.target.value })}
+            />
+            <input
+              className="w-full border rounded px-3 py-2"
+              placeholder="URL ubicació (Google Maps) (opcional)"
+              value={form.locationUrl}
+              onChange={(e) => setForm({ ...form, locationUrl: e.target.value })}
+            />
+
+            <textarea
+              className="w-full border rounded px-3 py-2"
+              placeholder="Descripció (opcional)"
+              rows={4}
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+            />
+
+            <div className="grid grid-cols-2 gap-3">
+              <input
+                type="number"
+                className="w-full border rounded px-3 py-2"
+                placeholder="Places (0 = il·limitat)"
+                value={form.maxSpots}
+                onChange={(e) => setForm({ ...form, maxSpots: Number(e.target.value) })}
+              />
+              <input
+                className="w-full border rounded px-3 py-2"
+                placeholder="URL imatge (opcional)"
+                value={form.imageUrl}
+                onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="w-full bg-orange-600 text-white font-bold py-2 rounded hover:bg-orange-700"
+            >
+              Crear esdeveniment
+            </button>
+          </form>
         </div>
 
-        <form onSubmit={submit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <input
-            className="border rounded-lg p-2"
-            placeholder="Títol"
-            value={form.title}
-            onChange={(e) => setForm({ ...form, title: e.target.value })}
-          />
+        {/* List */}
+        <div className="bg-white rounded-2xl border shadow-sm p-6">
+          <h2 className="font-bold text-slate-900 mb-4">Esdeveniments creats ({sorted.length})</h2>
 
-          <input
-            type="date"
-            className="border rounded-lg p-2"
-            value={form.date}
-            onChange={(e) => setForm({ ...form, date: e.target.value })}
-          />
-
-          <input
-            className="border rounded-lg p-2 md:col-span-2"
-            placeholder="Ubicació"
-            value={form.location}
-            onChange={(e) => setForm({ ...form, location: e.target.value })}
-          />
-
-          <textarea
-            className="border rounded-lg p-2 md:col-span-2"
-            placeholder="Descripció"
-            rows={4}
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-          />
-
-          <button
-            type="submit"
-            className="md:col-span-2 bg-yellow-400 text-black font-extrabold rounded-lg py-3 hover:bg-yellow-300 transition"
-          >
-            Crear Esdeveniment
-          </button>
-        </form>
-      </div>
-
-      {/* LIST */}
-      <div className="space-y-4">
-        {sorted.length === 0 ? (
-          <p className="text-gray-500 italic">Encara no hi ha esdeveniments creats.</p>
-        ) : (
-          sorted.map((ev) => (
-            <div key={ev.id} className="bg-white rounded-2xl border shadow-sm p-6">
-              <h3 className="text-xl font-bold text-slate-900">{ev.title}</h3>
-
-              <div className="mt-2 flex flex-wrap gap-4 text-sm text-gray-700">
-                <span className="inline-flex items-center gap-1">
-                  <CalendarDays size={16} className="text-yellow-500" /> {ev.date}
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <MapPin size={16} className="text-yellow-500" /> {ev.location}
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <Users size={16} className="text-yellow-500" /> {ev.participants.length} apuntats
-                </span>
-              </div>
-
-              <p className="text-gray-600 mt-3">{ev.description}</p>
-            </div>
-          ))
-        )}
+          {sorted.length === 0 ? (
+            <p className="text-gray-500">Encara no n’hi ha.</p>
+          ) : (
+            <ul className="space-y-3">
+              {sorted.map((ev) => (
+                <li key={ev.id} className="border rounded-xl p-4">
+                  <p className="font-bold text-slate-900">{ev.title}</p>
+                  <p className="text-sm text-gray-600">
+                    {ev.date} {ev.time ? `· ${ev.time}` : ""} {ev.location ? `· ${ev.location}` : ""}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Places: {ev.maxSpots ?? "il·limitat"} · Apuntats/des: {ev.participants.length}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
     </div>
   );
