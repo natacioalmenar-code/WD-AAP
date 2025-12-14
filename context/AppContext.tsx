@@ -91,6 +91,18 @@ export interface SocialEvent {
   participants: string[];
 }
 
+export interface EventItem {
+  id: string;
+  title: string;
+  date: string;        // "2025-12-14"
+  time?: string;       // "19:00"
+  location?: string;
+  description?: string;
+  createdBy: string;   // user id
+  participants: string[];
+  imageUrl?: string;
+}
+
 export interface ClubSettings {
   logoUrl: string;
   navbarPreTitle: string;
