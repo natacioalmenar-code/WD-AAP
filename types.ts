@@ -133,6 +133,9 @@ export interface ResourceItem {
   url: string;
   category: ResourceCategory;
 
+  /** ⭐ destacat (apareix sempre dalt) */
+  featured?: boolean;
+
   /** ordre manual dins de cada categoria (1,2,3...) */
   order: number;
 
@@ -143,7 +146,7 @@ export interface ResourceItem {
 
 /** ✅ MUR SOCIAL */
 export interface PostComment {
-  id: string; // generat al client
+  id: string;
   userId: string;
   userName: string;
   userAvatarUrl?: string;
@@ -161,7 +164,7 @@ export interface SocialPost {
   createdByName: string;
   createdByAvatarUrl?: string;
 
-  likes: string[]; // uids
+  likes: string[];
   comments: PostComment[];
 
   createdAt?: any;
