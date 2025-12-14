@@ -4,12 +4,13 @@ import { useAppContext as useApp } from '../context/AppContext';
 import { Menu, X, LogOut, Users, PenTool } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
-  const { currentUser, logout, canManageSystem, clubSettings } = useApp();
+  const { currentUser, logout, canManageSystem, canManageTrips, clubSettings } = useApp();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
 
   const isPublic = !currentUser;
   const showAdmin = canManageSystem();
+  const showManagement = canManageTrips();
 
   const NavItem = ({ to, label }: { to: string; label: string }) => {
     const isActive = location.pathname === to;
@@ -67,6 +68,8 @@ export const Navbar: React.FC = () => {
                 <NavItem to="/social-events" label="ESDEVENIMENTS" />
                 <NavItem to="/social-wall" label="MUR SOCIAL" />
                 <NavItem to="/resources" label="MATERIAL" />
+
+                {showManagement && <NavItem to="/admin" label="GESTIÓ" />}
 
                 {showAdmin && (
                   <>
@@ -130,6 +133,8 @@ export const Navbar: React.FC = () => {
               <NavItem to="/resources" label="MATERIAL" />
               <NavItem to="/profile" label="EL MEU PERFIL" />
 
+              {showManagement && <NavItem to="/admin" label="GESTIÓ" />}
+
               {showAdmin && (
                 <>
                   <NavItem to="/admin-users" label="SOCIS/ES" />
@@ -150,4 +155,3 @@ export const Navbar: React.FC = () => {
     </nav>
   );
 };
-
