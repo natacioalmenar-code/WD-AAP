@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Shield, Anchor, User } from "lucide-react";
 
 export const Login: React.FC = () => {
   const [mode, setMode] = useState<"login" | "register">("login");
@@ -14,7 +13,7 @@ export const Login: React.FC = () => {
 
   const [error, setError] = useState("");
 
-  const { loginWithEmail, registerUser, loginAsDemoAdmin } = useApp();
+  const { loginWithEmail, registerUser } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -46,7 +45,7 @@ export const Login: React.FC = () => {
         certification: trimmedCert,
       });
 
-      // després de crear el compte (pending), tornem a login
+      // Després de crear el compte (queda pending), tornem a login
       setMode("login");
       setName("");
       setCertification("");
@@ -55,17 +54,9 @@ export const Login: React.FC = () => {
       return;
     }
 
-    // mode === login
+    // mode login
     await loginWithEmail(trimmedEmail, trimmedPassword);
     navigate(redirectTo, { replace: true });
-  };
-
-  const quickLogin = async (emailToUse: string) => {
-    setError("");
-    setEmail(emailToUse);
-    // IMPORTANT: aquí necessites una password real (Firebase),
-    // així que deixem els botons demo només per ADMIN (local).
-    setError("Els accessos ràpids d’instructor/soci ara requereixen contrasenya (Firebase).");
   };
 
   return (
@@ -81,48 +72,6 @@ export const Login: React.FC = () => {
               : "Introdueix el teu correu i contrasenya."}
           </p>
         </div>
-
-        {/* DEMO ADMIN */}
-        {mode === "login" && (
-          <div className="grid grid-cols-1 gap-3 mb-6">
-            <button
-              onClick={() => {
-                setError("");
-                loginAsDemoAdmin();
-                navigate("/dashboard", { replace: true });
-              }}
-              className="flex items-center justify-center gap-2 w-full p-3 bg-slate-900 text-yellow-400 rounded-lg hover:bg-slate-800 transition-colors font-bold shadow-sm"
-            >
-              <Shield size={18} /> Entrar com a ADMINISTRACIÓ (demo)
-            </button>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => quickLogin("instructor@westdivers.local")}
-                className="flex-1 flex items-center justify-center gap-2 p-2 bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 font-medium text-sm"
-                type="button"
-              >
-                <Anchor size={16} /> Instructor/a (info)
-              </button>
-
-              <button
-                onClick={() => quickLogin("soci@westdivers.local")}
-                className="flex-1 flex items-center justify-center gap-2 p-2 bg-gray-100 text-gray-800 rounded-lg hover:bg-gray-200 font-medium text-sm"
-                type="button"
-              >
-                <User size={16} /> Soci/a (info)
-              </button>
-            </div>
-
-            <div className="relative flex py-2 items-center">
-              <div className="flex-grow border-t border-gray-300" />
-              <span className="flex-shrink-0 mx-4 text-gray-400 text-xs">
-                Accés manual
-              </span>
-              <div className="flex-grow border-t border-gray-300" />
-            </div>
-          </div>
-        )}
 
         <form className="mt-4 space-y-4" onSubmit={handleSubmit}>
           {mode === "register" && (
