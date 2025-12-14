@@ -52,7 +52,7 @@ export interface Trip {
 
   createdBy: string;
   participants: string[];
-  pendingParticipants?: string[]; // compat
+  pendingParticipants?: string[];
 
   published: boolean;
   status: PublishableStatus;
@@ -75,7 +75,7 @@ export interface Course {
 
   createdBy: string;
   participants: string[];
-  pendingParticipants?: string[]; // compat
+  pendingParticipants?: string[];
 
   published: boolean;
   status: PublishableStatus;
@@ -97,7 +97,7 @@ export interface SocialEvent {
 
   createdBy: string;
   participants: string[];
-  pendingParticipants?: string[]; // compat
+  pendingParticipants?: string[];
 
   published: boolean;
   status: PublishableStatus;
@@ -132,6 +132,9 @@ export interface ResourceItem {
   description: string;
   url: string;
   category: ResourceCategory;
+
+  /** ordre manual dins de cada categoria (1,2,3...) */
+  order: number;
 
   createdBy: string;
   createdAt?: any;
