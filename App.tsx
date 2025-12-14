@@ -8,7 +8,7 @@ import { Home } from "./pages/Home";
 import { Login } from "./pages/Login";
 import { Dashboard } from "./pages/Dashboard";
 import { Trips } from "./pages/Trips";
-import { CoursesPublic } from "./pages/CoursesPublic";
+import CoursesPublic from "./pages/CoursesPublic";
 import { AdminUsers } from "./pages/AdminUsers";
 import { AdminSettings } from "./pages/AdminSettings";
 import { CalendarPage } from "./pages/CalendarPage";
