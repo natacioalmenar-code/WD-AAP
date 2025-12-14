@@ -10,8 +10,6 @@ export const AdminTrips: React.FC = () => {
     setTripPublished,
     cancelTrip,
     deleteTrip,
-    approveTripRequest,
-    rejectTripRequest,
   } = useApp();
 
   const [q, setQ] = useState("");
@@ -38,7 +36,7 @@ export const AdminTrips: React.FC = () => {
         <div>
           <h1 className="text-3xl font-extrabold text-slate-900">Gestió de Sortides</h1>
           <p className="text-gray-600 mt-1">
-            Publicar/ocultar, cancel·lar i aprovar sol·licituds.
+            Publicar/ocultar, cancel·lar i veure participants.
           </p>
         </div>
 
@@ -72,9 +70,7 @@ export const AdminTrips: React.FC = () => {
     trip: Trip;
     userName: (uid: string) => string;
   }) {
-    const pending = trip.pendingParticipants || [];
     const approved = trip.participants || [];
-
     const isCancelled = trip.status === "cancelled";
 
     const togglePublish = async () => {
@@ -158,66 +154,25 @@ export const AdminTrips: React.FC = () => {
           </div>
         </div>
 
-        {/* PENDENTS */}
-        <div className="mt-5 grid grid-cols-1 xl:grid-cols-2 gap-4">
-          <div className="border rounded-2xl p-4">
-            <div className="font-extrabold text-slate-900 mb-2">
-              Sol·licituds pendents ({pending.length})
-            </div>
-
-            {pending.length === 0 ? (
-              <div className="text-sm text-gray-500">Cap pendent.</div>
-            ) : (
-              <div className="space-y-2">
-                {pending.map((uid) => (
-                  <div
-                    key={uid}
-                    className="flex items-center justify-between gap-2 border rounded-xl p-2"
-                  >
-                    <div className="text-sm font-bold text-slate-900 truncate">
-                      {userName(uid)}
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => approveTripRequest(trip.id, uid)}
-                        className="px-3 py-1.5 rounded-lg bg-green-600 text-white font-bold text-xs hover:bg-green-700"
-                      >
-                        Aprovar
-                      </button>
-                      <button
-                        onClick={() => rejectTripRequest(trip.id, uid)}
-                        className="px-3 py-1.5 rounded-lg bg-gray-100 font-bold text-xs hover:bg-gray-200"
-                      >
-                        Denegar
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+        <div className="mt-5 border rounded-2xl p-4">
+          <div className="font-extrabold text-slate-900 mb-2">
+            Participants ({approved.length})
           </div>
 
-          {/* APROVATS */}
-          <div className="border rounded-2xl p-4">
-            <div className="font-extrabold text-slate-900 mb-2">
-              Participants aprovats ({approved.length})
+          {approved.length === 0 ? (
+            <div className="text-sm text-gray-500">Encara ningú.</div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {approved.map((uid) => (
+                <span
+                  key={uid}
+                  className="text-xs font-bold px-2 py-1 rounded-full bg-slate-900 text-yellow-300"
+                >
+                  {userName(uid)}
+                </span>
+              ))}
             </div>
-
-            {approved.length === 0 ? (
-              <div className="text-sm text-gray-500">Encara ningú.</div>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {approved.map((uid) => (
-                  <span
-                    key={uid}
-                    className="text-xs font-bold px-2 py-1 rounded-full bg-slate-900 text-yellow-300"
-                  >
-                    {userName(uid)}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
+          )}
         </div>
       </div>
     );
