@@ -6,7 +6,6 @@ import { Home } from "./pages/Home";
 import { Login } from "./pages/Login";
 import { Dashboard } from "./pages/Dashboard";
 import { Trips } from "./pages/Trips";
-import { AdminTrips } from "./pages/AdminTrips";
 import { AdminUsers } from "./pages/AdminUsers";
 import { AdminSettings } from "./pages/AdminSettings";
 import { CalendarPage } from "./pages/CalendarPage";
@@ -134,14 +133,6 @@ const AppContent = () => {
           element={
             <InstructorRoute>
               <Admin />
-            </InstructorRoute>
-          }
-        />
-        <Route
-          path="/admin-trips"
-          element={
-            <InstructorRoute>
-              <AdminTrips />
             </InstructorRoute>
           }
         />
