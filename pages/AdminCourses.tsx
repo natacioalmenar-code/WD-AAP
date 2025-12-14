@@ -1,166 +1,222 @@
 import React, { useMemo, useState } from "react";
 import { useApp } from "../context/AppContext";
-import { GraduationCap, PlusCircle } from "lucide-react";
+import type { Course } from "../types";
 
 export const AdminCourses: React.FC = () => {
-  const { courses, createCourse, canManageTrips } = useApp();
+  const {
+    courses,
+    users,
+    canManageSystem,
+    setCoursePublished,
+    cancelCourse,
+    deleteCourse,
+    approveCourseRequest,
+    rejectCourseRequest,
+  } = useApp();
 
-  if (!canManageTrips()) {
-    return <div className="p-8 text-center text-red-600">Accés denegat.</div>;
-  }
+  const [q, setQ] = useState("");
 
-  const [form, setForm] = useState({
-    title: "",
-    date: "",
-    schedule: "",
-    description: "",
-    price: "",
-    levelRequired: "B1E",
-    maxSpots: 10,
-    imageUrl: "",
-  });
+  const list = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return [...courses]
+      .filter((c) => {
+        if (!needle) return true;
+        return (
+          c.title.toLowerCase().includes(needle) ||
+          (c.levelRequired || "").toLowerCase().includes(needle) ||
+          (c.date || "").includes(needle)
+        );
+      })
+      .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  }, [courses, q]);
 
-  const sorted = useMemo(
-    () => [...courses].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
-    [courses]
-  );
-
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!form.title || !form.date) {
-      alert("Falten camps obligatoris (títol i data).");
-      return;
-    }
-
-    createCourse({
-      title: form.title,
-      date: form.date,
-      schedule: form.schedule || "-",
-      description: form.description || "",
-      price: form.price || "-",
-      levelRequired: form.levelRequired,
-      maxSpots: Number(form.maxSpots) || 0,
-      imageUrl: form.imageUrl || "",
-    } as any);
-
-    setForm({
-      title: "",
-      date: "",
-      schedule: "",
-      description: "",
-      price: "",
-      levelRequired: "B1E",
-      maxSpots: 10,
-      imageUrl: "",
-    });
-
-    alert("Curs creat!");
-  };
+  const userName = (uid: string) => users.find((u) => u.id === uid)?.name || uid;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="mb-6 border-b pb-4">
-        <h1 className="text-3xl font-extrabold text-slate-900 flex items-center gap-2">
-          <GraduationCap /> Gestió de cursos
-        </h1>
-        <p className="text-gray-600 mt-2">Crea cursos perquè els/les socis/es s’hi puguin apuntar.</p>
+    <div className="max-w-7xl mx-auto px-4 py-10">
+      <div className="mb-6 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold text-slate-900">Gestió de Cursos</h1>
+          <p className="text-gray-600 mt-1">Publicar/ocultar, cancel·lar i aprovar sol·licituds.</p>
+        </div>
+
+        <div className="w-full md:w-80">
+          <label className="text-sm font-bold text-slate-700">Cerca</label>
+          <input
+            className="mt-1 w-full rounded-xl border px-3 py-2"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Títol, nivell o data…"
+          />
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Create */}
-        <div className="bg-white rounded-2xl border shadow-sm p-6">
-          <h2 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
-            <PlusCircle className="text-orange-600" /> Crear curs
-          </h2>
-
-          <form onSubmit={submit} className="space-y-3">
-            <input
-              className="w-full border rounded px-3 py-2"
-              placeholder="Títol"
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-            />
-            <input
-              type="date"
-              className="w-full border rounded px-3 py-2"
-              value={form.date}
-              onChange={(e) => setForm({ ...form, date: e.target.value })}
-            />
-            <input
-              className="w-full border rounded px-3 py-2"
-              placeholder="Horari (ex: 19:00 - 21:00)"
-              value={form.schedule}
-              onChange={(e) => setForm({ ...form, schedule: e.target.value })}
-            />
-            <input
-              className="w-full border rounded px-3 py-2"
-              placeholder="Preu (ex: 120€)"
-              value={form.price}
-              onChange={(e) => setForm({ ...form, price: e.target.value })}
-            />
-
-            <div className="grid grid-cols-2 gap-3">
-              <input
-                type="number"
-                className="w-full border rounded px-3 py-2"
-                placeholder="Places"
-                value={form.maxSpots}
-                onChange={(e) => setForm({ ...form, maxSpots: Number(e.target.value) })}
-              />
-              <input
-                className="w-full border rounded px-3 py-2"
-                placeholder="Nivell requerit (ex: B1E)"
-                value={form.levelRequired}
-                onChange={(e) => setForm({ ...form, levelRequired: e.target.value })}
-              />
-            </div>
-
-            <textarea
-              className="w-full border rounded px-3 py-2"
-              placeholder="Descripció"
-              rows={4}
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-            />
-
-            <input
-              className="w-full border rounded px-3 py-2"
-              placeholder="URL imatge (opcional)"
-              value={form.imageUrl}
-              onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
-            />
-
-            <button
-              type="submit"
-              className="w-full bg-orange-600 text-white font-bold py-2 rounded hover:bg-orange-700"
-            >
-              Crear curs
-            </button>
-          </form>
-        </div>
-
-        {/* List */}
-        <div className="bg-white rounded-2xl border shadow-sm p-6">
-          <h2 className="font-bold text-slate-900 mb-4">Cursos creats ({sorted.length})</h2>
-
-          {sorted.length === 0 ? (
-            <p className="text-gray-500">Encara no n’hi ha.</p>
-          ) : (
-            <ul className="space-y-3">
-              {sorted.map((c) => (
-                <li key={c.id} className="border rounded-xl p-4">
-                  <p className="font-bold text-slate-900">{c.title}</p>
-                  <p className="text-sm text-gray-600">
-                    {c.date} · {c.schedule} · Requisit: {c.levelRequired}
-                  </p>
-                  <p className="text-sm text-gray-600">Places: {c.maxSpots ?? "-"} · Preu: {c.price}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+      <div className="space-y-4">
+        {list.length === 0 ? (
+          <div className="bg-white border rounded-2xl shadow-sm p-8 text-center text-gray-500">
+            No hi ha cursos.
+          </div>
+        ) : (
+          list.map((c) => (
+            <CourseCard key={c.id} course={c} userName={userName} />
+          ))
+        )}
       </div>
     </div>
   );
+
+  function CourseCard({
+    course,
+    userName,
+  }: {
+    course: Course;
+    userName: (uid: string) => string;
+  }) {
+    const pending = course.pendingParticipants || [];
+    const approved = course.participants || [];
+    const isCancelled = course.status === "cancelled";
+
+    const togglePublish = async () => {
+      await setCoursePublished(course.id, !course.published);
+    };
+
+    const doCancel = async () => {
+      const reason = prompt("Motiu de cancel·lació (opcional):") || "";
+      await cancelCourse(course.id, reason);
+    };
+
+    const doDelete = async () => {
+      if (!canManageSystem()) return;
+      const ok = confirm("Segur que vols ESBORRAR definitivament este curs?");
+      if (ok) await deleteCourse(course.id);
+    };
+
+    return (
+      <div className="bg-white border rounded-2xl shadow-sm p-5">
+        <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex items-center gap-3 flex-wrap">
+              <h2 className="text-lg font-extrabold text-slate-900">{course.title}</h2>
+
+              <span
+                className={`text-xs font-bold px-2 py-1 rounded-full ${
+                  isCancelled
+                    ? "bg-red-100 text-red-700"
+                    : course.published
+                    ? "bg-green-100 text-green-700"
+                    : "bg-gray-100 text-gray-700"
+                }`}
+              >
+                {isCancelled ? "CANCEL·LAT" : course.published ? "PUBLICAT" : "OCULT"}
+              </span>
+            </div>
+
+            <div className="text-sm text-gray-600 mt-1">
+              {course.date} · Horari: {course.schedule} · Nivell: {course.levelRequired} · Places:{" "}
+              {approved.length}/{course.maxSpots ?? "—"} · Preu: {course.price}
+            </div>
+
+            {isCancelled && course.cancelledReason ? (
+              <div className="mt-2 text-sm text-red-700">
+                <span className="font-bold">Motiu:</span> {course.cancelledReason}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {!isCancelled && (
+              <button
+                onClick={togglePublish}
+                className={`px-4 py-2 rounded-xl font-extrabold text-sm ${
+                  course.published
+                    ? "bg-gray-100 hover:bg-gray-200"
+                    : "bg-yellow-400 hover:bg-yellow-300"
+                }`}
+              >
+                {course.published ? "Ocultar" : "Publicar"}
+              </button>
+            )}
+
+            {!isCancelled && (
+              <button
+                onClick={doCancel}
+                className="px-4 py-2 rounded-xl font-extrabold text-sm border hover:bg-gray-50"
+              >
+                Cancel·lar
+              </button>
+            )}
+
+            {canManageSystem() && (
+              <button
+                onClick={doDelete}
+                className="px-4 py-2 rounded-xl font-extrabold text-sm bg-red-600 text-white hover:bg-red-700"
+              >
+                Esborrar
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-5 grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <div className="border rounded-2xl p-4">
+            <div className="font-extrabold text-slate-900 mb-2">
+              Sol·licituds pendents ({pending.length})
+            </div>
+
+            {pending.length === 0 ? (
+              <div className="text-sm text-gray-500">Cap pendent.</div>
+            ) : (
+              <div className="space-y-2">
+                {pending.map((uid) => (
+                  <div
+                    key={uid}
+                    className="flex items-center justify-between gap-2 border rounded-xl p-2"
+                  >
+                    <div className="text-sm font-bold text-slate-900 truncate">
+                      {userName(uid)}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => approveCourseRequest(course.id, uid)}
+                        className="px-3 py-1.5 rounded-lg bg-green-600 text-white font-bold text-xs hover:bg-green-700"
+                      >
+                        Aprovar
+                      </button>
+                      <button
+                        onClick={() => rejectCourseRequest(course.id, uid)}
+                        className="px-3 py-1.5 rounded-lg bg-gray-100 font-bold text-xs hover:bg-gray-200"
+                      >
+                        Denegar
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="border rounded-2xl p-4">
+            <div className="font-extrabold text-slate-900 mb-2">
+              Participants aprovats ({approved.length})
+            </div>
+
+            {approved.length === 0 ? (
+              <div className="text-sm text-gray-500">Encara ningú.</div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {approved.map((uid) => (
+                  <span
+                    key={uid}
+                    className="text-xs font-bold px-2 py-1 rounded-full bg-slate-900 text-yellow-300"
+                  >
+                    {userName(uid)}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 };
