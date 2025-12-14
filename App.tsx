@@ -6,6 +6,7 @@ import { Home } from "./pages/Home";
 import { Login } from "./pages/Login";
 import { Dashboard } from "./pages/Dashboard";
 import { Trips } from "./pages/Trips";
+import { CoursesPublic } from "./pages/CoursesPublic";
 import { AdminUsers } from "./pages/AdminUsers";
 import { AdminSettings } from "./pages/AdminSettings";
 import { CalendarPage } from "./pages/CalendarPage";
@@ -19,6 +20,7 @@ import { GeminiDiveGuide } from "./components/GeminiDiveGuide";
 import { Admin } from "./pages/Admin";
 import { AdminCourses } from "./pages/AdminCourses";
 import { AdminEvents } from "./pages/AdminEvents";
+import { AdminTrips } from "./pages/AdminTrips";
 
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const { currentUser } = useApp();
@@ -58,7 +60,7 @@ const AppContent = () => {
       <Routes>
         {/* Public */}
         <Route path="/" element={<Home />} />
-        <Route path="/courses-public" element={<div className="p-8 text-center">Cursos (públic)</div>} />
+        <Route path="/courses-public" element={<CoursesPublic />} />
         <Route path="/login" element={<Login />} />
 
         {/* Private */}
@@ -133,6 +135,14 @@ const AppContent = () => {
           element={
             <InstructorRoute>
               <Admin />
+            </InstructorRoute>
+          }
+        />
+        <Route
+          path="/admin-trips"
+          element={
+            <InstructorRoute>
+              <AdminTrips />
             </InstructorRoute>
           }
         />
