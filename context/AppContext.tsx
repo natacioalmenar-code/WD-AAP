@@ -114,7 +114,7 @@ interface AppState {
   users: User[];
   trips: Trip[];
   courses: Course[];
-  socialEvents: SocialEvent[];
+  events: EventItem[];
   currentUser: User | null;
   clubSettings: ClubSettings;
 }
