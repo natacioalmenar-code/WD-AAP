@@ -8,24 +8,23 @@ export type FecdAsLevel =
   | "B1E"
   | "B2E"
   | "B3E"
-  | "AOWD"
-  | "RESCUE"
-  | "DIVEMASTER"
-  | "INSTRUCTOR"
-  | "ADMIN"
+  | "GG"
+  | "IN1E"
+  | "IN2E"
+  | "IN3E"
   | "PENDENT";
 
 export const FECDAS_LEVELS: FecdAsLevel[] = [
   "B1E",
   "B2E",
   "B3E",
-  "AOWD",
-  "RESCUE",
-  "DIVEMASTER",
-  "INSTRUCTOR",
-  "ADMIN",
+  "GG",
+  "IN1E",
+  "IN2E",
+  "IN3E",
   "PENDENT",
 ];
+
 
 export interface User {
   id: string;
