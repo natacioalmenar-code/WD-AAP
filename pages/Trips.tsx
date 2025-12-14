@@ -82,6 +82,9 @@ export const Trips: React.FC = () => {
         ) : (
           sorted.map((t) => {
             const isSignedUp = currentUser ? t.participants.includes(currentUser.id) : false;
+            const spotsLeft = t.maxSpots - t.participants.length;
+            const isFull = spotsLeft <= 0;
+
 
             return (
               <div key={t.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
