@@ -29,6 +29,7 @@ import {
   getDoc,
   arrayUnion,
   arrayRemove,
+  runTransaction,
 } from "firebase/firestore";
 
 import { auth, db } from "../firebase/firebase";
@@ -68,11 +69,10 @@ interface AppContextValue extends AppState {
   approveUser: (userId: string) => Promise<void>;
   setUserRole: (userId: string, role: Role) => Promise<void>;
 
-  canManageTrips: () => boolean; // admin o instructor
-  canManageSystem: () => boolean; // admin
-  isActiveMember: () => boolean; // active i role != pending
+  canManageTrips: () => boolean;
+  canManageSystem: () => boolean;
+  isActiveMember: () => boolean;
 
-  // Trips
   createTrip: (
     data: Omit<
       Trip,
@@ -89,7 +89,6 @@ interface AppContextValue extends AppState {
   setTripPublished: (tripId: string, published: boolean) => Promise<void>;
   cancelTrip: (tripId: string, reason?: string) => Promise<void>;
 
-  // Courses
   createCourse: (
     data: Omit<
       Course,
@@ -106,7 +105,6 @@ interface AppContextValue extends AppState {
   setCoursePublished: (courseId: string, published: boolean) => Promise<void>;
   cancelCourse: (courseId: string, reason?: string) => Promise<void>;
 
-  // Social
   createSocialEvent: (
     data: Omit<
       SocialEvent,
@@ -123,7 +121,6 @@ interface AppContextValue extends AppState {
   setSocialEventPublished: (eventId: string, published: boolean) => Promise<void>;
   cancelSocialEvent: (eventId: string, reason?: string) => Promise<void>;
 
-  // Inscripcions directes
   joinTrip: (tripId: string) => Promise<void>;
   leaveTrip: (tripId: string) => Promise<void>;
   joinCourse: (courseId: string) => Promise<void>;
@@ -131,7 +128,6 @@ interface AppContextValue extends AppState {
   joinSocialEvent: (eventId: string) => Promise<void>;
   leaveSocialEvent: (eventId: string) => Promise<void>;
 
-  // Settings
   updateClubSettings: (data: Partial<ClubSettings>) => Promise<void>;
 
   // ✅ MATERIAL
@@ -140,6 +136,9 @@ interface AppContextValue extends AppState {
   ) => Promise<void>;
   updateResource: (resourceId: string, data: Partial<ResourceItem>) => Promise<void>;
   deleteResource: (resourceId: string) => Promise<void>;
+
+  // ✅ ordre manual (swap segur)
+  swapResourceOrder: (aId: string, bId: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
@@ -176,9 +175,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     clubSettings: defaultClubSettings,
   });
 
-  /**
-   * Subscriptions Firestore
-   */
   useEffect(() => {
     const unsubUsers = onSnapshot(
       query(collection(db, "users"), orderBy("createdAt", "asc")),
@@ -217,12 +213,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
     );
 
-    // ✅ Resources
+    // ✅ Resources: category + order (ordre manual)
     const unsubResources = onSnapshot(
-      query(collection(db, "resources"), orderBy("category", "asc")),
+      query(collection(db, "resources"), orderBy("category", "asc"), orderBy("order", "asc")),
       (snap) => {
         const resources = snap.docs.map((d) => ({ ...(d.data() as any), id: d.id })) as ResourceItem[];
-        setState((prev) => ({ ...prev, resources }));
+        // si algun vell no té order, el posem al final a nivell UI
+        const safe = resources.map((r) => ({
+          ...r,
+          order: typeof (r as any).order === "number" ? (r as any).order : 999999,
+        }));
+        setState((prev) => ({ ...prev, resources: safe }));
       }
     );
 
@@ -246,9 +247,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
-  /**
-   * Auth listener
-   */
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (fbUser) => {
       if (!fbUser?.email) {
@@ -305,9 +303,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     return () => unsub();
   }, [state.users]);
 
-  /**
-   * Permisos
-   */
   const canManageTrips = useMemo(() => {
     return () =>
       !!state.currentUser &&
@@ -329,9 +324,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       state.currentUser.role !== "pending";
   }, [state.currentUser]);
 
-  /**
-   * AUTH
-   */
   const loginWithEmail: AppContextValue["loginWithEmail"] = async (email, password) => {
     const trimmed = email.trim().toLowerCase();
     if (!trimmed || !password) {
@@ -352,9 +344,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     } catch {}
   };
 
-  /**
-   * REGISTRE
-   */
   const registerUser: AppContextValue["registerUser"] = async ({
     name,
     email,
@@ -395,9 +384,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  /**
-   * ADMINS
-   */
   const approveUser: AppContextValue["approveUser"] = async (userId) => {
     if (!canManageSystem()) {
       alert("Només administració pot aprovar persones sòcies.");
@@ -424,9 +410,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  /**
-   * Helpers CRUD
-   */
   const ensureCanCreateOrEdit = () => {
     if (!canManageTrips()) {
       alert("Només administració o instructors poden gestionar això.");
@@ -445,36 +428,24 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     updatedAt: serverTimestamp(),
   });
 
-  /**
-   * TRIPS
-   */
+  // TRIPS
   const createTrip: AppContextValue["createTrip"] = async (data) => {
     if (!ensureCanCreateOrEdit()) return;
     assertAuthed(state.currentUser);
-    await addDoc(collection(db, "trips"), {
-      ...baseDefaults(state.currentUser.id),
-      ...data,
-    });
+    await addDoc(collection(db, "trips"), { ...baseDefaults(state.currentUser.id), ...data });
   };
-
   const updateTrip: AppContextValue["updateTrip"] = async (tripId, data) => {
     if (!ensureCanCreateOrEdit()) return;
     await updateDoc(doc(db, "trips", tripId), { ...data, updatedAt: serverTimestamp() });
   };
-
   const deleteTrip: AppContextValue["deleteTrip"] = async (tripId) => {
-    if (!canManageSystem()) {
-      alert("Només administració pot esborrar definitivament.");
-      return;
-    }
+    if (!canManageSystem()) return alert("Només administració pot esborrar definitivament.");
     await deleteDoc(doc(db, "trips", tripId));
   };
-
   const setTripPublished: AppContextValue["setTripPublished"] = async (tripId, published) => {
     if (!ensureCanCreateOrEdit()) return;
     await updateDoc(doc(db, "trips", tripId), { published, updatedAt: serverTimestamp() });
   };
-
   const cancelTrip: AppContextValue["cancelTrip"] = async (tripId, reason) => {
     if (!ensureCanCreateOrEdit()) return;
     await updateDoc(doc(db, "trips", tripId), {
@@ -485,36 +456,24 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  /**
-   * COURSES
-   */
+  // COURSES
   const createCourse: AppContextValue["createCourse"] = async (data) => {
     if (!ensureCanCreateOrEdit()) return;
     assertAuthed(state.currentUser);
-    await addDoc(collection(db, "courses"), {
-      ...baseDefaults(state.currentUser.id),
-      ...data,
-    });
+    await addDoc(collection(db, "courses"), { ...baseDefaults(state.currentUser.id), ...data });
   };
-
   const updateCourse: AppContextValue["updateCourse"] = async (courseId, data) => {
     if (!ensureCanCreateOrEdit()) return;
     await updateDoc(doc(db, "courses", courseId), { ...data, updatedAt: serverTimestamp() });
   };
-
   const deleteCourse: AppContextValue["deleteCourse"] = async (courseId) => {
-    if (!canManageSystem()) {
-      alert("Només administració pot esborrar definitivament.");
-      return;
-    }
+    if (!canManageSystem()) return alert("Només administració pot esborrar definitivament.");
     await deleteDoc(doc(db, "courses", courseId));
   };
-
   const setCoursePublished: AppContextValue["setCoursePublished"] = async (courseId, published) => {
     if (!ensureCanCreateOrEdit()) return;
     await updateDoc(doc(db, "courses", courseId), { published, updatedAt: serverTimestamp() });
   };
-
   const cancelCourse: AppContextValue["cancelCourse"] = async (courseId, reason) => {
     if (!ensureCanCreateOrEdit()) return;
     await updateDoc(doc(db, "courses", courseId), {
@@ -525,36 +484,24 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  /**
-   * SOCIAL EVENTS
-   */
+  // SOCIAL EVENTS
   const createSocialEvent: AppContextValue["createSocialEvent"] = async (data) => {
     if (!ensureCanCreateOrEdit()) return;
     assertAuthed(state.currentUser);
-    await addDoc(collection(db, "socialEvents"), {
-      ...baseDefaults(state.currentUser.id),
-      ...data,
-    });
+    await addDoc(collection(db, "socialEvents"), { ...baseDefaults(state.currentUser.id), ...data });
   };
-
   const updateSocialEvent: AppContextValue["updateSocialEvent"] = async (eventId, data) => {
     if (!ensureCanCreateOrEdit()) return;
     await updateDoc(doc(db, "socialEvents", eventId), { ...data, updatedAt: serverTimestamp() });
   };
-
   const deleteSocialEvent: AppContextValue["deleteSocialEvent"] = async (eventId) => {
-    if (!canManageSystem()) {
-      alert("Només administració pot esborrar definitivament.");
-      return;
-    }
+    if (!canManageSystem()) return alert("Només administració pot esborrar definitivament.");
     await deleteDoc(doc(db, "socialEvents", eventId));
   };
-
   const setSocialEventPublished: AppContextValue["setSocialEventPublished"] = async (eventId, published) => {
     if (!ensureCanCreateOrEdit()) return;
     await updateDoc(doc(db, "socialEvents", eventId), { published, updatedAt: serverTimestamp() });
   };
-
   const cancelSocialEvent: AppContextValue["cancelSocialEvent"] = async (eventId, reason) => {
     if (!ensureCanCreateOrEdit()) return;
     await updateDoc(doc(db, "socialEvents", eventId), {
@@ -565,9 +512,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  /**
-   * INSCRIPCIÓ DIRECTA
-   */
+  // JOIN/LEAVE
   const ensureCanJoin = () => {
     if (!isActiveMember()) {
       alert("Has d’estar aprovat/da per a apuntar-te.");
@@ -579,76 +524,41 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const joinTrip: AppContextValue["joinTrip"] = async (tripId) => {
     if (!ensureCanJoin()) return;
     assertAuthed(state.currentUser);
-    await updateDoc(doc(db, "trips", tripId), {
-      participants: arrayUnion(state.currentUser.id),
-      updatedAt: serverTimestamp(),
-    });
+    await updateDoc(doc(db, "trips", tripId), { participants: arrayUnion(state.currentUser.id), updatedAt: serverTimestamp() });
   };
-
   const leaveTrip: AppContextValue["leaveTrip"] = async (tripId) => {
     if (!state.currentUser) return;
-    await updateDoc(doc(db, "trips", tripId), {
-      participants: arrayRemove(state.currentUser.id),
-      updatedAt: serverTimestamp(),
-    });
+    await updateDoc(doc(db, "trips", tripId), { participants: arrayRemove(state.currentUser.id), updatedAt: serverTimestamp() });
   };
-
   const joinCourse: AppContextValue["joinCourse"] = async (courseId) => {
     if (!ensureCanJoin()) return;
     assertAuthed(state.currentUser);
-    await updateDoc(doc(db, "courses", courseId), {
-      participants: arrayUnion(state.currentUser.id),
-      updatedAt: serverTimestamp(),
-    });
+    await updateDoc(doc(db, "courses", courseId), { participants: arrayUnion(state.currentUser.id), updatedAt: serverTimestamp() });
   };
-
   const leaveCourse: AppContextValue["leaveCourse"] = async (courseId) => {
     if (!state.currentUser) return;
-    await updateDoc(doc(db, "courses", courseId), {
-      participants: arrayRemove(state.currentUser.id),
-      updatedAt: serverTimestamp(),
-    });
+    await updateDoc(doc(db, "courses", courseId), { participants: arrayRemove(state.currentUser.id), updatedAt: serverTimestamp() });
   };
-
   const joinSocialEvent: AppContextValue["joinSocialEvent"] = async (eventId) => {
     if (!ensureCanJoin()) return;
     assertAuthed(state.currentUser);
-    await updateDoc(doc(db, "socialEvents", eventId), {
-      participants: arrayUnion(state.currentUser.id),
-      updatedAt: serverTimestamp(),
-    });
+    await updateDoc(doc(db, "socialEvents", eventId), { participants: arrayUnion(state.currentUser.id), updatedAt: serverTimestamp() });
   };
-
   const leaveSocialEvent: AppContextValue["leaveSocialEvent"] = async (eventId) => {
     if (!state.currentUser) return;
-    await updateDoc(doc(db, "socialEvents", eventId), {
-      participants: arrayRemove(state.currentUser.id),
-      updatedAt: serverTimestamp(),
-    });
+    await updateDoc(doc(db, "socialEvents", eventId), { participants: arrayRemove(state.currentUser.id), updatedAt: serverTimestamp() });
   };
 
-  /**
-   * Settings
-   */
+  // SETTINGS
   const updateClubSettings: AppContextValue["updateClubSettings"] = async (data) => {
-    if (!canManageSystem()) {
-      alert("Només administració pot modificar la web/app.");
-      return;
-    }
-    await setDoc(
-      doc(db, "clubSettings", "main"),
-      { ...data, updatedAt: serverTimestamp() },
-      { merge: true }
-    );
+    if (!canManageSystem()) return alert("Només administració pot modificar la web/app.");
+    await setDoc(doc(db, "clubSettings", "main"), { ...data, updatedAt: serverTimestamp() }, { merge: true });
   };
 
-  /**
-   * ✅ MATERIAL
-   */
+  // ✅ MATERIAL
   const createResource: AppContextValue["createResource"] = async (data) => {
     if (!ensureCanCreateOrEdit()) return;
     assertAuthed(state.currentUser);
-
     await addDoc(collection(db, "resources"), {
       ...data,
       createdBy: state.currentUser.id,
@@ -659,19 +569,38 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const updateResource: AppContextValue["updateResource"] = async (resourceId, data) => {
     if (!ensureCanCreateOrEdit()) return;
-    await updateDoc(doc(db, "resources", resourceId), {
-      ...data,
-      updatedAt: serverTimestamp(),
-    });
+    await updateDoc(doc(db, "resources", resourceId), { ...data, updatedAt: serverTimestamp() });
   };
 
-  // ✅ canvi: abans només admin. Ara admin + instructor
   const deleteResource: AppContextValue["deleteResource"] = async (resourceId) => {
+    if (!canManageTrips()) return alert("Només administració o instructors poden eliminar material.");
+    await deleteDoc(doc(db, "resources", resourceId));
+  };
+
+  // ✅ swap d’ordre (dos docs) amb transacció
+  const swapResourceOrder: AppContextValue["swapResourceOrder"] = async (aId, bId) => {
     if (!canManageTrips()) {
-      alert("Només administració o instructors poden eliminar material.");
+      alert("Només administració o instructors poden ordenar material.");
       return;
     }
-    await deleteDoc(doc(db, "resources", resourceId));
+
+    const aRef = doc(db, "resources", aId);
+    const bRef = doc(db, "resources", bId);
+
+    await runTransaction(db, async (tx) => {
+      const aSnap = await tx.get(aRef);
+      const bSnap = await tx.get(bRef);
+      if (!aSnap.exists() || !bSnap.exists()) throw new Error("Resource missing");
+
+      const a = aSnap.data() as any;
+      const b = bSnap.data() as any;
+
+      const aOrder = typeof a.order === "number" ? a.order : 999999;
+      const bOrder = typeof b.order === "number" ? b.order : 999999;
+
+      tx.update(aRef, { order: bOrder, updatedAt: serverTimestamp() });
+      tx.update(bRef, { order: aOrder, updatedAt: serverTimestamp() });
+    });
   };
 
   const value: AppContextValue = {
@@ -718,6 +647,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     createResource,
     updateResource,
     deleteResource,
+    swapResourceOrder,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
