@@ -1,494 +1,204 @@
 import React, { useMemo } from "react";
-import { useApp } from "../context/AppContext";
 import { Link } from "react-router-dom";
-import {
-  Calendar,
-  Award,
-  BookOpen,
-  Users,
-  Shield,
-  Settings,
-  Anchor,
-  GraduationCap,
-  ClipboardList,
-} from "lucide-react";
+import { useApp } from "../context/AppContext";
+import { CalendarDays, MapPin, GraduationCap, Users, Settings } from "lucide-react";
 
 export const Dashboard: React.FC = () => {
-  const { currentUser, users, trips, courses, canManageTrips, canManageSystem } =
-    useApp();
+  const { currentUser, trips, courses, socialEvents, canManageTrips, canManageSystem } = useApp();
 
-  if (!currentUser) return null;
-
-  const isAdmin = canManageSystem();
-  const isInstructor = canManageTrips() && !isAdmin; // instructor/a (no admin)
-
-  const pendingUsers = useMemo(
-    () => users.filter((u) => u.status === "pending"),
-    [users]
-  );
-  const activeUsers = useMemo(
-    () => users.filter((u) => u.status === "active"),
-    [users]
-  );
-
-  const myTrips = useMemo(
-    () => trips.filter((t) => t.participants.includes(currentUser.id)),
-    [trips, currentUser.id]
-  );
-
-  const myCourses = useMemo(
-    () => courses.filter((c) => c.participants.includes(currentUser.id)),
-    [courses, currentUser.id]
-  );
-
-  const nextTrip = useMemo(() => {
-    const sorted = [...myTrips].sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
-    return sorted[0] ?? null;
-  }, [myTrips]);
-
-  const nextCourse = useMemo(() => {
-    const sorted = [...myCourses].sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
-    return sorted[0] ?? null;
-  }, [myCourses]);
-
-  const upcomingTrips = useMemo(() => {
-    const sorted = [...trips].sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
-    return sorted.slice(0, 5);
+  const nextTrips = useMemo(() => {
+    return [...trips]
+      .filter((t) => t.published && t.status !== "cancelled")
+      .sort((a, b) => (a.date || "").localeCompare(b.date || ""))
+      .slice(0, 3);
   }, [trips]);
 
-  const upcomingCourses = useMemo(() => {
-    const sorted = [...courses].sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
-    return sorted.slice(0, 5);
+  const nextCourses = useMemo(() => {
+    return [...courses]
+      .filter((c) => c.published && c.status !== "cancelled")
+      .sort((a, b) => (a.date || "").localeCompare(b.date || ""))
+      .slice(0, 3);
   }, [courses]);
 
-  // Si algun dia un pending entra (per error), li avisem
-  if (currentUser.status === "pending") {
+  const nextEvents = useMemo(() => {
+    return [...socialEvents]
+      .filter((e) => e.published && e.status !== "cancelled")
+      .sort((a, b) => (a.date || "").localeCompare(b.date || ""))
+      .slice(0, 3);
+  }, [socialEvents]);
+
+  if (!currentUser) {
+    // en teoria no s’hi arriba perquè és PrivateRoute, però per seguretat
     return (
-      <div className="max-w-4xl mx-auto px-4 py-10">
-        <div className="bg-white border border-yellow-200 rounded-2xl p-8 shadow-sm">
-          <h1 className="text-2xl font-extrabold text-slate-900">
-            Compte pendent d’aprovació
-          </h1>
-          <p className="text-gray-600 mt-2">
-            La teva sol·licitud està enviada. Quan l’administració l’aprovi, podràs
-            accedir a totes les funcions.
-          </p>
-          <div className="mt-6">
-            <Link
-              to="/login"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-yellow-400 text-black font-bold hover:bg-yellow-300"
-            >
-              Tornar a Accés
-            </Link>
-          </div>
+      <div className="max-w-5xl mx-auto p-6">
+        <div className="bg-white border rounded-2xl p-6 shadow-sm">
+          <p className="text-gray-700">Has d’iniciar sessió.</p>
+          <Link to="/login" className="text-yellow-700 font-bold">
+            Anar a login →
+          </Link>
         </div>
       </div>
     );
   }
 
-  const RoleBadge = () => {
-    if (isAdmin) {
-      return (
-        <span className="inline-flex items-center gap-2 bg-slate-900 text-yellow-400 px-3 py-1 rounded-full text-xs font-extrabold uppercase">
-          <Shield size={14} /> Administració
-        </span>
-      );
-    }
-    if (isInstructor) {
-      return (
-        <span className="inline-flex items-center gap-2 bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-extrabold uppercase">
-          <Anchor size={14} /> Instructor/a
-        </span>
-      );
-    }
-    return (
-      <span className="inline-flex items-center gap-2 bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-extrabold uppercase">
-        <Users size={14} /> Soci/a
-      </span>
-    );
-  };
-
-  const StatCard = ({
-    icon,
-    title,
-    value,
-    hint,
-    colorClass,
-    linkTo,
-    linkLabel,
-  }: {
-    icon: React.ReactNode;
-    title: string;
-    value: string;
-    hint?: string;
-    colorClass: string;
-    linkTo?: string;
-    linkLabel?: string;
-  }) => {
-    const body = (
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-        <div className="flex items-center gap-4">
-          <div className={`p-3 rounded-full ${colorClass}`}>{icon}</div>
-          <div className="flex-1">
-            <p className="text-sm text-gray-500 font-bold uppercase tracking-wide">
-              {title}
-            </p>
-            <p className="font-extrabold text-slate-900 text-xl mt-1">{value}</p>
-            {hint && <p className="text-sm text-gray-500 mt-1">{hint}</p>}
-            {linkTo && linkLabel && (
-              <div className="mt-3">
-                <Link
-                  to={linkTo}
-                  className="text-sm font-bold text-blue-700 hover:text-blue-900 hover:underline"
-                >
-                  {linkLabel} →
-                </Link>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-
-    return body;
-  };
+  const isPending = currentUser.status !== "active" || currentUser.role === "pending";
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-6">
-        <div>
-          <h1 className="text-2xl font-extrabold text-slate-900">
-            Hola, {currentUser.name}! 👋
-          </h1>
-          <p className="text-gray-600 mt-1">
-            Benvingut/da al panell del club.
-          </p>
-        </div>
-        <RoleBadge />
-      </div>
+      <div className="mb-6">
+        <h1 className="text-3xl font-extrabold text-slate-900">
+          Hola, {currentUser.name}
+        </h1>
+        <p className="text-gray-600 mt-1">
+          Rol: <span className="font-bold">{currentUser.role}</span> · Estat:{" "}
+          <span className="font-bold">{currentUser.status}</span>
+        </p>
 
-      {/* Quick stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
-        <StatCard
-          icon={<Award size={24} />}
-          title="Nivell"
-          value={currentUser.level || "—"}
-          hint="Titulació / categoria"
-          colorClass="bg-blue-100 text-blue-600"
-          linkTo="/profile"
-          linkLabel="Veure perfil"
-        />
-
-        <StatCard
-          icon={<Calendar size={24} />}
-          title="Les meves sortides"
-          value={`${myTrips.length}`}
-          hint="Reserves actives"
-          colorClass="bg-yellow-100 text-yellow-700"
-          linkTo="/trips"
-          linkLabel="Veure sortides"
-        />
-
-        <StatCard
-          icon={<GraduationCap size={24} />}
-          title="Els meus cursos"
-          value={`${myCourses.length}`}
-          hint="Inscripcions"
-          colorClass="bg-orange-100 text-orange-700"
-          linkTo="/courses-private"
-          linkLabel="Veure cursos"
-        />
-
-        {isAdmin ? (
-          <StatCard
-            icon={<ClipboardList size={24} />}
-            title="Sol·licituds pendents"
-            value={`${pendingUsers.length}`}
-            hint="Persones esperant aprovació"
-            colorClass="bg-purple-100 text-purple-700"
-            linkTo="/admin-users"
-            linkLabel="Gestionar socis/es"
-          />
-        ) : (
-          <StatCard
-            icon={<Users size={24} />}
-            title="Socis/es actius/es"
-            value={`${activeUsers.length}`}
-            hint="Total al sistema"
-            colorClass="bg-green-100 text-green-700"
-          />
+        {isPending && (
+          <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-2xl p-4">
+            <p className="font-bold text-slate-900">Compte pendent d’aprovació</p>
+            <p className="text-sm text-gray-700 mt-1">
+              Quan un administrador/a t’aprove, podràs apuntar-te a sortides, cursos i
+              esdeveniments.
+            </p>
+          </div>
         )}
       </div>
 
-      {/* Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main */}
-        <div className="lg:col-span-2 space-y-8">
-          {/* Next Trip / Course */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Next trip */}
-            <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl p-6 text-white shadow-lg">
-              <h2 className="text-lg font-extrabold mb-3">
-                La teva propera sortida
-              </h2>
-              {nextTrip ? (
-                <div>
-                  <h3 className="text-xl font-extrabold mb-2">{nextTrip.title}</h3>
-                  <p className="opacity-90 mb-4 flex items-center gap-2 text-sm">
-                    <Calendar size={16} /> {nextTrip.date} {nextTrip.time ? `· ${nextTrip.time}` : ""}
-                  </p>
-                  <Link
-                    to="/trips"
-                    className="inline-block bg-yellow-400 text-black px-4 py-2 rounded-lg font-extrabold text-sm hover:bg-yellow-300 transition-colors"
-                  >
-                    Veure sortides
-                  </Link>
-                </div>
-              ) : (
-                <div className="py-2">
-                  <p className="opacity-90 mb-4">
-                    No tens cap sortida programada.
-                  </p>
-                  <Link
-                    to="/trips"
-                    className="inline-block bg-yellow-400 text-black px-4 py-2 rounded-lg font-extrabold text-sm hover:bg-yellow-300 transition-colors"
-                  >
-                    Buscar sortides
-                  </Link>
-                </div>
-              )}
+      {/* Accions ràpides */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+        <Link
+          to="/calendar"
+          className="bg-white border rounded-2xl p-5 shadow-sm hover:shadow-md transition"
+        >
+          <div className="flex items-center gap-3">
+            <div className="bg-yellow-400 rounded-2xl p-3">
+              <CalendarDays className="text-black" />
             </div>
-
-            {/* Next course */}
-            <div className="bg-gradient-to-r from-orange-700 to-orange-600 rounded-2xl p-6 text-white shadow-lg">
-              <h2 className="text-lg font-extrabold mb-3">
-                El teu proper curs
-              </h2>
-              {nextCourse ? (
-                <div>
-                  <h3 className="text-xl font-extrabold mb-2">{nextCourse.title}</h3>
-                  <p className="opacity-90 mb-4 flex items-center gap-2 text-sm">
-                    <Calendar size={16} /> {nextCourse.date}
-                    {nextCourse.schedule ? ` · ${nextCourse.schedule}` : ""}
-                  </p>
-                  <Link
-                    to="/courses-private"
-                    className="inline-block bg-white text-orange-800 px-4 py-2 rounded-lg font-extrabold text-sm hover:bg-gray-100 transition-colors"
-                  >
-                    Veure cursos
-                  </Link>
-                </div>
-              ) : (
-                <div className="py-2">
-                  <p className="opacity-90 mb-4">
-                    No tens cap curs programat.
-                  </p>
-                  <Link
-                    to="/courses-private"
-                    className="inline-block bg-white text-orange-800 px-4 py-2 rounded-lg font-extrabold text-sm hover:bg-gray-100 transition-colors"
-                  >
-                    Buscar cursos
-                  </Link>
-                </div>
-              )}
+            <div>
+              <div className="font-extrabold text-slate-900">Calendari</div>
+              <div className="text-sm text-gray-600">Veure tot el que ve</div>
             </div>
           </div>
+        </Link>
 
-          {/* Upcoming lists */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <h3 className="font-extrabold text-slate-900 flex items-center gap-2">
-                <Calendar size={18} className="text-yellow-500" /> Properes sortides
-              </h3>
-              <Link to="/trips" className="text-sm font-bold text-blue-700 hover:underline">
-                Veure tot →
-              </Link>
+        <Link
+          to="/trips"
+          className="bg-white border rounded-2xl p-5 shadow-sm hover:shadow-md transition"
+        >
+          <div className="flex items-center gap-3">
+            <div className="bg-yellow-400 rounded-2xl p-3">
+              <MapPin className="text-black" />
             </div>
-
-            {upcomingTrips.length === 0 ? (
-              <p className="text-gray-600">Encara no hi ha sortides publicades.</p>
-            ) : (
-              <ul className="space-y-3">
-                {upcomingTrips.map((t) => (
-                  <li key={t.id} className="flex items-start justify-between gap-4 border border-gray-100 rounded-lg p-3 hover:bg-gray-50">
-                    <div>
-                      <p className="font-bold text-slate-900">{t.title}</p>
-                      <p className="text-sm text-gray-600">
-                        {t.date} {t.time ? `· ${t.time}` : ""} {t.location ? `· ${t.location}` : ""}
-                      </p>
-                    </div>
-                    <span className="text-xs font-extrabold bg-yellow-100 text-yellow-900 px-2 py-1 rounded-full">
-                      {t.levelRequired}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <h3 className="font-extrabold text-slate-900 flex items-center gap-2">
-                <GraduationCap size={18} className="text-orange-500" /> Propers cursos
-              </h3>
-              <Link to="/courses-private" className="text-sm font-bold text-blue-700 hover:underline">
-                Veure tot →
-              </Link>
-            </div>
-
-            {upcomingCourses.length === 0 ? (
-              <p className="text-gray-600">Encara no hi ha cursos publicats.</p>
-            ) : (
-              <ul className="space-y-3">
-                {upcomingCourses.map((c) => (
-                  <li key={c.id} className="flex items-start justify-between gap-4 border border-gray-100 rounded-lg p-3 hover:bg-gray-50">
-                    <div>
-                      <p className="font-bold text-slate-900">{c.title}</p>
-                      <p className="text-sm text-gray-600">
-                        {c.date} {c.schedule ? `· ${c.schedule}` : ""}
-                      </p>
-                    </div>
-                    <span className="text-xs font-extrabold bg-orange-100 text-orange-900 px-2 py-1 rounded-full">
-                      {c.levelRequired}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Admin / Instructor quick actions */}
-          {(isAdmin || isInstructor) && (
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-              <h3 className="font-extrabold text-slate-900 mb-4 flex items-center gap-2">
-                <Settings size={18} className="text-slate-700" /> Gestió ràpida
-              </h3>
-
-              <div className="flex flex-col gap-2">
-  <Link
-    to="/trips"
-    className="w-full px-3 py-2 rounded-lg bg-slate-900 text-yellow-400 font-extrabold text-sm hover:bg-slate-800"
-  >
-    Gestionar sortides
-  </Link>
-
-  <Link
-    to="/courses-private"
-    className="w-full px-3 py-2 rounded-lg bg-slate-900 text-yellow-400 font-extrabold text-sm hover:bg-slate-800"
-  >
-    Gestionar formació
-  </Link>
-
-  <Link
-    to="/social-events"
-    className="w-full px-3 py-2 rounded-lg bg-slate-900 text-yellow-400 font-extrabold text-sm hover:bg-slate-800"
-  >
-    Gestionar esdeveniments
-  </Link>
-
-  {isAdmin && (
-    <Link
-      to="/admin-users"
-      className="w-full px-3 py-2 rounded-lg bg-purple-100 text-purple-800 font-extrabold text-sm hover:bg-purple-200"
-    >
-      Gestionar socis/es (aprovacions)
-    </Link>
-  )}
-
-  {isAdmin && (
-    <Link
-      to="/admin-settings"
-      className="w-full px-3 py-2 rounded-lg bg-cyan-100 text-cyan-800 font-extrabold text-sm hover:bg-cyan-200"
-    >
-      Configuració web
-    </Link>
-  )}
-</div>
-
-                {isAdmin && (
-                  <Link
-                    to="/admin-users"
-                    className="w-full px-3 py-2 rounded-lg bg-purple-100 text-purple-800 font-extrabold text-sm hover:bg-purple-200"
-                  >
-                    Gestionar socis/es (aprovacions)
-                  </Link>
-                )}
-
-                {isAdmin && (
-                  <Link
-                    to="/admin-settings"
-                    className="w-full px-3 py-2 rounded-lg bg-cyan-100 text-cyan-800 font-extrabold text-sm hover:bg-cyan-200"
-                  >
-                    Configuració web
-                  </Link>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Documentation */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <h3 className="font-extrabold text-slate-900 mb-4 flex items-center gap-2">
-              <BookOpen size={18} className="text-blue-600" /> Documentació
-            </h3>
-            <ul className="space-y-2 text-sm text-gray-600">
-              <li className="hover:text-blue-600 cursor-pointer">➔ Assegurança</li>
-              <li className="hover:text-blue-600 cursor-pointer">➔ Certificat mèdic</li>
-              <li className="hover:text-blue-600 cursor-pointer">➔ Titulacions</li>
-            </ul>
-            <p className="text-xs text-gray-400 mt-3">
-              (Això després ho connectarem a PDFs o enllaços reals)
-            </p>
-          </div>
-
-          {/* Social groups */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <h3 className="font-extrabold text-slate-900 mb-4 flex items-center gap-2">
-              <Users size={18} className="text-blue-600" /> Grups socials
-            </h3>
-            <div className="flex flex-col gap-2">
-              <button className="w-full text-left px-3 py-2 bg-green-50 text-green-700 rounded-lg text-sm font-bold hover:bg-green-100">
-                WhatsApp sortides
-              </button>
-              <button className="w-full text-left px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-bold hover:bg-blue-100">
-                Compravenda material
-              </button>
+            <div>
+              <div className="font-extrabold text-slate-900">Sortides</div>
+              <div className="text-sm text-gray-600">Apunta’t (amb aprovació)</div>
             </div>
           </div>
+        </Link>
 
-          {/* Admin highlight */}
-          {isAdmin && (
-            <div className="bg-yellow-50 border border-yellow-200 p-6 rounded-xl">
-              <h3 className="font-extrabold text-slate-900 flex items-center gap-2">
-                <Shield size={18} /> Administració
-              </h3>
-              <p className="text-sm text-gray-700 mt-2">
-                Tens <b>{pendingUsers.length}</b> sol·licitud(s) pendent(s) d’aprovació.
-              </p>
-              <div className="mt-4">
-                <Link
-                  to="/admin-users"
-                  className="inline-block px-4 py-2 rounded-lg bg-slate-900 text-yellow-400 font-extrabold text-sm hover:bg-slate-800"
-                >
-                  Revisar ara
-                </Link>
-              </div>
+        <Link
+          to="/courses-private"
+          className="bg-white border rounded-2xl p-5 shadow-sm hover:shadow-md transition"
+        >
+          <div className="flex items-center gap-3">
+            <div className="bg-yellow-400 rounded-2xl p-3">
+              <GraduationCap className="text-black" />
             </div>
-          )}
-        </div>
+            <div>
+              <div className="font-extrabold text-slate-900">Formació</div>
+              <div className="text-sm text-gray-600">Cursos del club</div>
+            </div>
+          </div>
+        </Link>
+
+        <Link
+          to="/social-events"
+          className="bg-white border rounded-2xl p-5 shadow-sm hover:shadow-md transition"
+        >
+          <div className="flex items-center gap-3">
+            <div className="bg-yellow-400 rounded-2xl p-3">
+              <Users className="text-black" />
+            </div>
+            <div>
+              <div className="font-extrabold text-slate-900">Esdeveniments</div>
+              <div className="text-sm text-gray-600">Quedades i activitats</div>
+            </div>
+          </div>
+        </Link>
       </div>
+
+      {/* Gestió */}
+      {(canManageTrips() || canManageSystem()) && (
+        <div className="mb-8 bg-white border rounded-2xl p-5 shadow-sm">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <div className="font-extrabold text-slate-900 text-lg">Gestió</div>
+              <div className="text-sm text-gray-600">
+                Panell per crear/publicar i aprovar inscripcions
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              {canManageTrips() && (
+                <Link
+                  to="/admin"
+                  className="px-4 py-2 rounded-xl bg-slate-900 text-yellow-300 font-extrabold hover:bg-slate-800"
+                >
+                  Anar a Gestió
+                </Link>
+              )}
+              {canManageSystem() && (
+                <Link
+                  to="/admin-settings"
+                  className="px-4 py-2 rounded-xl border font-extrabold hover:bg-gray-50 inline-flex items-center gap-2"
+                >
+                  <Settings size={16} />
+                  Web/App
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Properes coses */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <Section title="Properes sortides" items={nextTrips.map((t) => ({ id: t.id, title: t.title, date: t.date, to: "/trips" }))} />
+        <Section title="Propers cursos" items={nextCourses.map((c) => ({ id: c.id, title: c.title, date: c.date, to: "/courses-private" }))} />
+        <Section title="Propers esdeveniments" items={nextEvents.map((e) => ({ id: e.id, title: e.title, date: e.date, to: "/social-events" }))} />
+      </div>
+    </div>
+  );
+};
+
+const Section = ({
+  title,
+  items,
+}: {
+  title: string;
+  items: { id: string; title: string; date: string; to: string }[];
+}) => {
+  return (
+    <div className="bg-white border rounded-2xl shadow-sm p-5">
+      <div className="font-extrabold text-slate-900 mb-3">{title}</div>
+
+      {items.length === 0 ? (
+        <div className="text-sm text-gray-500">No hi ha elements publicats.</div>
+      ) : (
+        <div className="space-y-3">
+          {items.map((it) => (
+            <Link
+              key={it.id}
+              to={it.to}
+              className="block rounded-xl border p-3 hover:bg-gray-50 transition"
+            >
+              <div className="font-bold text-slate-900">{it.title}</div>
+              <div className="text-xs text-gray-600">{it.date}</div>
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
