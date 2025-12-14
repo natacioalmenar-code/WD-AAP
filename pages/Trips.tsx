@@ -1,9 +1,35 @@
 import React, { useMemo, useState } from "react";
 import { useApp } from "../context/AppContext";
-import { Calendar, MapPin, Clock, ArrowRight, ExternalLink, PlusCircle } from "lucide-react";
+import { Calendar, Clock, MapPin, ArrowRight, ExternalLink, PlusCircle } from "lucide-react";
 
 export const Trips: React.FC = () => {
-  const { trips, users, currentUser, joinTrip, leaveTrip, createTrip, canManageTrips } = useApp();
+  const {
+    trips,
+    users,
+    currentUser,
+    joinTrip,
+    leaveTrip,
+    createTrip,
+    canManageTrips,
+  } = useApp();
+
+  const [isCreating, setIsCreating] = useState(false);
+  const [form, setForm] = useState({
+    title: "",
+    date: "",
+    time: "",
+    location: "",
+    locationUrl: "",
+    depth: "",
+    description: "",
+    imageUrl: "",
+    levelRequired: "B1E",
+    maxSpots: "12",
+  });
+
+  if (!currentUser) return null;
+
+  const canCreate = canManageTrips();
 
   const sortedTrips = useMemo(
     () => [...trips].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
@@ -12,40 +38,35 @@ export const Trips: React.FC = () => {
 
   const nameFromId = (id: string) => users.find((u) => u.id === id)?.name || "Persona desconeguda";
 
-  const [form, setForm] = useState({
-    title: "",
-    date: "",
-    time: "",
-    location: "",
-    locationUrl: "",
-    depth: "",
-    levelRequired: "B1E",
-    maxSpots: 12,
-    imageUrl: "",
-    description: "",
-  });
-
-  if (!currentUser) return null;
-
-  const handleCreateTrip = (e: React.FormEvent) => {
+  const onSubmitCreate = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!form.title.trim()) return alert("Introdueix el títol.");
-    if (!form.date.trim()) return alert("Introdueix la data.");
-    if (!form.location.trim()) return alert("Introdueix la ubicació.");
-    if (!form.maxSpots || form.maxSpots < 1) return alert("Posa un màxim de places correcte.");
+    const title = form.title.trim();
+    const date = form.date.trim();
+    const location = form.location.trim();
+    const levelRequired = form.levelRequired.trim();
+    const maxSpotsNum = Number(form.maxSpots);
+
+    if (!title || !date || !location || !levelRequired) {
+      alert("Falten dades: títol, data, lloc i nivell requerit són obligatoris.");
+      return;
+    }
+    if (!Number.isFinite(maxSpotsNum) || maxSpotsNum <= 0) {
+      alert("El número de places ha de ser un número positiu.");
+      return;
+    }
 
     createTrip({
-      title: form.title.trim(),
-      date: form.date.trim(),
-      time: form.time.trim(),
-      location: form.location.trim(),
-      locationUrl: form.locationUrl.trim(),
-      depth: form.depth.trim(),
-      levelRequired: form.levelRequired.trim(),
-      maxSpots: Number(form.maxSpots),
-      imageUrl: form.imageUrl.trim(),
-      description: form.description.trim(),
+      title,
+      date,
+      location,
+      levelRequired,
+      maxSpots: maxSpotsNum,
+      time: form.time.trim() || undefined,
+      depth: form.depth.trim() || undefined,
+      description: form.description.trim() || undefined,
+      imageUrl: form.imageUrl.trim() || undefined,
+      locationUrl: form.locationUrl.trim() || undefined,
     });
 
     setForm({
@@ -55,120 +76,162 @@ export const Trips: React.FC = () => {
       location: "",
       locationUrl: "",
       depth: "",
-      levelRequired: "B1E",
-      maxSpots: 12,
-      imageUrl: "",
       description: "",
+      imageUrl: "",
+      levelRequired: "B1E",
+      maxSpots: "12",
     });
-
-    alert("✅ Sortida creada!");
+    setIsCreating(false);
   };
-
-  const canCreateTripsHere = canManageTrips();
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="mb-8 border-b border-gray-200 pb-4">
-        <h1 className="text-3xl font-extrabold text-slate-900 uppercase tracking-tight">
-          Sortides i viatges
-        </h1>
-        <p className="text-gray-600 mt-2">Apunta’t a les properes immersions amb un sol clic.</p>
+      <div className="mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+        <div className="border-b border-gray-200 pb-4 w-full md:w-auto">
+          <h1 className="text-3xl font-extrabold text-slate-900 uppercase tracking-tight">
+            Sortides i viatges
+          </h1>
+          <p className="text-gray-600 mt-2">Apunta’t a les properes immersions amb un sol clic.</p>
+        </div>
+
+        {canCreate && (
+          <button
+            onClick={() => setIsCreating((v) => !v)}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-bold bg-slate-900 text-yellow-400 hover:bg-slate-800 transition-colors"
+          >
+            <PlusCircle size={18} />
+            {isCreating ? "Tancar formulari" : "Crear sortida"}
+          </button>
+        )}
       </div>
 
-      {/* ✅ CREAR SORTIDA (només admin/instructor) */}
-      {canCreateTripsHere && (
+      {canCreate && isCreating && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <PlusCircle className="text-yellow-500" />
-            <h2 className="text-lg font-extrabold text-slate-900 uppercase tracking-wide">
-              Crear nova sortida
-            </h2>
-          </div>
+          <h2 className="text-xl font-extrabold text-slate-900 mb-4">Nova sortida</h2>
 
-          <form onSubmit={handleCreateTrip} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input
-              className="border border-gray-300 rounded-lg p-2"
-              placeholder="Títol (ex: Cala X)"
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-            />
+          <form onSubmit={onSubmitCreate} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Títol *</label>
+              <input
+                className="w-full border border-gray-300 rounded-lg p-2"
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                placeholder="Immersió a Tossa, Viatge a... "
+              />
+            </div>
 
-            <input
-              type="date"
-              className="border border-gray-300 rounded-lg p-2"
-              value={form.date}
-              onChange={(e) => setForm({ ...form, date: e.target.value })}
-            />
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Data *</label>
+              <input
+                type="date"
+                className="w-full border border-gray-300 rounded-lg p-2"
+                value={form.date}
+                onChange={(e) => setForm({ ...form, date: e.target.value })}
+              />
+            </div>
 
-            <input
-              className="border border-gray-300 rounded-lg p-2"
-              placeholder="Hora (ex: 09:00)"
-              value={form.time}
-              onChange={(e) => setForm({ ...form, time: e.target.value })}
-            />
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Hora</label>
+              <input
+                type="time"
+                className="w-full border border-gray-300 rounded-lg p-2"
+                value={form.time}
+                onChange={(e) => setForm({ ...form, time: e.target.value })}
+              />
+            </div>
 
-            <input
-              className="border border-gray-300 rounded-lg p-2"
-              placeholder="Ubicació (ex: Tossa de Mar)"
-              value={form.location}
-              onChange={(e) => setForm({ ...form, location: e.target.value })}
-            />
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Lloc *</label>
+              <input
+                className="w-full border border-gray-300 rounded-lg p-2"
+                value={form.location}
+                onChange={(e) => setForm({ ...form, location: e.target.value })}
+                placeholder="Tossa de Mar, L'Estartit..."
+              />
+            </div>
 
-            <input
-              className="border border-gray-300 rounded-lg p-2 md:col-span-2"
-              placeholder="Link ubicació (opcional: Google Maps)"
-              value={form.locationUrl}
-              onChange={(e) => setForm({ ...form, locationUrl: e.target.value })}
-            />
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                Enllaç ubicació (Maps)
+              </label>
+              <input
+                className="w-full border border-gray-300 rounded-lg p-2"
+                value={form.locationUrl}
+                onChange={(e) => setForm({ ...form, locationUrl: e.target.value })}
+                placeholder="https://maps.google.com/..."
+              />
+            </div>
 
-            <input
-              className="border border-gray-300 rounded-lg p-2"
-              placeholder="Profunditat (ex: 18m)"
-              value={form.depth}
-              onChange={(e) => setForm({ ...form, depth: e.target.value })}
-            />
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Profunditat</label>
+              <input
+                className="w-full border border-gray-300 rounded-lg p-2"
+                value={form.depth}
+                onChange={(e) => setForm({ ...form, depth: e.target.value })}
+                placeholder="Ex: 20-30m"
+              />
+            </div>
 
-            <input
-              type="number"
-              className="border border-gray-300 rounded-lg p-2"
-              placeholder="Places màximes"
-              value={form.maxSpots}
-              onChange={(e) => setForm({ ...form, maxSpots: Number(e.target.value) })}
-            />
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nivell requerit *</label>
+              <input
+                className="w-full border border-gray-300 rounded-lg p-2"
+                value={form.levelRequired}
+                onChange={(e) => setForm({ ...form, levelRequired: e.target.value })}
+                placeholder="B1E / B2E..."
+              />
+            </div>
 
-            <input
-              className="border border-gray-300 rounded-lg p-2"
-              placeholder="Nivell requerit (ex: B1E)"
-              value={form.levelRequired}
-              onChange={(e) => setForm({ ...form, levelRequired: e.target.value })}
-            />
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Places *</label>
+              <input
+                className="w-full border border-gray-300 rounded-lg p-2"
+                inputMode="numeric"
+                value={form.maxSpots}
+                onChange={(e) => setForm({ ...form, maxSpots: e.target.value })}
+                placeholder="12"
+              />
+            </div>
 
-            <input
-              className="border border-gray-300 rounded-lg p-2 md:col-span-2"
-              placeholder="Imatge URL (opcional)"
-              value={form.imageUrl}
-              onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
-            />
+            <div className="md:col-span-2">
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">URL imatge</label>
+              <input
+                className="w-full border border-gray-300 rounded-lg p-2"
+                value={form.imageUrl}
+                onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
+                placeholder="https://..."
+              />
+            </div>
 
-            <textarea
-              className="border border-gray-300 rounded-lg p-2 md:col-span-2"
-              placeholder="Descripció (opcional)"
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              rows={3}
-            />
+            <div className="md:col-span-2">
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Descripció</label>
+              <textarea
+                className="w-full border border-gray-300 rounded-lg p-2 min-h-[90px]"
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                placeholder="Punt de trobada, què cal portar, etc."
+              />
+            </div>
 
-            <button
-              type="submit"
-              className="md:col-span-2 bg-yellow-400 text-black font-extrabold rounded-lg py-2 hover:bg-yellow-300"
-            >
-              Crear sortida
-            </button>
+            <div className="md:col-span-2 flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsCreating(false)}
+                className="px-4 py-2 rounded-lg font-bold border border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                Cancel·lar
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 rounded-lg font-bold bg-yellow-400 text-black hover:bg-yellow-300"
+              >
+                Crear
+              </button>
+            </div>
           </form>
         </div>
       )}
 
-      {/* ✅ LLISTA SORTIDES */}
       <div className="space-y-8">
         {sortedTrips.map((trip) => {
           const isSignedUp = trip.participants.includes(currentUser.id);
@@ -180,7 +243,6 @@ export const Trips: React.FC = () => {
               key={trip.id}
               className="bg-white rounded-2xl shadow-lg overflow-hidden flex flex-col md:flex-row group transition-all hover:shadow-xl border border-gray-100"
             >
-              {/* Image Section */}
               <div className="md:w-2/5 h-56 md:h-auto relative overflow-hidden">
                 {trip.imageUrl ? (
                   <img
@@ -197,7 +259,6 @@ export const Trips: React.FC = () => {
                 </div>
               </div>
 
-              {/* Content Section */}
               <div className="flex-1 p-6 flex flex-col justify-between relative">
                 <div>
                   <div className="flex justify-between items-start mb-2">
@@ -216,7 +277,7 @@ export const Trips: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-2">
                       <Clock size={18} className="text-yellow-500" />
-                      <span>{trip.time}</span>
+                      <span>{trip.time || "-"}</span>
                     </div>
                     <div className="flex items-center gap-2 col-span-2 md:col-span-1 lg:col-span-1">
                       <MapPin size={18} className="text-yellow-500" />
@@ -235,13 +296,12 @@ export const Trips: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-2">
                       <ArrowRight size={18} className="text-yellow-500" />
-                      <span>{trip.depth}</span>
+                      <span>{trip.depth || "-"}</span>
                     </div>
                   </div>
 
-                  <p className="text-gray-600 mb-4 leading-relaxed">{trip.description}</p>
+                  {trip.description && <p className="text-gray-600 mb-4 leading-relaxed">{trip.description}</p>}
 
-                  {/* Participants list (NOMS) */}
                   <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
                     <div className="flex items-center justify-between gap-3">
                       <p className="text-sm font-extrabold text-slate-900 uppercase tracking-wide">
@@ -249,9 +309,7 @@ export const Trips: React.FC = () => {
                       </p>
                       <span className="text-sm font-bold text-slate-700">
                         {trip.participants.length}{" "}
-                        <span className="text-slate-400 font-normal">
-                          / {trip.maxSpots}
-                        </span>
+                        <span className="text-slate-400 font-normal">/ {trip.maxSpots}</span>
                       </span>
                     </div>
 
@@ -269,28 +327,29 @@ export const Trips: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Action Buttons */}
-                <div className="flex flex-col md:flex-row justify-end items-center gap-3 pt-4">
-                  {isSignedUp ? (
-                    <button
-                      onClick={() => leaveTrip(trip.id)}
-                      className="w-full md:w-auto px-6 py-2 border-2 border-red-100 text-red-600 rounded-lg hover:bg-red-50 transition-colors font-bold uppercase text-sm tracking-wide"
-                    >
-                      Desapuntar-me
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => joinTrip(trip.id)}
-                      disabled={isFull}
-                      className={`w-full md:w-auto px-8 py-3 rounded-lg font-bold shadow-md uppercase text-sm tracking-wider transition-all transform active:scale-95 ${
-                        isFull
-                          ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                          : "bg-yellow-400 text-black hover:bg-yellow-300 hover:shadow-lg"
-                      }`}
-                    >
-                      {isFull ? "Complet" : "Apunta-m’hi"}
-                    </button>
-                  )}
+                <div className="flex flex-col md:flex-row justify-end items-center gap-4 pt-4">
+                  <div className="w-full md:w-auto">
+                    {isSignedUp ? (
+                      <button
+                        onClick={() => leaveTrip(trip.id)}
+                        className="w-full md:w-auto px-6 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors font-bold"
+                      >
+                        Desapuntar-me
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => joinTrip(trip.id)}
+                        disabled={isFull}
+                        className={`w-full md:w-auto px-8 py-3 rounded-lg font-bold shadow-md uppercase text-sm tracking-wider transition-all transform active:scale-95 ${
+                          isFull
+                            ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                            : "bg-yellow-400 text-black hover:bg-yellow-300 hover:shadow-lg"
+                        }`}
+                      >
+                        {isFull ? "Complet" : "Apunta-m’hi"}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
