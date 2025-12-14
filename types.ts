@@ -140,3 +140,30 @@ export interface ResourceItem {
   createdAt?: any;
   updatedAt?: any;
 }
+
+/** ✅ MUR SOCIAL */
+export interface PostComment {
+  id: string; // generat al client
+  userId: string;
+  userName: string;
+  userAvatarUrl?: string;
+  text: string;
+  createdAt?: any;
+}
+
+export interface SocialPost {
+  id: string;
+
+  text: string;
+  imageUrl?: string;
+
+  createdBy: string;
+  createdByName: string;
+  createdByAvatarUrl?: string;
+
+  likes: string[]; // uids
+  comments: PostComment[];
+
+  createdAt?: any;
+  updatedAt?: any;
+}
