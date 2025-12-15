@@ -429,7 +429,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   alert(
     "No s’ha pogut completar el registre.\n" +
     "Si el compte s’ha creat, quedarà pendent d’aprovació per l’administració."
-    }
   };
 
   // ====== USERS ADMIN ======
