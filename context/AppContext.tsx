@@ -47,10 +47,6 @@ import type {
   PostComment,
 } from "../types";
 
-/* =========================
-   CONTEXT TYPES
-========================= */
-
 interface AppState {
   users: User[];
   trips: Trip[];
@@ -76,38 +72,62 @@ interface AppContextValue extends AppState {
   approveUser: (userId: string) => Promise<void>;
   setUserRole: (userId: string, role: Role) => Promise<void>;
 
-  canManageTrips: () => boolean;      // admin + instructor
-  canManageSystem: () => boolean;     // admin
-  isActiveMember: () => boolean;
+  canManageTrips: () => boolean; // admin o instructor (instructor: active)
+  canManageSystem: () => boolean; // admin (NO depèn de status)
+  isActiveMember: () => boolean; // active i role != pending
 
   // Trips
-  createTrip: (data: Omit<Trip,
-    "id" | "createdBy" | "participants" | "pendingParticipants" | "published" | "status"
-  >) => Promise<void>;
+  createTrip: (
+    data: Omit<
+      Trip,
+      | "id"
+      | "createdBy"
+      | "participants"
+      | "pendingParticipants"
+      | "published"
+      | "status"
+    >
+  ) => Promise<void>;
   updateTrip: (tripId: string, data: Partial<Trip>) => Promise<void>;
   deleteTrip: (tripId: string) => Promise<void>;
   setTripPublished: (tripId: string, published: boolean) => Promise<void>;
   cancelTrip: (tripId: string, reason?: string) => Promise<void>;
 
   // Courses
-  createCourse: (data: Omit<Course,
-    "id" | "createdBy" | "participants" | "pendingParticipants" | "published" | "status"
-  >) => Promise<void>;
+  createCourse: (
+    data: Omit<
+      Course,
+      | "id"
+      | "createdBy"
+      | "participants"
+      | "pendingParticipants"
+      | "published"
+      | "status"
+    >
+  ) => Promise<void>;
   updateCourse: (courseId: string, data: Partial<Course>) => Promise<void>;
   deleteCourse: (courseId: string) => Promise<void>;
   setCoursePublished: (courseId: string, published: boolean) => Promise<void>;
   cancelCourse: (courseId: string, reason?: string) => Promise<void>;
 
-  // Social Events (només admin)
-  createSocialEvent: (data: Omit<SocialEvent,
-    "id" | "createdBy" | "participants" | "pendingParticipants" | "published" | "status"
-  >) => Promise<void>;
+  // Social events (NOMÉS ADMIN)
+  createSocialEvent: (
+    data: Omit<
+      SocialEvent,
+      | "id"
+      | "createdBy"
+      | "participants"
+      | "pendingParticipants"
+      | "published"
+      | "status"
+    >
+  ) => Promise<void>;
   updateSocialEvent: (eventId: string, data: Partial<SocialEvent>) => Promise<void>;
   deleteSocialEvent: (eventId: string) => Promise<void>;
   setSocialEventPublished: (eventId: string, published: boolean) => Promise<void>;
   cancelSocialEvent: (eventId: string, reason?: string) => Promise<void>;
 
-  // Join / Leave
+  // Inscripcions
   joinTrip: (tripId: string) => Promise<void>;
   leaveTrip: (tripId: string) => Promise<void>;
   joinCourse: (courseId: string) => Promise<void>;
@@ -118,20 +138,20 @@ interface AppContextValue extends AppState {
   // Settings
   updateClubSettings: (data: Partial<ClubSettings>) => Promise<void>;
 
-  // Resources
-  createResource: (data: Omit<ResourceItem, "id" | "createdBy" | "createdAt" | "updatedAt">) => Promise<void>;
+  // ✅ MATERIAL
+  createResource: (
+    data: Omit<ResourceItem, "id" | "createdBy" | "createdAt" | "updatedAt">
+  ) => Promise<void>;
   updateResource: (resourceId: string, data: Partial<ResourceItem>) => Promise<void>;
   deleteResource: (resourceId: string) => Promise<void>;
   swapResourceOrder: (aId: string, bId: string) => Promise<void>;
 
-  // Social Wall
+  // ✅ MUR SOCIAL
   createSocialPost: (data: { text: string; imageUrl?: string }) => Promise<void>;
   togglePostLike: (postId: string) => Promise<void>;
   addPostComment: (postId: string, text: string) => Promise<void>;
   deleteSocialPost: (postId: string) => Promise<void>;
 }
-
-/* ========================= */
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
 
@@ -142,18 +162,19 @@ const defaultClubSettings: ClubSettings = {
   appBackgroundUrl: "",
 };
 
-const roleToLevel = (role: Role) =>
-  role === "admin" ? "ADMIN" :
-  role === "instructor" ? "INSTRUCTOR" :
-  role === "pending" ? "PENDENT" : "B1E";
+function roleToLevel(role: Role) {
+  return role === "admin"
+    ? "ADMIN"
+    : role === "instructor"
+    ? "INSTRUCTOR"
+    : role === "pending"
+    ? "PENDENT"
+    : "B1E";
+}
 
-const assertAuthed = (u: User | null): asserts u is User => {
-  if (!u) throw new Error("No autenticat");
-};
-
-/* =========================
-   PROVIDER
-========================= */
+function assertAuthed(currentUser: User | null): asserts currentUser is User {
+  if (!currentUser) throw new Error("No autenticat/da.");
+}
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [state, setState] = useState<AppState>({
@@ -167,189 +188,650 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     clubSettings: defaultClubSettings,
   });
 
-  /* ===== LISTENERS ===== */
-
+  // ====== SNAPSHOTS ======
   useEffect(() => {
-    const unsubs = [
-      onSnapshot(query(collection(db, "users"), orderBy("createdAt", "asc")),
-        s => setState(p => ({ ...p, users: s.docs.map(d => d.data() as User) }))
-      ),
-      onSnapshot(query(collection(db, "trips"), orderBy("date", "asc")),
-        s => setState(p => ({ ...p, trips: s.docs.map(d => ({ ...d.data(), id: d.id }) as Trip) }))
-      ),
-      onSnapshot(query(collection(db, "courses"), orderBy("date", "asc")),
-        s => setState(p => ({ ...p, courses: s.docs.map(d => ({ ...d.data(), id: d.id }) as Course) }))
-      ),
-      onSnapshot(query(collection(db, "socialEvents"), orderBy("date", "asc")),
-        s => setState(p => ({ ...p, socialEvents: s.docs.map(d => ({ ...d.data(), id: d.id }) as SocialEvent) }))
-      ),
-    ];
+    const unsubUsers = onSnapshot(
+      query(collection(db, "users"), orderBy("createdAt", "asc")),
+      (snap) => {
+        const users = snap.docs.map((d) => d.data() as User);
+        setState((prev) => {
+          const cur = prev.currentUser
+            ? users.find((u) => u.id === prev.currentUser!.id) ?? prev.currentUser
+            : null;
+          return { ...prev, users, currentUser: cur };
+        });
+      }
+    );
 
-    return () => unsubs.forEach(u => u());
+    const unsubTrips = onSnapshot(
+      query(collection(db, "trips"), orderBy("date", "asc")),
+      (snap) => {
+        const trips = snap.docs.map((d) => ({ ...(d.data() as any), id: d.id })) as Trip[];
+        setState((prev) => ({ ...prev, trips }));
+      }
+    );
+
+    const unsubCourses = onSnapshot(
+      query(collection(db, "courses"), orderBy("date", "asc")),
+      (snap) => {
+        const courses = snap.docs.map((d) => ({ ...(d.data() as any), id: d.id })) as Course[];
+        setState((prev) => ({ ...prev, courses }));
+      }
+    );
+
+    const unsubEvents = onSnapshot(
+      query(collection(db, "socialEvents"), orderBy("date", "asc")),
+      (snap) => {
+        const socialEvents = snap.docs.map((d) => ({ ...(d.data() as any), id: d.id })) as SocialEvent[];
+        setState((prev) => ({ ...prev, socialEvents }));
+      }
+    );
+
+    const unsubResources = onSnapshot(
+      query(collection(db, "resources"), orderBy("category", "asc"), orderBy("order", "asc")),
+      (snap) => {
+        const resources = snap.docs.map((d) => ({ ...(d.data() as any), id: d.id })) as ResourceItem[];
+        const safe = resources.map((r) => ({
+          ...r,
+          order: typeof (r as any).order === "number" ? (r as any).order : 999999,
+        }));
+        setState((prev) => ({ ...prev, resources: safe }));
+      }
+    );
+
+    const unsubPosts = onSnapshot(
+      query(collection(db, "socialPosts"), orderBy("createdAt", "desc")),
+      (snap) => {
+        const socialPosts = snap.docs.map((d) => ({ ...(d.data() as any), id: d.id })) as SocialPost[];
+        const safe = socialPosts.map((p) => ({
+          ...p,
+          likes: Array.isArray((p as any).likes) ? (p as any).likes : [],
+          comments: Array.isArray((p as any).comments) ? (p as any).comments : [],
+        }));
+        setState((prev) => ({ ...prev, socialPosts: safe }));
+      }
+    );
+
+    const settingsRef = doc(db, "clubSettings", "main");
+    const unsubSettings = onSnapshot(settingsRef, (snap) => {
+      if (!snap.exists()) {
+        setDoc(settingsRef, { ...defaultClubSettings, updatedAt: serverTimestamp() }).catch(() => {});
+        setState((prev) => ({ ...prev, clubSettings: defaultClubSettings }));
+        return;
+      }
+      setState((prev) => ({ ...prev, clubSettings: snap.data() as ClubSettings }));
+    });
+
+    return () => {
+      unsubUsers();
+      unsubTrips();
+      unsubCourses();
+      unsubEvents();
+      unsubResources();
+      unsubPosts();
+      unsubSettings();
+    };
   }, []);
 
-  /* ===== AUTH ===== */
-
+  // ====== AUTH STATE ======
   useEffect(() => {
-    return onAuthStateChanged(auth, async fbUser => {
+    const unsub = onAuthStateChanged(auth, async (fbUser) => {
       if (!fbUser?.email) {
-        setState(p => ({ ...p, currentUser: null }));
+        setState((prev) => ({ ...prev, currentUser: null }));
         return;
       }
 
+      const email = fbUser.email.toLowerCase();
       const uid = fbUser.uid;
-      const snap = await getDoc(doc(db, "users", uid));
-      if (snap.exists()) {
-        setState(p => ({ ...p, currentUser: snap.data() as User }));
+
+      const localFound = state.users.find((u) => u.id === uid || u.email?.toLowerCase() === email);
+      let userDocData: User | null = localFound ?? null;
+
+      if (!userDocData) {
+        const userRef = doc(db, "users", uid);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) userDocData = userSnap.data() as User;
       }
+
+      // Si NO existeix doc encara, el creem com pending (important per a aprovacions)
+      if (!userDocData) {
+        const newUser: User = {
+          id: uid,
+          name: fbUser.displayName || "Nou/va soci/a",
+          email,
+          role: "pending",
+          status: "pending",
+          level: "PENDENT",
+          avatarUrl: "",
+          certification: "",
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        };
+
+        await setDoc(doc(db, "users", uid), newUser, { merge: true }).catch(() => {});
+        setState((prev) => ({ ...prev, currentUser: newUser }));
+        return;
+      }
+
+      const patched: Partial<User> = {};
+      if (!userDocData.level) patched.level = roleToLevel(userDocData.role);
+      if (userDocData.avatarUrl === undefined) patched.avatarUrl = "";
+      if (!userDocData.email) patched.email = email;
+
+      if (Object.keys(patched).length) {
+        await updateDoc(doc(db, "users", uid), { ...patched, updatedAt: serverTimestamp() }).catch(() => {});
+        userDocData = { ...userDocData, ...patched } as User;
+      }
+
+      setState((prev) => ({ ...prev, currentUser: userDocData }));
     });
-  }, []);
 
-  /* ===== PERMISSIONS ===== */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => unsub();
+  }, [state.users]);
 
-  const canManageTrips = useMemo(() => () =>
-    !!state.currentUser &&
-    (state.currentUser.role === "admin" ||
-      (state.currentUser.role === "instructor" && state.currentUser.status === "active")),
-  [state.currentUser]);
+  // ====== PERMISOS ======
+  // Admin: sempre pot gestionar (no depèn de status)
+  // Instructor: només si està active
+  const canManageTrips = useMemo(() => {
+    return () =>
+      !!state.currentUser &&
+      (state.currentUser.role === "admin" ||
+        (state.currentUser.role === "instructor" && state.currentUser.status === "active"));
+  }, [state.currentUser]);
 
-  const canManageSystem = useMemo(() => () =>
-    !!state.currentUser && state.currentUser.role === "admin",
-  [state.currentUser]);
+  const canManageSystem = useMemo(() => {
+    return () => !!state.currentUser && state.currentUser.role === "admin";
+  }, [state.currentUser]);
 
-  const isActiveMember = useMemo(() => () =>
-    !!state.currentUser && state.currentUser.status === "active",
-  [state.currentUser]);
+  const isActiveMember = useMemo(() => {
+    return () =>
+      !!state.currentUser &&
+      state.currentUser.status === "active" &&
+      state.currentUser.role !== "pending";
+  }, [state.currentUser]);
 
-  /* ===== AUTH ACTIONS ===== */
-
-  const loginWithEmail = async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
+  // ====== AUTH METHODS ======
+  const loginWithEmail: AppContextValue["loginWithEmail"] = async (email, password) => {
+    const trimmed = email.trim().toLowerCase();
+    if (!trimmed || !password) throw new Error("missing_credentials");
+    await signInWithEmailAndPassword(auth, trimmed, password);
   };
 
-  const logout = async () => {
-    await signOut(auth);
-    setState(p => ({ ...p, currentUser: null }));
+  const logout: AppContextValue["logout"] = async () => {
+    try {
+      await signOut(auth);
+      setState((prev) => ({ ...prev, currentUser: null }));
+    } catch {}
   };
 
-  /* ===== REGISTER (MISSATGE ARREGLAT) ===== */
-
+  // ✅ REGISTRE: missatge correcte "pendent d'aprovació"
   const registerUser: AppContextValue["registerUser"] = async ({
     name,
     email,
     password,
     certification,
   }) => {
-    try {
-      const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
-      await updateProfile(cred.user, { displayName: name.trim() });
+    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedName = name.trim();
+    const trimmedCert = certification.trim();
 
-      const user: User = {
+    if (!trimmedEmail || !trimmedName || !password) {
+      alert("Falten dades.");
+      return;
+    }
+
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, trimmedEmail, password);
+      await updateProfile(cred.user, { displayName: trimmedName });
+
+      const newUser: User = {
         id: cred.user.uid,
-        name: name.trim(),
-        email: email.trim().toLowerCase(),
+        name: trimmedName,
+        email: trimmedEmail,
         role: "pending",
         status: "pending",
         level: "PENDENT",
         avatarUrl: "",
-        certification: certification.trim(),
+        certification: trimmedCert,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
 
-      await setDoc(doc(db, "users", cred.user.uid), user);
+      await setDoc(doc(db, "users", cred.user.uid), newUser, { merge: true });
+
       alert("Compte creat correctament.\nEstà pendent d’aprovació per l’administració.");
       await signOut(auth);
-    } catch {
-      alert(
-        "El compte ja està creat o pendent d’aprovació.\n" +
-        "Si ja t’has registrat, espera que l’administració l’active."
-      );
+    } catch (err: any) {
+      console.error("REGISTER ERROR:", err);
+
+      if (err?.code === "auth/email-already-in-use") {
+        alert(
+          "Aquest correu ja està registrat.\n" +
+            "Si ja tens un compte, inicia sessió.\n" +
+            "Si acabes de registrar-te, està pendent d’aprovació per l’administració."
+        );
+      } else if (err?.code === "auth/weak-password") {
+        alert("La contrasenya és massa feble (mínim 6 caràcters).");
+      } else if (err?.code === "auth/invalid-email") {
+        alert("El correu no és vàlid.");
+      } else {
+        alert(
+          "No s’ha pogut completar el registre.\n" +
+            "Si ja t’has registrat, el compte pot estar pendent d’aprovació."
+        );
+      }
     }
   };
 
-  /* ===== ADMIN USERS ===== */
-
-  const approveUser = async (userId: string) => {
-    if (!canManageSystem()) return;
+  // ====== USERS ADMIN ======
+  const approveUser: AppContextValue["approveUser"] = async (userId) => {
+    if (!canManageSystem()) {
+      alert("Només administració pot aprovar persones sòcies.");
+      return;
+    }
     await updateDoc(doc(db, "users", userId), {
-      role: "member",
-      status: "active",
+      status: "active" as Status,
+      role: "member" as Role,
       level: "B1E",
       updatedAt: serverTimestamp(),
     });
   };
 
-  const setUserRole = async (userId: string, role: Role) => {
-    if (!canManageSystem()) return;
+  const setUserRole: AppContextValue["setUserRole"] = async (userId, role) => {
+    if (!canManageSystem()) {
+      alert("Només administració pot canviar rols.");
+      return;
+    }
     await updateDoc(doc(db, "users", userId), {
       role,
-      status: "active",
       level: roleToLevel(role),
+      status: "active" as Status,
       updatedAt: serverTimestamp(),
     });
   };
 
-  /* ===== HELPERS ===== */
+  // ====== GUARDS ======
+  const ensureCanManageTripsAndCourses = () => {
+    if (!canManageTrips()) {
+      alert("Només administració o instructors poden gestionar això.");
+      return false;
+    }
+    return true;
+  };
 
-  const baseDefaults = (uid: string) => ({
-    createdBy: uid,
-    participants: [],
-    pendingParticipants: [],
+  const ensureCanManageSocialEvents = () => {
+    if (!canManageSystem()) {
+      alert("Només administració pot gestionar esdeveniments.");
+      return false;
+    }
+    return true;
+  };
+
+  const baseDefaults = (currentUserId: string) => ({
+    createdBy: currentUserId,
+    participants: [] as string[],
+    pendingParticipants: [] as string[],
     published: false,
     status: "active" as PublishableStatus,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
 
-  /* ===== EXPORT VALUE ===== */
+  // ====== TRIPS ======
+  const createTrip: AppContextValue["createTrip"] = async (data) => {
+    if (!ensureCanManageTripsAndCourses()) return;
+    assertAuthed(state.currentUser);
+    await addDoc(collection(db, "trips"), { ...baseDefaults(state.currentUser.id), ...data });
+  };
+
+  const updateTrip: AppContextValue["updateTrip"] = async (tripId, data) => {
+    if (!ensureCanManageTripsAndCourses()) return;
+    await updateDoc(doc(db, "trips", tripId), { ...data, updatedAt: serverTimestamp() });
+  };
+
+  const deleteTrip: AppContextValue["deleteTrip"] = async (tripId) => {
+    if (!canManageSystem()) return alert("Només administració pot esborrar definitivament.");
+    await deleteDoc(doc(db, "trips", tripId));
+  };
+
+  const setTripPublished: AppContextValue["setTripPublished"] = async (tripId, published) => {
+    if (!ensureCanManageTripsAndCourses()) return;
+    await updateDoc(doc(db, "trips", tripId), { published, updatedAt: serverTimestamp() });
+  };
+
+  const cancelTrip: AppContextValue["cancelTrip"] = async (tripId, reason) => {
+    if (!ensureCanManageTripsAndCourses()) return;
+    await updateDoc(doc(db, "trips", tripId), {
+      status: "cancelled",
+      cancelledAt: serverTimestamp(),
+      cancelledReason: reason || "",
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  // ====== COURSES ======
+  const createCourse: AppContextValue["createCourse"] = async (data) => {
+    if (!ensureCanManageTripsAndCourses()) return;
+    assertAuthed(state.currentUser);
+    await addDoc(collection(db, "courses"), { ...baseDefaults(state.currentUser.id), ...data });
+  };
+
+  const updateCourse: AppContextValue["updateCourse"] = async (courseId, data) => {
+    if (!ensureCanManageTripsAndCourses()) return;
+    await updateDoc(doc(db, "courses", courseId), { ...data, updatedAt: serverTimestamp() });
+  };
+
+  const deleteCourse: AppContextValue["deleteCourse"] = async (courseId) => {
+    if (!canManageSystem()) return alert("Només administració pot esborrar definitivament.");
+    await deleteDoc(doc(db, "courses", courseId));
+  };
+
+  const setCoursePublished: AppContextValue["setCoursePublished"] = async (courseId, published) => {
+    if (!ensureCanManageTripsAndCourses()) return;
+    await updateDoc(doc(db, "courses", courseId), { published, updatedAt: serverTimestamp() });
+  };
+
+  const cancelCourse: AppContextValue["cancelCourse"] = async (courseId, reason) => {
+    if (!ensureCanManageTripsAndCourses()) return;
+    await updateDoc(doc(db, "courses", courseId), {
+      status: "cancelled",
+      cancelledAt: serverTimestamp(),
+      cancelledReason: reason || "",
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  // ====== SOCIAL EVENTS (NOMÉS ADMIN) ======
+  const createSocialEvent: AppContextValue["createSocialEvent"] = async (data) => {
+    if (!ensureCanManageSocialEvents()) return;
+    assertAuthed(state.currentUser);
+    await addDoc(collection(db, "socialEvents"), { ...baseDefaults(state.currentUser.id), ...data });
+  };
+
+  const updateSocialEvent: AppContextValue["updateSocialEvent"] = async (eventId, data) => {
+    if (!ensureCanManageSocialEvents()) return;
+    await updateDoc(doc(db, "socialEvents", eventId), { ...data, updatedAt: serverTimestamp() });
+  };
+
+  const deleteSocialEvent: AppContextValue["deleteSocialEvent"] = async (eventId) => {
+    if (!ensureCanManageSocialEvents()) return;
+    await deleteDoc(doc(db, "socialEvents", eventId));
+  };
+
+  const setSocialEventPublished: AppContextValue["setSocialEventPublished"] = async (eventId, published) => {
+    if (!ensureCanManageSocialEvents()) return;
+    await updateDoc(doc(db, "socialEvents", eventId), { published, updatedAt: serverTimestamp() });
+  };
+
+  const cancelSocialEvent: AppContextValue["cancelSocialEvent"] = async (eventId, reason) => {
+    if (!ensureCanManageSocialEvents()) return;
+    await updateDoc(doc(db, "socialEvents", eventId), {
+      status: "cancelled",
+      cancelledAt: serverTimestamp(),
+      cancelledReason: reason || "",
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  // ====== JOIN/LEAVE ======
+  const ensureCanJoin = () => {
+    if (!isActiveMember()) {
+      alert("Has d’estar aprovat/da per a apuntar-te.");
+      return false;
+    }
+    return true;
+  };
+
+  const joinTrip: AppContextValue["joinTrip"] = async (tripId) => {
+    if (!ensureCanJoin()) return;
+    assertAuthed(state.currentUser);
+    await updateDoc(doc(db, "trips", tripId), {
+      participants: arrayUnion(state.currentUser.id),
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  const leaveTrip: AppContextValue["leaveTrip"] = async (tripId) => {
+    if (!state.currentUser) return;
+    await updateDoc(doc(db, "trips", tripId), {
+      participants: arrayRemove(state.currentUser.id),
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  const joinCourse: AppContextValue["joinCourse"] = async (courseId) => {
+    if (!ensureCanJoin()) return;
+    assertAuthed(state.currentUser);
+    await updateDoc(doc(db, "courses", courseId), {
+      participants: arrayUnion(state.currentUser.id),
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  const leaveCourse: AppContextValue["leaveCourse"] = async (courseId) => {
+    if (!state.currentUser) return;
+    await updateDoc(doc(db, "courses", courseId), {
+      participants: arrayRemove(state.currentUser.id),
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  const joinSocialEvent: AppContextValue["joinSocialEvent"] = async (eventId) => {
+    if (!ensureCanJoin()) return;
+    assertAuthed(state.currentUser);
+    await updateDoc(doc(db, "socialEvents", eventId), {
+      participants: arrayUnion(state.currentUser.id),
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  const leaveSocialEvent: AppContextValue["leaveSocialEvent"] = async (eventId) => {
+    if (!state.currentUser) return;
+    await updateDoc(doc(db, "socialEvents", eventId), {
+      participants: arrayRemove(state.currentUser.id),
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  // ====== SETTINGS ======
+  const updateClubSettings: AppContextValue["updateClubSettings"] = async (data) => {
+    if (!canManageSystem()) return alert("Només administració pot modificar la web/app.");
+    await setDoc(doc(db, "clubSettings", "main"), { ...data, updatedAt: serverTimestamp() }, { merge: true });
+  };
+
+  // ====== MATERIAL ======
+  const createResource: AppContextValue["createResource"] = async (data) => {
+    if (!ensureCanManageTripsAndCourses()) return;
+    assertAuthed(state.currentUser);
+    await addDoc(collection(db, "resources"), {
+      ...data,
+      createdBy: state.currentUser.id,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  const updateResource: AppContextValue["updateResource"] = async (resourceId, data) => {
+    if (!ensureCanManageTripsAndCourses()) return;
+    await updateDoc(doc(db, "resources", resourceId), { ...data, updatedAt: serverTimestamp() });
+  };
+
+  const deleteResource: AppContextValue["deleteResource"] = async (resourceId) => {
+    if (!canManageTrips()) return alert("Només administració o instructors poden eliminar material.");
+    await deleteDoc(doc(db, "resources", resourceId));
+  };
+
+  const swapResourceOrder: AppContextValue["swapResourceOrder"] = async (aId, bId) => {
+    if (!canManageTrips()) {
+      alert("Només administració o instructors poden ordenar material.");
+      return;
+    }
+
+    const aRef = doc(db, "resources", aId);
+    const bRef = doc(db, "resources", bId);
+
+    await runTransaction(db, async (tx) => {
+      const aSnap = await tx.get(aRef);
+      const bSnap = await tx.get(bRef);
+      if (!aSnap.exists() || !bSnap.exists()) throw new Error("Resource missing");
+
+      const a = aSnap.data() as any;
+      const b = bSnap.data() as any;
+
+      const aOrder = typeof a.order === "number" ? a.order : 999999;
+      const bOrder = typeof b.order === "number" ? b.order : 999999;
+
+      tx.update(aRef, { order: bOrder, updatedAt: serverTimestamp() });
+      tx.update(bRef, { order: aOrder, updatedAt: serverTimestamp() });
+    });
+  };
+
+  // ====== MUR SOCIAL ======
+  const createSocialPost: AppContextValue["createSocialPost"] = async ({ text, imageUrl }) => {
+    if (!isActiveMember()) {
+      alert("Has d’estar aprovat/da per publicar.");
+      return;
+    }
+    assertAuthed(state.currentUser);
+
+    const t = text.trim();
+    const img = (imageUrl || "").trim();
+
+    if (!t) {
+      alert("Escriu algun text per publicar.");
+      return;
+    }
+    if (img && !/^https?:\/\//i.test(img)) {
+      alert("La URL de la imatge ha de començar per http:// o https://");
+      return;
+    }
+
+    await addDoc(collection(db, "socialPosts"), {
+      text: t,
+      imageUrl: img || "",
+      createdBy: state.currentUser.id,
+      createdByName: state.currentUser.name,
+      createdByAvatarUrl: state.currentUser.avatarUrl || "",
+      likes: [],
+      comments: [],
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  const togglePostLike: AppContextValue["togglePostLike"] = async (postId) => {
+    if (!isActiveMember()) return;
+    assertAuthed(state.currentUser);
+
+    const ref = doc(db, "socialPosts", postId);
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists()) throw new Error("Post missing");
+      const data = snap.data() as any;
+      const likes: string[] = Array.isArray(data.likes) ? data.likes : [];
+      const uid = state.currentUser.id;
+
+      const has = likes.includes(uid);
+      tx.update(ref, {
+        likes: has ? likes.filter((x) => x !== uid) : [...likes, uid],
+        updatedAt: serverTimestamp(),
+      });
+    });
+  };
+
+  const addPostComment: AppContextValue["addPostComment"] = async (postId, text) => {
+    if (!isActiveMember()) return;
+    assertAuthed(state.currentUser);
+
+    const t = text.trim();
+    if (!t) return;
+
+    const comment: PostComment = {
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      userId: state.currentUser.id,
+      userName: state.currentUser.name,
+      userAvatarUrl: state.currentUser.avatarUrl || "",
+      text: t,
+      createdAt: serverTimestamp(),
+    };
+
+    await updateDoc(doc(db, "socialPosts", postId), {
+      comments: arrayUnion(comment as any),
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  const deleteSocialPost: AppContextValue["deleteSocialPost"] = async (postId) => {
+    if (!isActiveMember()) return;
+    assertAuthed(state.currentUser);
+
+    const post = state.socialPosts.find((p) => p.id === postId);
+    if (!post) return;
+
+    const allowed = canManageTrips() || post.createdBy === state.currentUser.id;
+    if (!allowed) {
+      alert("No tens permisos per eliminar aquesta publicació.");
+      return;
+    }
+
+    await deleteDoc(doc(db, "socialPosts", postId));
+  };
 
   const value: AppContextValue = {
     ...state,
+
     loginWithEmail,
     logout,
+
     registerUser,
     approveUser,
     setUserRole,
+
     canManageTrips,
     canManageSystem,
     isActiveMember,
-    createTrip: async d => { assertAuthed(state.currentUser); await addDoc(collection(db,"trips"),{...baseDefaults(state.currentUser.id),...d}); },
-    updateTrip: async (id,d) => updateDoc(doc(db,"trips",id),{...d,updatedAt:serverTimestamp()}),
-    deleteTrip: async id => deleteDoc(doc(db,"trips",id)),
-    setTripPublished: async (id,p) => updateDoc(doc(db,"trips",id),{published:p,updatedAt:serverTimestamp()}),
-    cancelTrip: async (id,r) => updateDoc(doc(db,"trips",id),{status:"cancelled",cancelledReason:r||"",updatedAt:serverTimestamp()}),
-    createCourse: async d => { assertAuthed(state.currentUser); await addDoc(collection(db,"courses"),{...baseDefaults(state.currentUser.id),...d}); },
-    updateCourse: async (id,d) => updateDoc(doc(db,"courses",id),{...d,updatedAt:serverTimestamp()}),
-    deleteCourse: async id => deleteDoc(doc(db,"courses",id)),
-    setCoursePublished: async (id,p) => updateDoc(doc(db,"courses",id),{published:p,updatedAt:serverTimestamp()}),
-    cancelCourse: async (id,r) => updateDoc(doc(db,"courses",id),{status:"cancelled",cancelledReason:r||"",updatedAt:serverTimestamp()}),
-    createSocialEvent: async d => { assertAuthed(state.currentUser); await addDoc(collection(db,"socialEvents"),{...baseDefaults(state.currentUser.id),...d}); },
-    updateSocialEvent: async (id,d) => updateDoc(doc(db,"socialEvents",id),{...d,updatedAt:serverTimestamp()}),
-    deleteSocialEvent: async id => deleteDoc(doc(db,"socialEvents",id)),
-    setSocialEventPublished: async (id,p) => updateDoc(doc(db,"socialEvents",id),{published:p,updatedAt:serverTimestamp()}),
-    cancelSocialEvent: async (id,r) => updateDoc(doc(db,"socialEvents",id),{status:"cancelled",cancelledReason:r||"",updatedAt:serverTimestamp()}),
-    joinTrip: async id => updateDoc(doc(db,"trips",id),{participants:arrayUnion(state.currentUser?.id)}),
-    leaveTrip: async id => updateDoc(doc(db,"trips",id),{participants:arrayRemove(state.currentUser?.id)}),
-    joinCourse: async id => updateDoc(doc(db,"courses",id),{participants:arrayUnion(state.currentUser?.id)}),
-    leaveCourse: async id => updateDoc(doc(db,"courses",id),{participants:arrayRemove(state.currentUser?.id)}),
-    joinSocialEvent: async id => updateDoc(doc(db,"socialEvents",id),{participants:arrayUnion(state.currentUser?.id)}),
-    leaveSocialEvent: async id => updateDoc(doc(db,"socialEvents",id),{participants:arrayRemove(state.currentUser?.id)}),
-    updateClubSettings: async d => setDoc(doc(db,"clubSettings","main"),{...d,updatedAt:serverTimestamp()},{merge:true}),
-    createResource: async d => addDoc(collection(db,"resources"),{...d,createdBy:state.currentUser?.id,createdAt:serverTimestamp(),updatedAt:serverTimestamp()}),
-    updateResource: async (id,d) => updateDoc(doc(db,"resources",id),{...d,updatedAt:serverTimestamp()}),
-    deleteResource: async id => deleteDoc(doc(db,"resources",id)),
-    swapResourceOrder: async () => {},
-    createSocialPost: async () => {},
-    togglePostLike: async () => {},
-    addPostComment: async () => {},
-    deleteSocialPost: async () => {},
+
+    createTrip,
+    updateTrip,
+    deleteTrip,
+    setTripPublished,
+    cancelTrip,
+
+    createCourse,
+    updateCourse,
+    deleteCourse,
+    setCoursePublished,
+    cancelCourse,
+
+    createSocialEvent,
+    updateSocialEvent,
+    deleteSocialEvent,
+    setSocialEventPublished,
+    cancelSocialEvent,
+
+    joinTrip,
+    leaveTrip,
+    joinCourse,
+    leaveCourse,
+    joinSocialEvent,
+    leaveSocialEvent,
+
+    updateClubSettings,
+
+    createResource,
+    updateResource,
+    deleteResource,
+    swapResourceOrder,
+
+    createSocialPost,
+    togglePostLike,
+    addPostComment,
+    deleteSocialPost,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };
-
-/* ===== HOOK ===== */
 
 export const useAppContext = () => {
   const ctx = useContext(AppContext);
