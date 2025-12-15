@@ -402,20 +402,29 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
       alert("Compte creat correctament.\nEstà pendent d’aprovació per l’administració.");
       await signOut(auth);
-   } catch (err: any) {
+  } catch (err: any) {
   console.error("REGISTER ERROR:", err);
 
-  // Sempre tanquem sessió si s'ha quedat mig creat / mig guardat
-  try { await signOut(auth); } catch {}
+  // Ens assegurem de no quedar loguejats en estat inconsistent
+  try {
+    await signOut(auth);
+  } catch {}
 
   if (err?.code === "auth/email-already-in-use") {
     alert(
       "Aquest correu ja està registrat.\n" +
       "Si ja tens un compte, inicia sessió.\n" +
-      "Si acabes de registrar-te, pot estar pendent d’aprovació."
+      "Si acabes de registrar-te, el compte pot estar pendent d’aprovació."
     );
     return;
   }
+
+  alert(
+    "No s’ha pogut completar el registre.\n" +
+    "Si el compte s’ha creat, quedarà pendent d’aprovació per l’administració."
+  );
+}
+
 
   alert(
     "No s’ha pogut completar el registre.\n" +
