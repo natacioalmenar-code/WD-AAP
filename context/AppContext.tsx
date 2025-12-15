@@ -367,63 +367,64 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   // ✅ REGISTRE: missatge correcte "pendent d'aprovació"
   const registerUser: AppContextValue["registerUser"] = async ({
-    name,
-    email,
-    password,
-    certification,
-  }) => {
-    const trimmedEmail = email.trim().toLowerCase();
-    const trimmedName = name.trim();
-    const trimmedCert = certification.trim();
+  name,
+  email,
+  password,
+  certification,
+}) => {
+  const trimmedEmail = email.trim().toLowerCase();
+  const trimmedName = name.trim();
+  const trimmedCert = certification.trim();
 
-    if (!trimmedEmail || !trimmedName || !password) {
-      alert("Falten dades.");
-      return;
-    }
-
-    try {
-      const cred = await createUserWithEmailAndPassword(auth, trimmedEmail, password);
-      await updateProfile(cred.user, { displayName: trimmedName });
-
-      const newUser: User = {
-        id: cred.user.uid,
-        name: trimmedName,
-        email: trimmedEmail,
-        role: "pending",
-        status: "pending",
-        level: "PENDENT",
-        avatarUrl: "",
-        certification: trimmedCert,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      };
-
-      await setDoc(doc(db, "users", cred.user.uid), newUser, { merge: true });
-
-      alert("Compte creat correctament.\nEstà pendent d’aprovació per l’administració.");
-      await signOut(auth);
-  } catch (err: any) {
-  console.error("REGISTER ERROR:", err);
-
-  // Ens assegurem de no quedar loguejats en estat inconsistent
-  try {
-    await signOut(auth);
-  } catch {}
-
-  if (err?.code === "auth/email-already-in-use") {
-    alert(
-      "Aquest correu ja està registrat.\n" +
-      "Si ja tens un compte, inicia sessió.\n" +
-      "Si acabes de registrar-te, el compte pot estar pendent d’aprovació."
-    );
+  if (!trimmedEmail || !trimmedName || !password) {
+    alert("Falten dades.");
     return;
   }
 
-  alert(
-    "No s’ha pogut completar el registre.\n" +
-    "Si el compte s’ha creat, quedarà pendent d’aprovació per l’administració."
-  );
-}
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, trimmedEmail, password);
+    await updateProfile(cred.user, { displayName: trimmedName });
+
+    const newUser: User = {
+      id: cred.user.uid,
+      name: trimmedName,
+      email: trimmedEmail,
+      role: "pending",
+      status: "pending",
+      level: "PENDENT",
+      avatarUrl: "",
+      certification: trimmedCert,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+
+    await setDoc(doc(db, "users", cred.user.uid), newUser, { merge: true });
+
+    alert("Compte creat. Ara l’administració ha d’aprovar el teu accés.");
+    await signOut(auth);
+  } catch (err: any) {
+    console.error("REGISTER ERROR:", err);
+
+    // Evita quedar-se en estat inconsistent
+    try {
+      await signOut(auth);
+    } catch {}
+
+    if (err?.code === "auth/email-already-in-use") {
+      alert(
+        "Aquest correu ja està registrat.\n" +
+          "Si ja tens un compte, inicia sessió.\n" +
+          "Si acabes de registrar-te, el compte pot estar pendent d’aprovació."
+      );
+      return;
+    }
+
+    alert(
+      "No s’ha pogut completar el registre.\n" +
+        "Si el compte s’ha creat, quedarà pendent d’aprovació per l’administració."
+    );
+  }
+};
 
 
   alert(
