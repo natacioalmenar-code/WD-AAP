@@ -12,16 +12,13 @@ export const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // ✅ REDIRECCIÓ AUTOMÀTICA SI JA ESTÀ LOGUEJAT
+  // ✅ SI JA ESTÀ LOGUEJAT → ANAR DIRECTE AL PANELL
   useEffect(() => {
     if (!currentUser) return;
 
-    if (canManageSystem()) {
-      navigate("/admin-users", { replace: true });
-    } else {
-      navigate("/dashboard", { replace: true });
-    }
-  }, [currentUser, canManageSystem, navigate]);
+    // Tant admin com soci/a van al panell
+    navigate("/dashboard", { replace: true });
+  }, [currentUser, navigate]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,12 +28,8 @@ export const Login: React.FC = () => {
     try {
       await loginWithEmail(email, password);
 
-      // 🔁 Redirecció després de login
-      if (canManageSystem()) {
-        navigate("/admin-users", { replace: true });
-      } else {
-        navigate("/dashboard", { replace: true });
-      }
+      // 🔁 Després de login → panell
+      navigate("/dashboard", { replace: true });
     } catch {
       setError("Correu o contrasenya incorrectes.");
     } finally {
