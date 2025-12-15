@@ -7,11 +7,10 @@ import { Footer } from "./components/Footer";
 import { Home } from "./pages/Home";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
+
 import { Dashboard } from "./pages/Dashboard";
 import { Trips } from "./pages/Trips";
 import { CoursesPublic } from "./pages/CoursesPublic";
-import { AdminUsers } from "./pages/AdminUsers";
-import { AdminSettings } from "./pages/AdminSettings";
 import { CalendarPage } from "./pages/CalendarPage";
 import { PrivateCourses } from "./pages/PrivateCourses";
 import { ResourcesPage } from "./pages/ResourcesPage";
@@ -19,27 +18,27 @@ import { SocialEvents } from "./pages/SocialEvents";
 import { Profile } from "./pages/Profile";
 import { SocialWall } from "./pages/SocialWall";
 import { PendingApproval } from "./pages/PendingApproval";
-import { GeminiDiveGuide } from "./components/GeminiDiveGuide";
 
 import { Admin } from "./pages/Admin";
 import { AdminCourses } from "./pages/AdminCourses";
 import { AdminEvents } from "./pages/AdminEvents";
 import { AdminTrips } from "./pages/AdminTrips";
+import { AdminUsers } from "./pages/AdminUsers";
+import { AdminSettings } from "./pages/AdminSettings";
 
 import { Help } from "./pages/Help";
 import { Privacy } from "./pages/Privacy";
 import { Terms } from "./pages/Terms";
 import { Cookies } from "./pages/Cookies";
 
+import { GeminiDiveGuide } from "./components/GeminiDiveGuide";
+
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const { currentUser } = useApp();
   const location = useLocation();
 
-  if (!currentUser) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
+  if (!currentUser) return <Navigate to="/login" state={{ from: location }} replace />;
 
-  // si està pending → cap a /pending (excepte si ja hi és)
   const isPending = currentUser.status !== "active" || currentUser.role === "pending";
   if (isPending && location.pathname !== "/pending" && location.pathname !== "/profile") {
     return <Navigate to="/pending" replace />;
@@ -83,7 +82,7 @@ const AppContent = () => {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
-          {/* Public “Club Ready” */}
+          {/* Pàgines legals / ajuda */}
           <Route path="/help" element={<Help />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
@@ -191,9 +190,9 @@ const AppContent = () => {
           <Route
             path="/admin-events"
             element={
-              <InstructorRoute>
+              <AdminRoute>
                 <AdminEvents />
-              </InstructorRoute>
+              </AdminRoute>
             }
           />
           <Route
@@ -220,4 +219,17 @@ const AppContent = () => {
         {currentUser && <GeminiDiveGuide />}
       </div>
 
-      <Fo
+      <Footer />
+    </div>
+  );
+};
+
+const App = () => (
+  <AppProvider>
+    <HashRouter>
+      <AppContent />
+    </HashRouter>
+  </AppProvider>
+);
+
+export default App;
