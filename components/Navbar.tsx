@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, NavLink, useLocation } from "react-router-dom";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useApp } from "../context/AppContext";
 import {
   Menu,
@@ -26,10 +26,21 @@ export const Navbar: React.FC = () => {
   const { currentUser, logout, canManageTrips, canManageSystem, clubSettings } = useApp();
   const [open, setOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
 
   const isPublic = !currentUser;
 
   const close = () => setOpen(false);
+
+  // ✅ Logout “pro”: tanca menú + redirigeix a login
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } finally {
+      close();
+      navigate("/login");
+    }
+  };
 
   const Brand = (
     <Link to="/" className="flex items-center gap-3" onClick={close}>
@@ -137,7 +148,7 @@ export const Navbar: React.FC = () => {
                   className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10"
                   title="El meu perfil"
                 >
-                  <div className="h-8 w-8 rounded-full bg-white/15 flex items-center justify-center font-extrabold">
+                  <div className="h-8 w-8 rounded-full bg-white/15 flex items-center justify-center font-extrabold text-white">
                     {(currentUser?.name || "W").slice(0, 1).toUpperCase()}
                   </div>
                   <div className="hidden 2xl:block leading-tight">
@@ -151,8 +162,8 @@ export const Navbar: React.FC = () => {
                 </Link>
 
                 <button
-                  onClick={logout}
-                  className="p-2 rounded-xl hover:bg-white/10"
+                  onClick={handleLogout}
+                  className="p-2 rounded-xl hover:bg-white/10 text-white"
                   title="Tancar sessió"
                 >
                   <LogOut size={18} />
@@ -217,7 +228,7 @@ export const Navbar: React.FC = () => {
                 <div className="border-t border-white/10 my-3" />
 
                 <button
-                  onClick={logout}
+                  onClick={handleLogout}
                   className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl bg-red-600 hover:bg-red-500 font-extrabold"
                 >
                   <LogOut />
@@ -226,7 +237,6 @@ export const Navbar: React.FC = () => {
               </>
             )}
 
-            {/* nota útil per a saber on estàs */}
             <div className="pt-4 text-xs text-white/60">
               Ruta actual: <span className="font-bold">{location.pathname}</span>
             </div>
