@@ -122,9 +122,15 @@ interface AppContextValue extends AppState {
       | "status"
     >
   ) => Promise<void>;
-  updateSocialEvent: (eventId: string, data: Partial<SocialEvent>) => Promise<void>;
+  updateSocialEvent: (
+    eventId: string,
+    data: Partial<SocialEvent>
+  ) => Promise<void>;
   deleteSocialEvent: (eventId: string) => Promise<void>;
-  setSocialEventPublished: (eventId: string, published: boolean) => Promise<void>;
+  setSocialEventPublished: (
+    eventId: string,
+    published: boolean
+  ) => Promise<void>;
   cancelSocialEvent: (eventId: string, reason?: string) => Promise<void>;
 
   // Inscripcions directes
@@ -330,6 +336,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     return () => unsub();
   }, [state.users]);
 
+  // ====== PERMISOS ======
   const canManageTrips = useMemo(() => {
     return () =>
       !!state.currentUser &&
@@ -351,21 +358,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       state.currentUser.role !== "pending";
   }, [state.currentUser]);
 
- const loginWithEmail: AppContextValue["loginWithEmail"] = async (email, password) => {
-  const trimmed = email.trim().toLowerCase();
-  if (!trimmed || !password) {
-    // deixem que la UI ho gestione
-    throw new Error("missing_credentials");
-  }
-
-  try {
+  // ====== AUTH ======
+  const loginWithEmail: AppContextValue["loginWithEmail"] = async (email, password) => {
+    const trimmed = email.trim().toLowerCase();
+    if (!trimmed || !password) throw new Error("missing_credentials");
     await signInWithEmailAndPassword(auth, trimmed, password);
-  } catch (err) {
-    // re-llancem perquè Login.tsx puga mostrar el missatge correcte
-    throw err;
-  }
-};
-
+  };
 
   const logout: AppContextValue["logout"] = async () => {
     try {
@@ -440,9 +438,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  const ensureCanCreateOrEdit = () => {
+  // ====== GUARDS ======
+  const ensureCanManageTripsAndCourses = () => {
     if (!canManageTrips()) {
       alert("Només administració o instructors poden gestionar això.");
+      return false;
+    }
+    return true;
+  };
+
+  const ensureCanManageSocialEvents = () => {
+    if (!canManageSystem()) {
+      alert("Només administració pot gestionar esdeveniments.");
       return false;
     }
     return true;
@@ -458,26 +465,30 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     updatedAt: serverTimestamp(),
   });
 
-  // TRIPS
+  // ====== TRIPS ======
   const createTrip: AppContextValue["createTrip"] = async (data) => {
-    if (!ensureCanCreateOrEdit()) return;
+    if (!ensureCanManageTripsAndCourses()) return;
     assertAuthed(state.currentUser);
     await addDoc(collection(db, "trips"), { ...baseDefaults(state.currentUser.id), ...data });
   };
+
   const updateTrip: AppContextValue["updateTrip"] = async (tripId, data) => {
-    if (!ensureCanCreateOrEdit()) return;
+    if (!ensureCanManageTripsAndCourses()) return;
     await updateDoc(doc(db, "trips", tripId), { ...data, updatedAt: serverTimestamp() });
   };
+
   const deleteTrip: AppContextValue["deleteTrip"] = async (tripId) => {
     if (!canManageSystem()) return alert("Només administració pot esborrar definitivament.");
     await deleteDoc(doc(db, "trips", tripId));
   };
+
   const setTripPublished: AppContextValue["setTripPublished"] = async (tripId, published) => {
-    if (!ensureCanCreateOrEdit()) return;
+    if (!ensureCanManageTripsAndCourses()) return;
     await updateDoc(doc(db, "trips", tripId), { published, updatedAt: serverTimestamp() });
   };
+
   const cancelTrip: AppContextValue["cancelTrip"] = async (tripId, reason) => {
-    if (!ensureCanCreateOrEdit()) return;
+    if (!ensureCanManageTripsAndCourses()) return;
     await updateDoc(doc(db, "trips", tripId), {
       status: "cancelled",
       cancelledAt: serverTimestamp(),
@@ -486,26 +497,30 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  // COURSES
+  // ====== COURSES ======
   const createCourse: AppContextValue["createCourse"] = async (data) => {
-    if (!ensureCanCreateOrEdit()) return;
+    if (!ensureCanManageTripsAndCourses()) return;
     assertAuthed(state.currentUser);
     await addDoc(collection(db, "courses"), { ...baseDefaults(state.currentUser.id), ...data });
   };
+
   const updateCourse: AppContextValue["updateCourse"] = async (courseId, data) => {
-    if (!ensureCanCreateOrEdit()) return;
+    if (!ensureCanManageTripsAndCourses()) return;
     await updateDoc(doc(db, "courses", courseId), { ...data, updatedAt: serverTimestamp() });
   };
+
   const deleteCourse: AppContextValue["deleteCourse"] = async (courseId) => {
     if (!canManageSystem()) return alert("Només administració pot esborrar definitivament.");
     await deleteDoc(doc(db, "courses", courseId));
   };
+
   const setCoursePublished: AppContextValue["setCoursePublished"] = async (courseId, published) => {
-    if (!ensureCanCreateOrEdit()) return;
+    if (!ensureCanManageTripsAndCourses()) return;
     await updateDoc(doc(db, "courses", courseId), { published, updatedAt: serverTimestamp() });
   };
+
   const cancelCourse: AppContextValue["cancelCourse"] = async (courseId, reason) => {
-    if (!ensureCanCreateOrEdit()) return;
+    if (!ensureCanManageTripsAndCourses()) return;
     await updateDoc(doc(db, "courses", courseId), {
       status: "cancelled",
       cancelledAt: serverTimestamp(),
@@ -514,26 +529,30 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  // SOCIAL EVENTS
+  // ====== SOCIAL EVENTS (NOMÉS ADMIN) ======
   const createSocialEvent: AppContextValue["createSocialEvent"] = async (data) => {
-    if (!ensureCanCreateOrEdit()) return;
+    if (!ensureCanManageSocialEvents()) return;
     assertAuthed(state.currentUser);
     await addDoc(collection(db, "socialEvents"), { ...baseDefaults(state.currentUser.id), ...data });
   };
+
   const updateSocialEvent: AppContextValue["updateSocialEvent"] = async (eventId, data) => {
-    if (!ensureCanCreateOrEdit()) return;
+    if (!ensureCanManageSocialEvents()) return;
     await updateDoc(doc(db, "socialEvents", eventId), { ...data, updatedAt: serverTimestamp() });
   };
+
   const deleteSocialEvent: AppContextValue["deleteSocialEvent"] = async (eventId) => {
-    if (!canManageSystem()) return alert("Només administració pot esborrar definitivament.");
+    if (!ensureCanManageSocialEvents()) return;
     await deleteDoc(doc(db, "socialEvents", eventId));
   };
+
   const setSocialEventPublished: AppContextValue["setSocialEventPublished"] = async (eventId, published) => {
-    if (!ensureCanCreateOrEdit()) return;
+    if (!ensureCanManageSocialEvents()) return;
     await updateDoc(doc(db, "socialEvents", eventId), { published, updatedAt: serverTimestamp() });
   };
+
   const cancelSocialEvent: AppContextValue["cancelSocialEvent"] = async (eventId, reason) => {
-    if (!ensureCanCreateOrEdit()) return;
+    if (!ensureCanManageSocialEvents()) return;
     await updateDoc(doc(db, "socialEvents", eventId), {
       status: "cancelled",
       cancelledAt: serverTimestamp(),
@@ -542,7 +561,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  // JOIN/LEAVE
+  // ====== JOIN / LEAVE ======
   const ensureCanJoin = () => {
     if (!isActiveMember()) {
       alert("Has d’estar aprovat/da per a apuntar-te.");
@@ -554,40 +573,67 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const joinTrip: AppContextValue["joinTrip"] = async (tripId) => {
     if (!ensureCanJoin()) return;
     assertAuthed(state.currentUser);
-    await updateDoc(doc(db, "trips", tripId), { participants: arrayUnion(state.currentUser.id), updatedAt: serverTimestamp() });
+    await updateDoc(doc(db, "trips", tripId), {
+      participants: arrayUnion(state.currentUser.id),
+      updatedAt: serverTimestamp(),
+    });
   };
+
   const leaveTrip: AppContextValue["leaveTrip"] = async (tripId) => {
     if (!state.currentUser) return;
-    await updateDoc(doc(db, "trips", tripId), { participants: arrayRemove(state.currentUser.id), updatedAt: serverTimestamp() });
+    await updateDoc(doc(db, "trips", tripId), {
+      participants: arrayRemove(state.currentUser.id),
+      updatedAt: serverTimestamp(),
+    });
   };
+
   const joinCourse: AppContextValue["joinCourse"] = async (courseId) => {
     if (!ensureCanJoin()) return;
     assertAuthed(state.currentUser);
-    await updateDoc(doc(db, "courses", courseId), { participants: arrayUnion(state.currentUser.id), updatedAt: serverTimestamp() });
+    await updateDoc(doc(db, "courses", courseId), {
+      participants: arrayUnion(state.currentUser.id),
+      updatedAt: serverTimestamp(),
+    });
   };
+
   const leaveCourse: AppContextValue["leaveCourse"] = async (courseId) => {
     if (!state.currentUser) return;
-    await updateDoc(doc(db, "courses", courseId), { participants: arrayRemove(state.currentUser.id), updatedAt: serverTimestamp() });
+    await updateDoc(doc(db, "courses", courseId), {
+      participants: arrayRemove(state.currentUser.id),
+      updatedAt: serverTimestamp(),
+    });
   };
+
   const joinSocialEvent: AppContextValue["joinSocialEvent"] = async (eventId) => {
     if (!ensureCanJoin()) return;
     assertAuthed(state.currentUser);
-    await updateDoc(doc(db, "socialEvents", eventId), { participants: arrayUnion(state.currentUser.id), updatedAt: serverTimestamp() });
+    await updateDoc(doc(db, "socialEvents", eventId), {
+      participants: arrayUnion(state.currentUser.id),
+      updatedAt: serverTimestamp(),
+    });
   };
+
   const leaveSocialEvent: AppContextValue["leaveSocialEvent"] = async (eventId) => {
     if (!state.currentUser) return;
-    await updateDoc(doc(db, "socialEvents", eventId), { participants: arrayRemove(state.currentUser.id), updatedAt: serverTimestamp() });
+    await updateDoc(doc(db, "socialEvents", eventId), {
+      participants: arrayRemove(state.currentUser.id),
+      updatedAt: serverTimestamp(),
+    });
   };
 
-  // SETTINGS
+  // ====== SETTINGS ======
   const updateClubSettings: AppContextValue["updateClubSettings"] = async (data) => {
     if (!canManageSystem()) return alert("Només administració pot modificar la web/app.");
-    await setDoc(doc(db, "clubSettings", "main"), { ...data, updatedAt: serverTimestamp() }, { merge: true });
+    await setDoc(
+      doc(db, "clubSettings", "main"),
+      { ...data, updatedAt: serverTimestamp() },
+      { merge: true }
+    );
   };
 
-  // ✅ MATERIAL
+  // ====== MATERIAL ======
   const createResource: AppContextValue["createResource"] = async (data) => {
-    if (!ensureCanCreateOrEdit()) return;
+    if (!ensureCanManageTripsAndCourses()) return;
     assertAuthed(state.currentUser);
     await addDoc(collection(db, "resources"), {
       ...data,
@@ -598,7 +644,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const updateResource: AppContextValue["updateResource"] = async (resourceId, data) => {
-    if (!ensureCanCreateOrEdit()) return;
+    if (!ensureCanManageTripsAndCourses()) return;
     await updateDoc(doc(db, "resources", resourceId), { ...data, updatedAt: serverTimestamp() });
   };
 
@@ -632,7 +678,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  // ✅ MUR SOCIAL
+  // ====== MUR SOCIAL ======
   const createSocialPost: AppContextValue["createSocialPost"] = async ({ text, imageUrl }) => {
     if (!isActiveMember()) {
       alert("Has d’estar aprovat/da per publicar.");
