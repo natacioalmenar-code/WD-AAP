@@ -5,7 +5,6 @@ import { SocialEvents } from "./SocialEvents";
 export const AdminEvents: React.FC = () => {
   const { canManageSystem } = useApp();
 
-  // Només administració
   if (!canManageSystem()) {
     return (
       <div className="max-w-6xl mx-auto px-4 py-10">
@@ -19,10 +18,5 @@ export const AdminEvents: React.FC = () => {
     );
   }
 
-  /**
-   * Reutilitzem la pàgina SocialEvents:
-   *  - ja mostra el botó "Crear esdeveniment" si és admin
-   *  - ja controla publicar, apuntar-se, etc.
-   */
   return <SocialEvents />;
 };
