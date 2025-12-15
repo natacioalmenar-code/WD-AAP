@@ -1,16 +1,27 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Mail, Lock, ArrowLeft, AlertTriangle } from "lucide-react";
 import { useApp } from "../context/AppContext";
 
 export const Login: React.FC = () => {
-  const { loginWithEmail } = useApp();
+  const { loginWithEmail, currentUser, canManageSystem } = useApp();
   const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // ✅ REDIRECCIÓ AUTOMÀTICA SI JA ESTÀ LOGUEJAT
+  useEffect(() => {
+    if (!currentUser) return;
+
+    if (canManageSystem()) {
+      navigate("/admin-users", { replace: true });
+    } else {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [currentUser, canManageSystem, navigate]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,7 +30,13 @@ export const Login: React.FC = () => {
 
     try {
       await loginWithEmail(email, password);
-      navigate("/dashboard");
+
+      // 🔁 Redirecció després de login
+      if (canManageSystem()) {
+        navigate("/admin-users", { replace: true });
+      } else {
+        navigate("/dashboard", { replace: true });
+      }
     } catch {
       setError("Correu o contrasenya incorrectes.");
     } finally {
@@ -52,7 +69,9 @@ export const Login: React.FC = () => {
 
         <form onSubmit={onSubmit} className="mt-6 space-y-4">
           <div>
-            <label className="text-sm font-bold text-slate-700">Correu electrònic</label>
+            <label className="text-sm font-bold text-slate-700">
+              Correu electrònic
+            </label>
             <div className="mt-1 flex items-center gap-2 border rounded-xl px-3 py-2">
               <Mail size={18} className="text-gray-400" />
               <input
@@ -67,7 +86,9 @@ export const Login: React.FC = () => {
           </div>
 
           <div>
-            <label className="text-sm font-bold text-slate-700">Contrasenya</label>
+            <label className="text-sm font-bold text-slate-700">
+              Contrasenya
+            </label>
             <div className="mt-1 flex items-center gap-2 border rounded-xl px-3 py-2">
               <Lock size={18} className="text-gray-400" />
               <input
