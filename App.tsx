@@ -6,6 +6,7 @@ import { Footer } from "./components/Footer";
 
 import { Home } from "./pages/Home";
 import { Login } from "./pages/Login";
+import { Register } from "./pages/Register";
 import { Dashboard } from "./pages/Dashboard";
 import { Trips } from "./pages/Trips";
 import { CoursesPublic } from "./pages/CoursesPublic";
@@ -66,7 +67,9 @@ const AppContent = () => {
     <div
       className="min-h-screen font-sans text-gray-900 bg-fixed bg-cover transition-all duration-500 flex flex-col"
       style={{
-        backgroundImage: `linear-gradient(rgba(249, 250, 251, 0.95), rgba(249, 250, 251, 0.95)), url("${clubSettings.appBackgroundUrl || ""}")`,
+        backgroundImage: `linear-gradient(rgba(249, 250, 251, 0.95), rgba(249, 250, 251, 0.95)), url("${
+          clubSettings.appBackgroundUrl || ""
+        }")`,
         backgroundColor: "#f9fafb",
       }}
     >
@@ -78,6 +81,7 @@ const AppContent = () => {
           <Route path="/" element={<Home />} />
           <Route path="/courses-public" element={<CoursesPublic />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
 
           {/* Public “Club Ready” */}
           <Route path="/help" element={<Help />} />
@@ -208,22 +212,12 @@ const AppContent = () => {
               </AdminRoute>
             }
           />
+
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
 
         {currentUser && <GeminiDiveGuide />}
       </div>
 
-      <Footer />
-    </div>
-  );
-};
-
-const App = () => (
-  <AppProvider>
-    <HashRouter>
-      <AppContent />
-    </HashRouter>
-  </AppProvider>
-);
-
-export default App;
+      <Fo
