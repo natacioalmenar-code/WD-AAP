@@ -163,7 +163,7 @@ export const Navbar: React.FC = () => {
 
                 <button
                   onClick={handleLogout}
-                  className="p-2 rounded-xl hover:bg-white/10 text-white"
+                  className="p-2 rounded-xl bg-yellow-400 hover:bg-yellow-500 text-black"
                   title="Tancar sessió"
                 >
                   <LogOut size={18} />
