@@ -39,7 +39,7 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
 
   if (!currentUser) return <Navigate to="/login" state={{ from: location }} replace />;
 
-  // 🔥 Clau: NO bloquejar admin encara que "status" estiga malament
+  // admin no queda bloquejat per "pending"
   const shouldGoPending =
     currentUser.role === "pending" || (currentUser.status !== "active" && currentUser.role !== "admin");
 
@@ -90,7 +90,7 @@ const AppContent = () => {
           <Route path="/social-wall" element={<PrivateRoute><SocialWall /></PrivateRoute>} />
           <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
 
-          {/* Admin area (control dins de cada pàgina) */}
+          {/* Admin */}
           <Route path="/admin" element={<PrivateRoute><Admin /></PrivateRoute>} />
           <Route path="/admin-trips" element={<PrivateRoute><AdminTrips /></PrivateRoute>} />
           <Route path="/admin-courses" element={<PrivateRoute><AdminCourses /></PrivateRoute>} />
@@ -98,6 +98,7 @@ const AppContent = () => {
           <Route path="/admin-users" element={<PrivateRoute><AdminUsers /></PrivateRoute>} />
           <Route path="/admin-settings" element={<PrivateRoute><AdminSettings /></PrivateRoute>} />
 
+          {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
 
@@ -119,5 +120,3 @@ const App = () => (
 
 export default App;
 
-
-export default App;
