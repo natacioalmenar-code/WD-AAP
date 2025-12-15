@@ -47,10 +47,6 @@ import type {
   PostComment,
 } from "../types";
 
-/* =======================
-   TYPES
-======================= */
-
 interface AppState {
   users: User[];
   trips: Trip[];
@@ -73,18 +69,30 @@ interface AppContextValue extends AppState {
     certification: string;
   }) => Promise<void>;
 
+  // ✅ PERFIL (usuari edita el seu propi nom/avatar/certificació)
+  updateMyProfile: (data: {
+    name?: string;
+    avatarUrl?: string;
+    certification?: string;
+  }) => Promise<void>;
+
   approveUser: (userId: string) => Promise<void>;
   setUserRole: (userId: string, role: Role) => Promise<void>;
 
   canManageTrips: () => boolean; // admin o instructor (instructor: active)
-  canManageSystem: () => boolean; // admin (no depèn de status)
+  canManageSystem: () => boolean; // admin
   isActiveMember: () => boolean; // active i role != pending
 
-  // Trips (Sortides)
+  // Trips
   createTrip: (
     data: Omit<
       Trip,
-      "id" | "createdBy" | "participants" | "pendingParticipants" | "published" | "status"
+      | "id"
+      | "createdBy"
+      | "participants"
+      | "pendingParticipants"
+      | "published"
+      | "status"
     >
   ) => Promise<void>;
   updateTrip: (tripId: string, data: Partial<Trip>) => Promise<void>;
@@ -96,7 +104,12 @@ interface AppContextValue extends AppState {
   createCourse: (
     data: Omit<
       Course,
-      "id" | "createdBy" | "participants" | "pendingParticipants" | "published" | "status"
+      | "id"
+      | "createdBy"
+      | "participants"
+      | "pendingParticipants"
+      | "published"
+      | "status"
     >
   ) => Promise<void>;
   updateCourse: (courseId: string, data: Partial<Course>) => Promise<void>;
@@ -108,7 +121,12 @@ interface AppContextValue extends AppState {
   createSocialEvent: (
     data: Omit<
       SocialEvent,
-      "id" | "createdBy" | "participants" | "pendingParticipants" | "published" | "status"
+      | "id"
+      | "createdBy"
+      | "participants"
+      | "pendingParticipants"
+      | "published"
+      | "status"
     >
   ) => Promise<void>;
   updateSocialEvent: (eventId: string, data: Partial<SocialEvent>) => Promise<void>;
@@ -144,10 +162,6 @@ interface AppContextValue extends AppState {
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
 
-/* =======================
-   HELPERS
-======================= */
-
 const defaultClubSettings: ClubSettings = {
   logoUrl: "/westdivers-logo.png",
   navbarPreTitle: "CLUB DE BUSSEIG",
@@ -168,10 +182,6 @@ function roleToLevel(role: Role) {
 function assertAuthed(currentUser: User | null): asserts currentUser is User {
   if (!currentUser) throw new Error("No autenticat/da.");
 }
-
-/* =======================
-   PROVIDER
-======================= */
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [state, setState] = useState<AppState>({
@@ -281,10 +291,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const email = fbUser.email.toLowerCase();
       const uid = fbUser.uid;
 
-      const localFound = state.users.find(
-        (u) => u.id === uid || u.email?.toLowerCase() === email
-      );
-
+      const localFound = state.users.find((u) => u.id === uid || u.email?.toLowerCase() === email);
       let userDocData: User | null = localFound ?? null;
 
       if (!userDocData) {
@@ -293,6 +300,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         if (userSnap.exists()) userDocData = userSnap.data() as User;
       }
 
+      // Si NO existeix doc encara, el creem com pending
       if (!userDocData) {
         const newUser: User = {
           id: uid,
@@ -306,6 +314,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         };
+
         await setDoc(doc(db, "users", uid), newUser, { merge: true }).catch(() => {});
         setState((prev) => ({ ...prev, currentUser: newUser }));
         return;
@@ -316,6 +325,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       if (userDocData.avatarUrl === undefined) patched.avatarUrl = "";
       if (!userDocData.email) patched.email = email;
 
+      // ✅ si el nom és buit o "Nou/va soci/a" i Auth té displayName, el reparem
+      const authName = (fbUser.displayName || "").trim();
+      const currentName = (userDocData.name || "").trim();
+      if (authName && (!currentName || currentName === "Nou/va soci/a")) {
+        patched.name = authName;
+      }
+
       if (Object.keys(patched).length) {
         await updateDoc(doc(db, "users", uid), { ...patched, updatedAt: serverTimestamp() }).catch(() => {});
         userDocData = { ...userDocData, ...patched } as User;
@@ -324,8 +340,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       setState((prev) => ({ ...prev, currentUser: userDocData }));
     });
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     return () => unsub();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.users]);
 
   // ====== PERMISOS ======
@@ -355,11 +371,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout: AppContextValue["logout"] = async () => {
-    await signOut(auth);
-    setState((prev) => ({ ...prev, currentUser: null }));
+    try {
+      await signOut(auth);
+      setState((prev) => ({ ...prev, currentUser: null }));
+    } catch {}
   };
 
-  // ✅ REGISTRE
+  // ✅ REGISTRE (pendent d'aprovació)
   const registerUser: AppContextValue["registerUser"] = async ({
     name,
     email,
@@ -394,26 +412,54 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
       await setDoc(doc(db, "users", cred.user.uid), newUser, { merge: true });
 
-      alert("Compte creat. Queda pendent d’aprovació per l’administració.");
+      alert("Compte creat. Ara l’administració ha d’aprovar el teu accés.");
       await signOut(auth);
     } catch (err: any) {
       console.error("REGISTER ERROR:", err);
 
-      try { await signOut(auth); } catch {}
+      try {
+        await signOut(auth);
+      } catch {}
 
       if (err?.code === "auth/email-already-in-use") {
         alert(
           "Aquest correu ja està registrat.\n" +
-          "Si ja tens un compte, inicia sessió.\n" +
-          "Si acabes de registrar-te, el compte pot estar pendent d’aprovació."
+            "Si ja tens un compte, inicia sessió.\n" +
+            "Si acabes de registrar-te, el compte pot estar pendent d’aprovació."
         );
         return;
       }
 
       alert(
         "No s’ha pogut completar el registre.\n" +
-        "Si el compte s’ha creat, quedarà pendent d’aprovació per l’administració."
+          "Si el compte s’ha creat, quedarà pendent d’aprovació per l’administració."
       );
+    }
+  };
+
+  // ✅ PERFIL (cada usuari edita el seu doc)
+  const updateMyProfile: AppContextValue["updateMyProfile"] = async (data) => {
+    if (!state.currentUser) {
+      alert("No autenticat/da");
+      return;
+    }
+
+    const allowedData: any = {};
+
+    if (typeof data.name === "string") allowedData.name = data.name.trim();
+    if (typeof data.avatarUrl === "string") allowedData.avatarUrl = data.avatarUrl.trim();
+    if (typeof data.certification === "string") allowedData.certification = data.certification.trim();
+
+    if (Object.keys(allowedData).length === 0) return;
+
+    try {
+      await updateDoc(doc(db, "users", state.currentUser.id), {
+        ...allowedData,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error("UPDATE PROFILE ERROR", err);
+      alert("No s’ha pogut canviar el perfil");
     }
   };
 
@@ -630,7 +676,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   // ====== SETTINGS ======
   const updateClubSettings: AppContextValue["updateClubSettings"] = async (data) => {
     if (!canManageSystem()) return alert("Només administració pot modificar la web/app.");
-    await setDoc(doc(db, "clubSettings", "main"), { ...data, updatedAt: serverTimestamp() }, { merge: true });
+    await setDoc(
+      doc(db, "clubSettings", "main"),
+      { ...data, updatedAt: serverTimestamp() },
+      { merge: true }
+    );
   };
 
   // ====== MATERIAL ======
@@ -778,6 +828,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     logout,
 
     registerUser,
+    updateMyProfile,
+
     approveUser,
     setUserRole,
 
