@@ -39,23 +39,14 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
 
   if (!currentUser) return <Navigate to="/login" state={{ from: location }} replace />;
 
-  const isPending = currentUser.status !== "active" || currentUser.role === "pending";
-  if (isPending && location.pathname !== "/pending" && location.pathname !== "/profile") {
+  // 🔥 Clau: NO bloquejar admin encara que "status" estiga malament
+  const shouldGoPending =
+    currentUser.role === "pending" || (currentUser.status !== "active" && currentUser.role !== "admin");
+
+  if (shouldGoPending && location.pathname !== "/pending" && location.pathname !== "/profile") {
     return <Navigate to="/pending" replace />;
   }
 
-  return <>{children}</>;
-};
-
-const InstructorRoute = ({ children }: { children: React.ReactNode }) => {
-  const { canManageTrips } = useApp();
-  if (!canManageTrips()) return <Navigate to="/dashboard" replace />;
-  return <>{children}</>;
-};
-
-const AdminRoute = ({ children }: { children: React.ReactNode }) => {
-  const { canManageSystem } = useApp();
-  if (!canManageSystem()) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 };
 
@@ -82,137 +73,31 @@ const AppContent = () => {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
-          {/* Pàgines legals / ajuda */}
+          {/* Legal / ajuda */}
           <Route path="/help" element={<Help />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/cookies" element={<Cookies />} />
 
           {/* Private */}
-          <Route
-            path="/dashboard"
-            element={
-              <PrivateRoute>
-                <Dashboard />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/pending"
-            element={
-              <PrivateRoute>
-                <PendingApproval />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/trips"
-            element={
-              <PrivateRoute>
-                <Trips />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/calendar"
-            element={
-              <PrivateRoute>
-                <CalendarPage />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/courses-private"
-            element={
-              <PrivateRoute>
-                <PrivateCourses />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/resources"
-            element={
-              <PrivateRoute>
-                <ResourcesPage />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/social-events"
-            element={
-              <PrivateRoute>
-                <SocialEvents />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/social-wall"
-            element={
-              <PrivateRoute>
-                <SocialWall />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/profile"
-            element={
-              <PrivateRoute>
-                <Profile />
-              </PrivateRoute>
-            }
-          />
+          <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+          <Route path="/pending" element={<PrivateRoute><PendingApproval /></PrivateRoute>} />
+          <Route path="/trips" element={<PrivateRoute><Trips /></PrivateRoute>} />
+          <Route path="/calendar" element={<PrivateRoute><CalendarPage /></PrivateRoute>} />
+          <Route path="/courses-private" element={<PrivateRoute><PrivateCourses /></PrivateRoute>} />
+          <Route path="/resources" element={<PrivateRoute><ResourcesPage /></PrivateRoute>} />
+          <Route path="/social-events" element={<PrivateRoute><SocialEvents /></PrivateRoute>} />
+          <Route path="/social-wall" element={<PrivateRoute><SocialWall /></PrivateRoute>} />
+          <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
 
-          {/* Admin / Instructor */}
-          <Route
-            path="/admin"
-            element={
-              <InstructorRoute>
-                <Admin />
-              </InstructorRoute>
-            }
-          />
-          <Route
-            path="/admin-trips"
-            element={
-              <InstructorRoute>
-                <AdminTrips />
-              </InstructorRoute>
-            }
-          />
-          <Route
-            path="/admin-courses"
-            element={
-              <InstructorRoute>
-                <AdminCourses />
-              </InstructorRoute>
-            }
-          />
-          <Route
-            path="/admin-events"
-            element={
-              <AdminRoute>
-                <AdminEvents />
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin-users"
-            element={
-              <AdminRoute>
-                <AdminUsers />
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/admin-settings"
-            element={
-              <AdminRoute>
-                <AdminSettings />
-              </AdminRoute>
-            }
-          />
+          {/* Admin area (control dins de cada pàgina) */}
+          <Route path="/admin" element={<PrivateRoute><Admin /></PrivateRoute>} />
+          <Route path="/admin-trips" element={<PrivateRoute><AdminTrips /></PrivateRoute>} />
+          <Route path="/admin-courses" element={<PrivateRoute><AdminCourses /></PrivateRoute>} />
+          <Route path="/admin-events" element={<PrivateRoute><AdminEvents /></PrivateRoute>} />
+          <Route path="/admin-users" element={<PrivateRoute><AdminUsers /></PrivateRoute>} />
+          <Route path="/admin-settings" element={<PrivateRoute><AdminSettings /></PrivateRoute>} />
 
-          {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
 
@@ -231,5 +116,8 @@ const App = () => (
     </HashRouter>
   </AppProvider>
 );
+
+export default App;
+
 
 export default App;
