@@ -72,8 +72,8 @@ interface AppContextValue extends AppState {
   approveUser: (userId: string) => Promise<void>;
   setUserRole: (userId: string, role: Role) => Promise<void>;
 
-  canManageTrips: () => boolean; // admin o instructor
-  canManageSystem: () => boolean; // admin
+  canManageTrips: () => boolean; // admin o instructor (instructor: active)
+  canManageSystem: () => boolean; // admin (sense dependre de status)
   isActiveMember: () => boolean; // active i role != pending
 
   // Trips
@@ -122,18 +122,12 @@ interface AppContextValue extends AppState {
       | "status"
     >
   ) => Promise<void>;
-  updateSocialEvent: (
-    eventId: string,
-    data: Partial<SocialEvent>
-  ) => Promise<void>;
+  updateSocialEvent: (eventId: string, data: Partial<SocialEvent>) => Promise<void>;
   deleteSocialEvent: (eventId: string) => Promise<void>;
-  setSocialEventPublished: (
-    eventId: string,
-    published: boolean
-  ) => Promise<void>;
+  setSocialEventPublished: (eventId: string, published: boolean) => Promise<void>;
   cancelSocialEvent: (eventId: string, reason?: string) => Promise<void>;
 
-  // Inscripcions directes
+  // Inscripcions
   joinTrip: (tripId: string) => Promise<void>;
   leaveTrip: (tripId: string) => Promise<void>;
   joinCourse: (courseId: string) => Promise<void>;
@@ -194,6 +188,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     clubSettings: defaultClubSettings,
   });
 
+  // ====== SNAPSHOTS ======
   useEffect(() => {
     const unsubUsers = onSnapshot(
       query(collection(db, "users"), orderBy("createdAt", "asc")),
@@ -232,7 +227,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
     );
 
-    // ✅ Resources: category + order
     const unsubResources = onSnapshot(
       query(collection(db, "resources"), orderBy("category", "asc"), orderBy("order", "asc")),
       (snap) => {
@@ -245,7 +239,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
     );
 
-    // ✅ Mur social: posts per data (últims primer)
     const unsubPosts = onSnapshot(
       query(collection(db, "socialPosts"), orderBy("createdAt", "desc")),
       (snap) => {
@@ -280,6 +273,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
+  // ====== AUTH STATE ======
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (fbUser) => {
       if (!fbUser?.email) {
@@ -291,7 +285,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const uid = fbUser.uid;
 
       const localFound = state.users.find((u) => u.id === uid || u.email?.toLowerCase() === email);
-
       let userDocData: User | null = localFound ?? null;
 
       if (!userDocData) {
@@ -336,19 +329,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     return () => unsub();
   }, [state.users]);
 
-  // ====== PERMISOS ======
+  // ====== PERMISOS (CLAVES) ======
+  // Admin: sempre pot gestionar (no depèn de status)
+  // Instructor: només si està active
   const canManageTrips = useMemo(() => {
     return () =>
       !!state.currentUser &&
-      state.currentUser.status === "active" &&
-      (state.currentUser.role === "admin" || state.currentUser.role === "instructor");
+      (state.currentUser.role === "admin" ||
+        (state.currentUser.role === "instructor" && state.currentUser.status === "active"));
   }, [state.currentUser]);
 
   const canManageSystem = useMemo(() => {
-    return () =>
-      !!state.currentUser &&
-      state.currentUser.status === "active" &&
-      state.currentUser.role === "admin";
+    return () => !!state.currentUser && state.currentUser.role === "admin";
   }, [state.currentUser]);
 
   const isActiveMember = useMemo(() => {
@@ -358,7 +350,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       state.currentUser.role !== "pending";
   }, [state.currentUser]);
 
-  // ====== AUTH ======
+  // ====== AUTH METHODS ======
   const loginWithEmail: AppContextValue["loginWithEmail"] = async (email, password) => {
     const trimmed = email.trim().toLowerCase();
     if (!trimmed || !password) throw new Error("missing_credentials");
@@ -372,12 +364,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     } catch {}
   };
 
-  const registerUser: AppContextValue["registerUser"] = async ({
-    name,
-    email,
-    password,
-    certification,
-  }) => {
+  const registerUser: AppContextValue["registerUser"] = async ({ name, email, password, certification }) => {
     const trimmedEmail = email.trim().toLowerCase();
     const trimmedName = name.trim();
     const trimmedCert = certification.trim();
@@ -561,7 +548,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  // ====== JOIN / LEAVE ======
+  // ====== JOIN/LEAVE ======
   const ensureCanJoin = () => {
     if (!isActiveMember()) {
       alert("Has d’estar aprovat/da per a apuntar-te.");
@@ -624,11 +611,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   // ====== SETTINGS ======
   const updateClubSettings: AppContextValue["updateClubSettings"] = async (data) => {
     if (!canManageSystem()) return alert("Només administració pot modificar la web/app.");
-    await setDoc(
-      doc(db, "clubSettings", "main"),
-      { ...data, updatedAt: serverTimestamp() },
-      { merge: true }
-    );
+    await setDoc(doc(db, "clubSettings", "main"), { ...data, updatedAt: serverTimestamp() }, { merge: true });
   };
 
   // ====== MATERIAL ======
@@ -829,5 +812,7 @@ export const useAppContext = () => {
   if (!ctx) throw new Error("useAppContext must be used within AppProvider");
   return ctx;
 };
+
+export const useApp = useAppContext;
 
 export const useApp = useAppContext;
