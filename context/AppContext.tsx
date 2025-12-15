@@ -814,5 +814,3 @@ export const useAppContext = () => {
 };
 
 export const useApp = useAppContext;
-
-export const useApp = useAppContext;
