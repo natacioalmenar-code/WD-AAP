@@ -202,6 +202,7 @@ export const AdminUsers: React.FC = () => {
                 </div>
               </div>
 
+              
               {u.id === currentUser.id && (
                 <div className="mt-3 text-xs text-gray-500">
                   *Aquest ets tu. El selector de rol està bloquejat per seguretat.
