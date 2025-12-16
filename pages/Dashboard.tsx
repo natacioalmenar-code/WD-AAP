@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../context/AppContext";
+import { AdminManagementCards } from "../components/AdminManagementCards";
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -35,8 +36,13 @@ export const Dashboard: React.FC = () => {
     );
   }
 
+  const isAdmin = canManageSystem?.() ?? false;
+
   return (
-    <div className="max-w-6xl mx-auto px-4 py-10">
+    <div className="max-w-6xl mx-auto px-4 py-10 space-y-6">
+      {/* ✅ TARGETES ADMIN (si és admin) */}
+      {isAdmin && <AdminManagementCards />}
+
       <div className="bg-white border rounded-2xl shadow-sm p-6">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
@@ -48,23 +54,16 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          {canManageSystem?.() ? (
-            <button
-              onClick={() => navigate("/admin")}
-              className="px-5 py-2.5 rounded-xl bg-black text-white font-extrabold hover:bg-gray-900"
-            >
-              Gestió (Admin)
-            </button>
-          ) : (
-            <button
-              onClick={() => navigate("/profile")}
-              className="px-5 py-2.5 rounded-xl bg-black text-white font-extrabold hover:bg-gray-900"
-            >
-              El meu perfil
-            </button>
-          )}
+          {/* ✅ Botó de dalt: per admin -> Perfil (la gestió ja està en targetes) */}
+          <button
+            onClick={() => navigate("/profile")}
+            className="px-5 py-2.5 rounded-xl bg-black text-white font-extrabold hover:bg-gray-900"
+          >
+            El meu perfil
+          </button>
         </div>
 
+        {/* ✅ Aquest grid és per tots (admin i socis) */}
         <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <button
             onClick={() => navigate("/calendar")}
@@ -82,8 +81,9 @@ export const Dashboard: React.FC = () => {
             <div className="text-gray-600 text-sm mt-1">Apunta’t (amb aprovació)</div>
           </button>
 
+          {/* ✅ IMPORTANT: formació privada ha d’anar a /courses-private (no /courses) */}
           <button
-            onClick={() => navigate("/courses")}
+            onClick={() => navigate("/courses-private")}
             className="bg-white border rounded-2xl p-5 text-left hover:shadow-sm"
           >
             <div className="font-extrabold text-slate-900">Formació</div>
