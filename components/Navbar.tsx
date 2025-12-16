@@ -8,7 +8,7 @@ function cx(...classes: Array<string | false | undefined>) {
 
 export const Navbar: React.FC = () => {
   const { clubSettings, currentUser, canManageSystem } = useApp();
-  const [location] = useLocation();
+  const location = useLocation();
 
   const isLogged = !!currentUser;
 
@@ -108,4 +108,3 @@ export const Navbar: React.FC = () => {
     </header>
   );
 };
-
