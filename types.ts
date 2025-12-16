@@ -1,7 +1,5 @@
 // types.ts
 
-import { ErrorBoundary } from "./components/ErrorBoundary";
-
 export type Role = "admin" | "instructor" | "member" | "pending";
 export type Status = "active" | "pending";
 export type PublishableStatus = "active" | "cancelled";
