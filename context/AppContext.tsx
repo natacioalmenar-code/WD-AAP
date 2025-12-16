@@ -69,6 +69,7 @@ interface AppContextValue extends AppState {
     certification: string;
   }) => Promise<void>;
 
+  // ✅ PERFIL (usuari edita el seu propi nom/avatar/certificació)
   updateMyProfile: (data: {
     name?: string;
     avatarUrl?: string;
@@ -78,10 +79,11 @@ interface AppContextValue extends AppState {
   approveUser: (userId: string) => Promise<void>;
   setUserRole: (userId: string, role: Role) => Promise<void>;
 
-  canManageTrips: () => boolean;
-  canManageSystem: () => boolean;
-  isActiveMember: () => boolean;
+  canManageTrips: () => boolean; // admin o instructor (instructor: active)
+  canManageSystem: () => boolean; // admin
+  isActiveMember: () => boolean; // active i role != pending
 
+  // Trips
   createTrip: (
     data: Omit<
       Trip,
@@ -98,6 +100,7 @@ interface AppContextValue extends AppState {
   setTripPublished: (tripId: string, published: boolean) => Promise<void>;
   cancelTrip: (tripId: string, reason?: string) => Promise<void>;
 
+  // Courses
   createCourse: (
     data: Omit<
       Course,
@@ -114,6 +117,7 @@ interface AppContextValue extends AppState {
   setCoursePublished: (courseId: string, published: boolean) => Promise<void>;
   cancelCourse: (courseId: string, reason?: string) => Promise<void>;
 
+  // Social events (NOMÉS ADMIN)
   createSocialEvent: (
     data: Omit<
       SocialEvent,
@@ -130,6 +134,7 @@ interface AppContextValue extends AppState {
   setSocialEventPublished: (eventId: string, published: boolean) => Promise<void>;
   cancelSocialEvent: (eventId: string, reason?: string) => Promise<void>;
 
+  // Inscripcions
   joinTrip: (tripId: string) => Promise<void>;
   leaveTrip: (tripId: string) => Promise<void>;
   joinCourse: (courseId: string) => Promise<void>;
@@ -137,8 +142,10 @@ interface AppContextValue extends AppState {
   joinSocialEvent: (eventId: string) => Promise<void>;
   leaveSocialEvent: (eventId: string) => Promise<void>;
 
+  // Settings
   updateClubSettings: (data: Partial<ClubSettings>) => Promise<void>;
 
+  // ✅ MATERIAL
   createResource: (
     data: Omit<ResourceItem, "id" | "createdBy" | "createdAt" | "updatedAt">
   ) => Promise<void>;
@@ -146,6 +153,7 @@ interface AppContextValue extends AppState {
   deleteResource: (resourceId: string) => Promise<void>;
   swapResourceOrder: (aId: string, bId: string) => Promise<void>;
 
+  // ✅ MUR SOCIAL
   createSocialPost: (data: { text: string; imageUrl?: string }) => Promise<void>;
   togglePostLike: (postId: string) => Promise<void>;
   addPostComment: (postId: string, text: string) => Promise<void>;
@@ -189,20 +197,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   // ====== SNAPSHOTS ======
   useEffect(() => {
-    const unsubUsers = onSnapshot(
-      query(collection(db, "users"), orderBy("createdAt", "asc")),
-      (snap) => {
-        // ✅ FIX IMPORTANT: sempre incloem l'id del document
-        const users = snap.docs.map((d) => ({ ...(d.data() as any), id: d.id })) as User[];
+    // ✅ FIX DEFINITIU: NO fem orderBy("createdAt") per evitar que “desapareguin” docs sense createdAt
+    const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
+      const users = snap.docs.map((d) => ({ ...(d.data() as any), id: d.id })) as User[];
 
-        setState((prev) => {
-          const cur = prev.currentUser
-            ? users.find((u) => u.id === prev.currentUser!.id) ?? prev.currentUser
-            : null;
-          return { ...prev, users, currentUser: cur };
-        });
-      }
-    );
+      setState((prev) => {
+        const cur = prev.currentUser
+          ? users.find((u) => u.id === prev.currentUser!.id) ?? prev.currentUser
+          : null;
+        return { ...prev, users, currentUser: cur };
+      });
+    });
 
     const unsubTrips = onSnapshot(
       query(collection(db, "trips"), orderBy("date", "asc")),
@@ -297,6 +302,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         if (userSnap.exists()) userDocData = userSnap.data() as User;
       }
 
+      // Si NO existeix doc encara, el creem com pending
       if (!userDocData) {
         const newUser: User = {
           id: uid,
@@ -372,6 +378,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     } catch {}
   };
 
+  // ✅ REGISTRE (pendent d'aprovació)
   const registerUser: AppContextValue["registerUser"] = async ({
     name,
     email,
@@ -431,6 +438,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // ✅ PERFIL (cada usuari edita el seu doc)
   const updateMyProfile: AppContextValue["updateMyProfile"] = async (data) => {
     if (!state.currentUser) {
       alert("No autenticat/da");
@@ -438,7 +446,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const allowedData: any = {};
-
     if (typeof data.name === "string") allowedData.name = data.name.trim();
     if (typeof data.avatarUrl === "string") allowedData.avatarUrl = data.avatarUrl.trim();
     if (typeof data.certification === "string") allowedData.certification = data.certification.trim();
@@ -483,6 +490,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
+  // ====== GUARDS ======
   const ensureCanManageTripsAndCourses = () => {
     if (!canManageTrips()) {
       alert("Només administració o instructors poden gestionar això.");
@@ -573,7 +581,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  // ====== SOCIAL EVENTS ======
+  // ====== SOCIAL EVENTS (NOMÉS ADMIN) ======
   const createSocialEvent: AppContextValue["createSocialEvent"] = async (data) => {
     if (!ensureCanManageSocialEvents()) return;
     assertAuthed(state.currentUser);
@@ -602,7 +610,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       cancelledAt: serverTimestamp(),
       cancelledReason: reason || "",
       updatedAt: serverTimestamp(),
-      });
+    });
   };
 
   // ====== JOIN/LEAVE ======
