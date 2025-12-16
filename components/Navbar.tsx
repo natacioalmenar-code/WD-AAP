@@ -1,110 +1,139 @@
-import React from "react";
-import { Link, NavLink, useLocation } from "react-router-dom";
+import React, { useState } from "react";
+import { Link, NavLink, useNavigate } from "react-router-dom";
+import { LogOut, X } from "lucide-react";
 import { useApp } from "../context/AppContext";
 
-function cx(...classes: Array<string | false | undefined>) {
-  return classes.filter(Boolean).join(" ");
-}
+const linkClass = ({ isActive }: { isActive: boolean }) =>
+  `px-3 py-2 rounded font-semibold ${
+    isActive ? "underline" : "hover:underline"
+  }`;
 
 export const Navbar: React.FC = () => {
-  const { clubSettings, currentUser, canManageSystem } = useApp();
-  const location = useLocation();
+  const navigate = useNavigate();
+  const { currentUser, logout, canManageSystem } = useApp();
 
-  const isLogged = !!currentUser;
+  const [showLogout, setShowLogout] = useState(false);
 
-  const logo = clubSettings.logoUrl || "/westdivers-logo.png";
-  const preTitle = clubSettings.navbarPreTitle || "CLUB DE BUSSEIG";
-  const title = clubSettings.heroTitle || "WEST DIVERS";
-
-  const navItemClass = ({ isActive }: any) =>
-    cx(
-      "px-3 py-2 rounded-xl text-sm font-extrabold transition",
-      isActive ? "bg-white/10 text-yellow-300" : "text-white/85 hover:text-white hover:bg-white/10"
-    );
+  const handleLogout = async () => {
+    await logout();
+    setShowLogout(false);
+    navigate("/login");
+  };
 
   return (
-    <header className="w-full bg-black/90 text-white sticky top-0 z-50 border-b border-white/10">
-      <div className="max-w-6xl mx-auto px-4">
-        <div className="h-16 flex items-center justify-between gap-4">
-          {/* BRAND (✅ evita solapament) */}
-          <Link to="/" className="flex items-center gap-3 min-w-0">
-            <img src={logo} alt="logo" className="h-10 w-10 rounded-full border border-white/20 flex-shrink-0" />
-            <div className="min-w-0 leading-tight">
-              <div className="text-[10px] uppercase tracking-wide text-white/70 truncate">
-                {preTitle}
-              </div>
-              <div className="text-sm font-extrabold truncate">{title}</div>
-            </div>
+    <>
+      <header className="w-full border-b bg-white">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+          <Link to="/" className="font-extrabold text-lg">
+            WD-AAP
           </Link>
 
-          {/* NAV */}
-          <nav className="hidden md:flex items-center gap-1">
-            <NavLink to="/dashboard" className={navItemClass}>
-              Panell
-            </NavLink>
-            <NavLink to="/wall" className={navItemClass}>
-              Mur social
-            </NavLink>
-            <NavLink to="/trips" className={navItemClass}>
-              Sortides
-            </NavLink>
-            <NavLink to="/courses" className={navItemClass}>
-              Cursos
-            </NavLink>
-            <NavLink to="/events" className={navItemClass}>
-              Esdeveniments
-            </NavLink>
-            <NavLink to="/resources" className={navItemClass}>
-              Material
-            </NavLink>
-            <NavLink to="/calendar" className={navItemClass}>
-              Calendari
-            </NavLink>
-            <NavLink to="/help" className={navItemClass}>
-              Ajuda
+          <nav className="flex items-center gap-2 flex-wrap">
+            <NavLink to="/" className={linkClass}>
+              Inici
             </NavLink>
 
-            {canManageSystem() && (
+            {currentUser && (
               <>
-                <NavLink to="/admin" className={navItemClass}>
-                  Gestió
+                <NavLink to="/dashboard" className={linkClass}>
+                  Panell
                 </NavLink>
-                <NavLink to="/admin-users" className={navItemClass}>
-                  Socis/es
+                <NavLink to="/trips" className={linkClass}>
+                  Sortides
                 </NavLink>
-                <NavLink to="/admin-web" className={navItemClass}>
-                  Web
+                <NavLink to="/calendar" className={linkClass}>
+                  Calendari
+                </NavLink>
+                <NavLink to="/resources" className={linkClass}>
+                  Recursos
+                </NavLink>
+                <NavLink to="/profile" className={linkClass}>
+                  Perfil
                 </NavLink>
               </>
             )}
-          </nav>
 
-          {/* RIGHT */}
-          <div className="flex items-center gap-3">
-            {isLogged ? (
-              <Link
-                to="/profile"
-                className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 font-extrabold text-sm"
-                title="Perfil"
-              >
-                <span className="w-8 h-8 rounded-full bg-yellow-400 text-black grid place-items-center font-extrabold">
-                  {(currentUser?.name || "W").slice(0, 1).toUpperCase()}
-                </span>
-                <span className="max-w-[140px] truncate">
-                  {currentUser?.name || "Perfil"}
-                </span>
-              </Link>
-            ) : (
-              <Link
-                to="/login"
-                className="px-4 py-2 rounded-xl bg-yellow-400 text-black font-extrabold hover:bg-yellow-300"
-              >
-                Accés Socis/es
-              </Link>
+            {!currentUser && (
+              <>
+                <NavLink to="/courses-public" className={linkClass}>
+                  Cursos
+                </NavLink>
+                <NavLink to="/register" className={linkClass}>
+                  Inscripció
+                </NavLink>
+                <NavLink to="/login" className={linkClass}>
+                  Entrar
+                </NavLink>
+              </>
             )}
+
+            {/* ADMIN */}
+            {currentUser && canManageSystem() && (
+              <>
+                <span className="mx-2 opacity-40">|</span>
+                <NavLink to="/admin-users" className={linkClass}>
+                  Admin · Socis
+                </NavLink>
+                <NavLink to="/admin-settings" className={linkClass}>
+                  Admin · Config
+                </NavLink>
+              </>
+            )}
+
+            {/* SORTIR */}
+            {currentUser && (
+              <>
+                <span className="mx-2 opacity-40">|</span>
+                <button
+                  onClick={() => setShowLogout(true)}
+                  className="flex items-center gap-1 px-3 py-2 rounded font-bold text-red-600 hover:underline"
+                >
+                  <LogOut size={16} />
+                  Sortir
+                </button>
+              </>
+            )}
+          </nav>
+        </div>
+      </header>
+
+      {/* MODAL CONFIRMACIÓ SORTIR */}
+      {showLogout && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 relative">
+            <button
+              onClick={() => setShowLogout(false)}
+              className="absolute top-3 right-3 text-gray-500 hover:text-black"
+            >
+              <X size={20} />
+            </button>
+
+            <h2 className="text-xl font-extrabold text-slate-900">
+              Vols sortir del compte?
+            </h2>
+
+            <p className="text-gray-600 mt-2">
+              Tancaràs la sessió actual i hauràs de tornar a entrar.
+            </p>
+
+            <div className="flex gap-3 mt-6 justify-end">
+              <button
+                onClick={() => setShowLogout(false)}
+                className="px-4 py-2 rounded-xl border font-bold hover:bg-gray-50"
+              >
+                Cancel·lar
+              </button>
+
+              <button
+                onClick={handleLogout}
+                className="px-4 py-2 rounded-xl bg-red-600 text-white font-extrabold hover:bg-red-700"
+              >
+                Sortir
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    </header>
+      )}
+    </>
   );
 };
