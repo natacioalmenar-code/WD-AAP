@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { LogOut, Menu, X } from "lucide-react";
+import { ChevronDown, LogOut, Menu, X, Shield } from "lucide-react";
 import { useApp } from "../context/AppContext";
 
 const itemBase = "px-3 py-2 rounded-xl font-extrabold transition whitespace-nowrap";
@@ -13,10 +13,15 @@ export const Navbar: React.FC = () => {
 
   const [open, setOpen] = useState(false);
   const [confirmLogout, setConfirmLogout] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
+
+  const adminMenuRef = useRef<HTMLDivElement | null>(null);
 
   const logoUrl = (clubSettings?.logoUrl || "/westdivers-logo.png").trim();
   const clubTitle = (clubSettings?.heroTitle || "WEST DIVERS").trim();
   const preTitle = (clubSettings?.navbarPreTitle || "CLUB DE BUSSEIG").trim();
+
+  const isAdmin = !!currentUser && (canManageSystem?.() ?? false);
 
   const roleChip = useMemo(() => {
     if (!currentUser) return null;
@@ -33,10 +38,10 @@ export const Navbar: React.FC = () => {
     await logout();
     setConfirmLogout(false);
     setOpen(false);
+    setAdminOpen(false);
     navigate("/login");
   }
 
-  // Helper per no repetir codi
   const N = ({
     to,
     children,
@@ -55,24 +60,26 @@ export const Navbar: React.FC = () => {
     </NavLink>
   );
 
+  // tanca menú admin quan cliques fora
+  React.useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      if (!adminMenuRef.current) return;
+      if (!adminMenuRef.current.contains(e.target as Node)) setAdminOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, []);
+
   return (
     <>
       <header className="sticky top-0 z-50 bg-black border-b border-white/10">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-3">
           {/* Logo + nom */}
           <Link to="/" className="flex items-center gap-3 min-w-0">
-            <img
-              src={logoUrl}
-              alt="logo club"
-              className="h-10 w-10 rounded-lg bg-white object-contain"
-            />
+            <img src={logoUrl} alt="logo club" className="h-10 w-10 rounded-lg bg-white object-contain" />
             <div className="leading-tight min-w-0">
-              <div className="text-[10px] font-extrabold tracking-wider text-white/70">
-                {preTitle}
-              </div>
-              <div className="text-sm font-black tracking-wide text-white truncate">
-                {clubTitle}
-              </div>
+              <div className="text-[10px] font-extrabold tracking-wider text-white/70">{preTitle}</div>
+              <div className="text-sm font-black tracking-wide text-white truncate">{clubTitle}</div>
             </div>
           </Link>
 
@@ -80,17 +87,13 @@ export const Navbar: React.FC = () => {
           <nav className="hidden md:flex items-center gap-1">
             <N to="/">Inici</N>
 
-            {/* Públic */}
-            {!currentUser && (
+            {!currentUser ? (
               <>
                 <N to="/courses-public">Cursos</N>
                 <N to="/register">Inscripció</N>
                 <N to="/login">Entrar</N>
               </>
-            )}
-
-            {/* Socis */}
-            {currentUser && (
+            ) : (
               <>
                 <N to="/dashboard">Panell</N>
                 <N to="/trips">Sortides</N>
@@ -100,18 +103,55 @@ export const Navbar: React.FC = () => {
                 <N to="/resources">Recursos</N>
                 <N to="/calendar">Calendari</N>
                 <N to="/profile">Perfil</N>
-              </>
-            )}
 
-            {/* Admin */}
-            {currentUser && canManageSystem?.() && (
-              <>
-                <span className="mx-2 text-white/20">|</span>
-                <N to="/admin-users">Admin Socis</N>
-                <N to="/admin-trips">Admin Sortides</N>
-                <N to="/admin-courses">Admin Cursos</N>
-                <N to="/admin-events">Admin Events</N>
-                <N to="/admin-settings">Admin Config</N>
+                {/* ✅ Admin en un únic desplegable */}
+                {isAdmin && (
+                  <div className="relative" ref={adminMenuRef}>
+                    <button
+                      onClick={() => setAdminOpen((v) => !v)}
+                      className={`${itemBase} ${adminOpen ? itemActive : itemInactive} inline-flex items-center gap-2`}
+                    >
+                      <Shield size={16} />
+                      Gestió
+                      <ChevronDown size={16} className={adminOpen ? "rotate-180 transition" : "transition"} />
+                    </button>
+
+                    {adminOpen && (
+                      <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-black border border-white/10 shadow-xl overflow-hidden">
+                        <button
+                          onClick={() => { setAdminOpen(false); navigate("/admin-users"); }}
+                          className="w-full text-left px-4 py-3 font-extrabold text-white/90 hover:bg-white/10 hover:text-yellow-300"
+                        >
+                          👥 Socis/es
+                        </button>
+                        <button
+                          onClick={() => { setAdminOpen(false); navigate("/admin-trips"); }}
+                          className="w-full text-left px-4 py-3 font-extrabold text-white/90 hover:bg-white/10 hover:text-yellow-300"
+                        >
+                          🗺️ Sortides
+                        </button>
+                        <button
+                          onClick={() => { setAdminOpen(false); navigate("/admin-courses"); }}
+                          className="w-full text-left px-4 py-3 font-extrabold text-white/90 hover:bg-white/10 hover:text-yellow-300"
+                        >
+                          🎓 Cursos
+                        </button>
+                        <button
+                          onClick={() => { setAdminOpen(false); navigate("/admin-events"); }}
+                          className="w-full text-left px-4 py-3 font-extrabold text-white/90 hover:bg-white/10 hover:text-yellow-300"
+                        >
+                          📅 Esdeveniments
+                        </button>
+                        <button
+                          onClick={() => { setAdminOpen(false); navigate("/admin-settings"); }}
+                          className="w-full text-left px-4 py-3 font-extrabold text-white/90 hover:bg-white/10 hover:text-yellow-300"
+                        >
+                          ⚙️ Config
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </>
             )}
           </nav>
@@ -120,8 +160,7 @@ export const Navbar: React.FC = () => {
           <div className="flex items-center gap-2">
             {currentUser && roleChip && (
               <span className={`hidden sm:inline-flex items-center rounded-full px-3 py-1 text-xs font-black border ${roleChip.cls}`}>
-                {roleChip.text}
-                {currentUser.name ? ` · ${currentUser.name}` : ""}
+                {roleChip.text}{currentUser.name ? ` · ${currentUser.name}` : ""}
               </span>
             )}
 
@@ -138,15 +177,14 @@ export const Navbar: React.FC = () => {
                 className="hidden sm:inline-flex px-4 py-2 rounded-xl bg-white/10 text-white font-black hover:bg-white/15 transition"
               >
                 <span className="inline-flex items-center gap-2">
-                  <LogOut size={16} />
-                  Sortir
+                  <LogOut size={16} /> Sortir
                 </span>
               </button>
             )}
 
             <button
               className="md:hidden inline-flex px-3 py-2 rounded-xl bg-white/10 text-white hover:bg-white/15 transition"
-              onClick={() => setOpen((v) => !v)}
+              onClick={() => { setOpen((v) => !v); setAdminOpen(false); }}
               aria-label="Menu"
             >
               {open ? <X size={18} /> : <Menu size={18} />}
@@ -165,12 +203,6 @@ export const Navbar: React.FC = () => {
                   <N to="/courses-public" onClick={() => setOpen(false)}>Cursos</N>
                   <N to="/register" onClick={() => setOpen(false)}>Inscripció</N>
                   <N to="/login" onClick={() => setOpen(false)}>Entrar</N>
-                  <button
-                    onClick={() => { setOpen(false); navigate("/login"); }}
-                    className="mt-2 px-4 py-3 rounded-xl bg-yellow-400 text-black font-black hover:bg-yellow-500 transition"
-                  >
-                    Accés Socis/es
-                  </button>
                 </>
               ) : (
                 <>
@@ -183,14 +215,26 @@ export const Navbar: React.FC = () => {
                   <N to="/calendar" onClick={() => setOpen(false)}>Calendari</N>
                   <N to="/profile" onClick={() => setOpen(false)}>Perfil</N>
 
-                  {canManageSystem?.() && (
+                  {/* Admin en bloc */}
+                  {isAdmin && (
                     <>
                       <div className="h-px bg-white/10 my-2" />
-                      <N to="/admin-users" onClick={() => setOpen(false)}>Admin Socis</N>
-                      <N to="/admin-trips" onClick={() => setOpen(false)}>Admin Sortides</N>
-                      <N to="/admin-courses" onClick={() => setOpen(false)}>Admin Cursos</N>
-                      <N to="/admin-events" onClick={() => setOpen(false)}>Admin Events</N>
-                      <N to="/admin-settings" onClick={() => setOpen(false)}>Admin Config</N>
+                      <div className="text-xs font-black text-white/60 px-3">GESTIÓ (ADMIN)</div>
+                      <button onClick={() => { setOpen(false); navigate("/admin-users"); }} className={`${itemBase} ${itemInactive} text-left`}>
+                        👥 Socis/es
+                      </button>
+                      <button onClick={() => { setOpen(false); navigate("/admin-trips"); }} className={`${itemBase} ${itemInactive} text-left`}>
+                        🗺️ Sortides
+                      </button>
+                      <button onClick={() => { setOpen(false); navigate("/admin-courses"); }} className={`${itemBase} ${itemInactive} text-left`}>
+                        🎓 Cursos
+                      </button>
+                      <button onClick={() => { setOpen(false); navigate("/admin-events"); }} className={`${itemBase} ${itemInactive} text-left`}>
+                        📅 Esdeveniments
+                      </button>
+                      <button onClick={() => { setOpen(false); navigate("/admin-settings"); }} className={`${itemBase} ${itemInactive} text-left`}>
+                        ⚙️ Config
+                      </button>
                     </>
                   )}
 
@@ -199,8 +243,7 @@ export const Navbar: React.FC = () => {
                     className="mt-2 px-4 py-3 rounded-xl bg-white/10 text-white font-black hover:bg-white/15 transition"
                   >
                     <span className="inline-flex items-center gap-2">
-                      <LogOut size={16} />
-                      Sortir
+                      <LogOut size={16} /> Sortir
                     </span>
                   </button>
                 </>
