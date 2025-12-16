@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Mail, Lock, ArrowLeft, AlertTriangle } from "lucide-react";
 import { useApp } from "../context/AppContext";
@@ -12,14 +12,6 @@ export const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // ✅ SI JA ESTÀ LOGUEJAT → ANAR DIRECTE AL PANELL
-  useEffect(() => {
-    if (!currentUser) return;
-
-    // Tant admin com soci/a van al panell
-    navigate("/dashboard", { replace: true });
-  }, [currentUser, navigate]);
-
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -28,14 +20,35 @@ export const Login: React.FC = () => {
     try {
       await loginWithEmail(email, password);
 
-      // 🔁 Després de login → panell
-      navigate("/dashboard", { replace: true });
+      // IMPORTANT: l’admin entra al panell, no a “administrar socis”
+      // (i tothom entra al dashboard)
+      navigate("/dashboard");
     } catch {
       setError("Correu o contrasenya incorrectes.");
     } finally {
       setLoading(false);
     }
   };
+
+  // Si ja està loguejat, fora
+  if (currentUser) {
+    return (
+      <div className="max-w-xl mx-auto px-4 py-14">
+        <div className="bg-white border rounded-2xl shadow-sm p-8 text-center">
+          <div className="text-2xl font-extrabold text-slate-900">Ja tens la sessió iniciada</div>
+          <div className="text-gray-600 mt-2">
+            {canManageSystem?.() ? "Pots anar al panell." : "Pots anar al teu panell."}
+          </div>
+          <button
+            onClick={() => navigate("/dashboard")}
+            className="mt-6 px-6 py-3 rounded-xl bg-yellow-400 text-black font-extrabold hover:bg-yellow-500"
+          >
+            Anar al panell
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-md mx-auto px-4 py-12">
@@ -47,13 +60,9 @@ export const Login: React.FC = () => {
       </button>
 
       <div className="bg-white border rounded-2xl shadow-sm p-8">
-        <h1 className="text-3xl font-extrabold text-slate-900 text-center">
-          Accés socis/es
-        </h1>
+        <h1 className="text-3xl font-extrabold text-slate-900 text-center">Accés socis/es</h1>
 
-        <p className="text-gray-600 mt-2 text-center">
-          Introdueix el teu correu i contrasenya.
-        </p>
+        <p className="text-gray-600 mt-2 text-center">Introdueix el teu correu i contrasenya.</p>
 
         <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-900">
           <b>Important:</b> si és la primera vegada, el teu compte pot estar{" "}
@@ -62,9 +71,7 @@ export const Login: React.FC = () => {
 
         <form onSubmit={onSubmit} className="mt-6 space-y-4">
           <div>
-            <label className="text-sm font-bold text-slate-700">
-              Correu electrònic
-            </label>
+            <label className="text-sm font-bold text-slate-700">Correu electrònic</label>
             <div className="mt-1 flex items-center gap-2 border rounded-xl px-3 py-2">
               <Mail size={18} className="text-gray-400" />
               <input
@@ -79,9 +86,7 @@ export const Login: React.FC = () => {
           </div>
 
           <div>
-            <label className="text-sm font-bold text-slate-700">
-              Contrasenya
-            </label>
+            <label className="text-sm font-bold text-slate-700">Contrasenya</label>
             <div className="mt-1 flex items-center gap-2 border rounded-xl px-3 py-2">
               <Lock size={18} className="text-gray-400" />
               <input
@@ -106,9 +111,7 @@ export const Login: React.FC = () => {
             type="submit"
             disabled={loading}
             className={`w-full mt-2 px-4 py-3 rounded-xl font-extrabold ${
-              loading
-                ? "bg-gray-300 text-gray-600 cursor-not-allowed"
-                : "bg-yellow-400 text-black hover:bg-yellow-500"
+              loading ? "bg-gray-300 text-gray-600 cursor-not-allowed" : "bg-yellow-400 text-black hover:bg-yellow-500"
             }`}
           >
             {loading ? "Entrant…" : "Entrar"}
@@ -116,10 +119,7 @@ export const Login: React.FC = () => {
         </form>
 
         <div className="mt-6 text-center">
-          <Link
-            to="/register"
-            className="text-sm text-blue-600 hover:underline font-bold"
-          >
+          <Link to="/register" className="text-sm text-blue-600 hover:underline font-bold">
             No tens compte? Crea’n un
           </Link>
         </div>
