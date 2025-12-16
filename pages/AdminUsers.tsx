@@ -5,77 +5,90 @@ import { useApp } from "../context/AppContext";
 type Tab = "pending" | "all";
 
 export const AdminUsers: React.FC = () => {
-  const { users } = useApp();
+  const { users, approveUser, setUserRole } = useApp();
 
   const [tab, setTab] = useState<Tab>("pending");
   const [q, setQ] = useState("");
 
-  // 🔎 Normalitzem status per evitar "Pending" vs "pending" vs "PENDING"
+  // Normalitzem camps
   const normalizedUsers = useMemo(() => {
     return (users || []).map((u: any) => ({
       ...u,
-      _statusNorm: String(u.status || "").toLowerCase(),
-      _roleNorm: String(u.role || "").toLowerCase(),
-      _nameNorm: String(u.name || "").toLowerCase(),
-      _emailNorm: String(u.email || "").toLowerCase(),
+      _status: String(u.status || "").toLowerCase(),
+      _role: String(u.role || "").toLowerCase(),
+      _name: String(u.name || "").toLowerCase(),
+      _email: String(u.email || "").toLowerCase(),
     }));
   }, [users]);
 
-  const pendingUsers = useMemo(() => {
-    return normalizedUsers.filter((u: any) => u._statusNorm === "pending");
-  }, [normalizedUsers]);
+  const pendingUsers = useMemo(
+    () => normalizedUsers.filter((u) => u._status === "pending"),
+    [normalizedUsers]
+  );
 
-  const activeUsers = useMemo(() => {
-    // “active” o “approved” (per si al vostre model es diu així)
-    return normalizedUsers.filter(
-      (u: any) => u._statusNorm === "active" || u._statusNorm === "approved"
-    );
-  }, [normalizedUsers]);
+  const activeUsers = useMemo(
+    () => normalizedUsers.filter((u) => u._status === "active"),
+    [normalizedUsers]
+  );
 
   const filtered = useMemo(() => {
-    const list = tab === "pending" ? pendingUsers : normalizedUsers;
+    const base = tab === "pending" ? pendingUsers : normalizedUsers;
     const qq = q.trim().toLowerCase();
-    if (!qq) return list;
+    if (!qq) return base;
 
-    return list.filter((u: any) => {
-      return (
-        u._nameNorm.includes(qq) ||
-        u._emailNorm.includes(qq) ||
-        u._roleNorm.includes(qq) ||
-        u._statusNorm.includes(qq)
-      );
-    });
+    return base.filter(
+      (u) =>
+        u._name.includes(qq) ||
+        u._email.includes(qq) ||
+        u._role.includes(qq) ||
+        u._status.includes(qq)
+    );
   }, [tab, pendingUsers, normalizedUsers, q]);
 
   return (
     <div className="bg-slate-50 min-h-screen">
       <PageHero
-        title="Gestió d’usuaris"
-        subtitle="Aprova nous socis/es i assigna rols. Només Admin pot aprovar."
-        badge="ADMIN / Usuaris"
+        title="Gestió de socis/es"
+        subtitle="Aprova nous accessos i gestiona els rols del club."
+        badge={
+          <span>
+            Pendents: <b>{pendingUsers.length}</b> · Actius:{" "}
+            <b>{activeUsers.length}</b> · Total:{" "}
+            <b>{normalizedUsers.length}</b>
+          </span>
+        }
       />
 
       <div className="max-w-6xl mx-auto px-4 py-10 space-y-6">
-        {/* KPIs premium */}
+        {/* KPIs */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white border rounded-2xl p-6 shadow-sm">
-            <div className="text-sm font-bold text-slate-500">Pendents</div>
-            <div className="mt-2 text-4xl font-black text-slate-900">
+            <div className="text-xs font-bold text-slate-500">Pendents</div>
+            <div className="mt-2 text-4xl font-black text-yellow-500">
               {pendingUsers.length}
             </div>
-          </div>
-
-          <div className="bg-white border rounded-2xl p-6 shadow-sm">
-            <div className="text-sm font-bold text-slate-500">Actius</div>
-            <div className="mt-2 text-4xl font-black text-slate-900">
-              {activeUsers.length}
+            <div className="text-sm text-slate-600 mt-1">
+              Persones per aprovar
             </div>
           </div>
 
           <div className="bg-white border rounded-2xl p-6 shadow-sm">
-            <div className="text-sm font-bold text-slate-500">Total</div>
+            <div className="text-xs font-bold text-slate-500">Actius</div>
+            <div className="mt-2 text-4xl font-black text-emerald-600">
+              {activeUsers.length}
+            </div>
+            <div className="text-sm text-slate-600 mt-1">
+              Socis/es amb accés
+            </div>
+          </div>
+
+          <div className="bg-white border rounded-2xl p-6 shadow-sm">
+            <div className="text-xs font-bold text-slate-500">Total</div>
             <div className="mt-2 text-4xl font-black text-slate-900">
               {normalizedUsers.length}
+            </div>
+            <div className="text-sm text-slate-600 mt-1">
+              Comptes registrats
             </div>
           </div>
         </div>
@@ -86,7 +99,7 @@ export const AdminUsers: React.FC = () => {
             <div className="inline-flex rounded-2xl border bg-slate-50 p-1">
               <button
                 onClick={() => setTab("pending")}
-                className={`px-4 py-2 rounded-xl text-sm font-extrabold transition ${
+                className={`px-4 py-2 rounded-xl text-sm font-black transition ${
                   tab === "pending"
                     ? "bg-slate-900 text-yellow-300"
                     : "text-slate-700 hover:bg-white"
@@ -96,7 +109,7 @@ export const AdminUsers: React.FC = () => {
               </button>
               <button
                 onClick={() => setTab("all")}
-                className={`px-4 py-2 rounded-xl text-sm font-extrabold transition ${
+                className={`px-4 py-2 rounded-xl text-sm font-black transition ${
                   tab === "all"
                     ? "bg-slate-900 text-yellow-300"
                     : "text-slate-700 hover:bg-white"
@@ -107,73 +120,79 @@ export const AdminUsers: React.FC = () => {
             </div>
 
             <div className="w-full lg:w-[420px]">
-              <div className="text-sm font-bold text-slate-700 mb-2">Cerca</div>
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Nom, email, rol, status..."
+                placeholder="Cerca per nom, email, rol..."
                 className="w-full rounded-2xl border px-4 py-3 bg-white focus:outline-none"
               />
             </div>
           </div>
 
-          {/* Taula */}
-          <div className="mt-6 overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="text-xs uppercase tracking-wide text-slate-500">
-                  <th className="py-3 pr-4">Nom</th>
-                  <th className="py-3 pr-4">Email</th>
-                  <th className="py-3 pr-4">Rol</th>
-                  <th className="py-3 pr-4">Estat</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="py-10 text-center text-slate-500">
-                      No hi ha resultats.
-                    </td>
-                  </tr>
-                ) : (
-                  filtered.map((u: any) => (
-                    <tr key={u.id} className="border-t">
-                      <td className="py-4 pr-4">
-                        <div className="font-extrabold text-slate-900">
-                          {u.name || "—"}
-                        </div>
-                        {u.createdAt ? (
-                          <div className="text-xs text-slate-500 mt-1">
-                            Alta: {String(u.createdAt)}
-                          </div>
-                        ) : null}
-                      </td>
-                      <td className="py-4 pr-4 text-slate-700">{u.email || "—"}</td>
-                      <td className="py-4 pr-4">
-                        <span className="inline-flex items-center rounded-full bg-slate-900 text-yellow-300 px-3 py-1 text-xs font-black">
-                          {String(u.role || "member")}
-                        </span>
-                      </td>
-                      <td className="py-4 pr-4">
-                        <span
-                          className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-black border ${
-                            u._statusNorm === "pending"
-                              ? "bg-yellow-50 border-yellow-200 text-yellow-900"
-                              : "bg-emerald-50 border-emerald-200 text-emerald-900"
-                          }`}
-                        >
-                          {String(u.status || "—")}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          {/* Llista */}
+          <div className="mt-6 divide-y">
+            {filtered.length === 0 && (
+              <div className="py-10 text-center text-slate-500">
+                No hi ha socis/es per mostrar.
+              </div>
+            )}
 
-          <div className="mt-6 text-xs text-slate-500">
-            *Si tens usuaris a Firebase però aquí surt 0, mira el punt 2 (config / filtres / status).
+            {filtered.map((u: any) => (
+              <div
+                key={u.id}
+                className="py-5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
+              >
+                <div>
+                  <div className="font-extrabold text-slate-900">
+                    {u.name || "—"}
+                  </div>
+                  <div className="text-sm text-slate-600">{u.email}</div>
+
+                  <div className="mt-2 flex gap-2 flex-wrap">
+                    <span className="text-xs font-black rounded-full px-3 py-1 bg-slate-900 text-yellow-300">
+                      {u.role}
+                    </span>
+
+                    <span
+                      className={`text-xs font-black rounded-full px-3 py-1 border ${
+                        u._status === "pending"
+                          ? "bg-yellow-50 text-yellow-900 border-yellow-200"
+                          : "bg-emerald-50 text-emerald-900 border-emerald-200"
+                      }`}
+                    >
+                      {u.status}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Accions */}
+                <div className="flex gap-2 flex-wrap">
+                  {u._status === "pending" && (
+                    <button
+                      onClick={() => approveUser(u.id)}
+                      className="px-4 py-2 rounded-xl bg-yellow-400 text-black font-black hover:bg-yellow-500"
+                    >
+                      Aprovar
+                    </button>
+                  )}
+
+                  {u._status === "active" && u.role !== "admin" && (
+                    <button
+                      onClick={() => setUserRole(u.id, "admin")}
+                      className="px-4 py-2 rounded-xl bg-slate-900 text-yellow-300 font-black hover:opacity-90"
+                    >
+                      Fer admin
+                    </button>
+                  )}
+
+                  {u.role === "admin" && (
+                    <span className="px-4 py-2 rounded-xl border text-sm font-black text-slate-600">
+                      Administrador
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
