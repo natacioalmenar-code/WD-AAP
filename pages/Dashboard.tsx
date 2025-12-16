@@ -6,24 +6,39 @@ import { PageHero } from "../components/PageHero";
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { currentUser, trips, courses, socialEvents, canManageSystem } = useApp();
+  const { currentUser, users, trips, courses, socialEvents, canManageSystem } = useApp();
 
   const isAdmin = canManageSystem?.() ?? false;
 
-  const nextTrips = useMemo(
-    () => (trips || []).filter((t: any) => t.published).slice(0, 3),
-    [trips]
-  );
+  const stats = useMemo(() => {
+    const list = (users || []).map((u: any) => ({
+      ...u,
+      _status: String(u.status || "").toLowerCase(),
+    }));
 
-  const nextCourses = useMemo(
-    () => (courses || []).filter((c: any) => c.published).slice(0, 3),
-    [courses]
-  );
+    const pending = list.filter((u: any) => u._status === "pending").length;
+    const active = list.filter(
+      (u: any) => u._status === "active" || u._status === "approved"
+    ).length;
 
-  const nextEvents = useMemo(
-    () => (socialEvents || []).filter((e: any) => e.published).slice(0, 3),
-    [socialEvents]
-  );
+    return {
+      total: list.length,
+      pending,
+      active,
+    };
+  }, [users]);
+
+  const nextTrips = useMemo(() => {
+    return (trips || []).filter((t: any) => t.published).slice(0, 3);
+  }, [trips]);
+
+  const nextCourses = useMemo(() => {
+    return (courses || []).filter((c: any) => c.published).slice(0, 3);
+  }, [courses]);
+
+  const nextEvents = useMemo(() => {
+    return (socialEvents || []).filter((e: any) => e.published).slice(0, 3);
+  }, [socialEvents]);
 
   if (!currentUser) {
     return (
@@ -46,71 +61,197 @@ export const Dashboard: React.FC = () => {
     );
   }
 
-  return (
-    <div className="bg-slate-50 min-h-screen">
-      <PageHero
-        title={
-          isAdmin
-            ? "Panell d’Administració"
-            : `Hola, ${currentUser.name || "Soci/a"}`
-        }
-        subtitle={
-          isAdmin
-            ? "Gestió ràpida del club: socis/es, sortides, cursos i esdeveniments."
-            : "Consulta pròximes activitats, apunts i recursos del club."
-        }
-        badge={
-          <span>
-            {isAdmin ? "ADMIN" : "Àrea privada"} · Rol:{" "}
-            <b>{currentUser.role}</b> · Estat: <b>{currentUser.status}</b>
-          </span>
-        }
-        right={
-          isAdmin ? (
+  // ✅ ADMIN: el panell ha de ser “Administració”
+  if (isAdmin) {
+    return (
+      <div className="bg-slate-50 min-h-screen">
+        <PageHero
+          title="Panell d’Administració"
+          subtitle="Control del club: socis/es, sortides, cursos i esdeveniments."
+          badge={
+            <span>
+              <b>ADMIN</b> · Pendents: <b>{stats.pending}</b> · Actius:{" "}
+              <b>{stats.active}</b> · Total: <b>{stats.total}</b>
+            </span>
+          }
+          right={
             <button
               onClick={() => navigate("/admin-users")}
               className="px-5 py-2.5 rounded-2xl bg-yellow-400 text-black font-black hover:bg-yellow-500 shadow"
             >
-              Gestió Socis/es
+              Gestió de socis/es
             </button>
-          ) : (
-            <button
-              onClick={() => navigate("/profile")}
-              className="px-5 py-2.5 rounded-2xl bg-yellow-400 text-black font-black hover:bg-yellow-500 shadow"
-            >
-              El meu perfil
-            </button>
-          )
+          }
+        />
+
+        <div className="max-w-6xl mx-auto px-4 py-10 space-y-6">
+          {/* ✅ “Gestió de Socis/es” com a secció principal */}
+          <div className="bg-white border rounded-2xl shadow-sm p-6">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div>
+                <div className="inline-flex items-center gap-2 text-xs font-black rounded-full bg-slate-900 text-yellow-300 px-3 py-1">
+                  PRIORITAT
+                </div>
+                <h2 className="mt-3 text-2xl font-extrabold text-slate-900">
+                  Gestió de socis/es
+                </h2>
+                <p className="text-gray-600 mt-1">
+                  Aprova pendents, assigna rols i revisa l’estat del club.
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => navigate("/admin-users")}
+                  className="px-5 py-3 rounded-2xl bg-slate-900 text-yellow-300 font-black hover:opacity-90"
+                >
+                  Obrir gestió
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="border rounded-2xl p-5 bg-slate-50">
+                <div className="text-xs font-bold text-slate-600">Pendents</div>
+                <div className="mt-2 text-4xl font-black text-slate-900">{stats.pending}</div>
+                <div className="text-sm text-slate-600 mt-1">
+                  Persones a punt d’entrar
+                </div>
+              </div>
+
+              <div className="border rounded-2xl p-5 bg-slate-50">
+                <div className="text-xs font-bold text-slate-600">Actius</div>
+                <div className="mt-2 text-4xl font-black text-slate-900">{stats.active}</div>
+                <div className="text-sm text-slate-600 mt-1">
+                  Socis/es amb accés
+                </div>
+              </div>
+
+              <div className="border rounded-2xl p-5 bg-slate-50">
+                <div className="text-xs font-bold text-slate-600">Total</div>
+                <div className="mt-2 text-4xl font-black text-slate-900">{stats.total}</div>
+                <div className="text-sm text-slate-600 mt-1">
+                  Registres al sistema
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ✅ La resta de gestions, però secundàries */}
+          <AdminManagementCards />
+
+          {/* Resum (opcional) */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="bg-white border rounded-2xl p-5 shadow-sm">
+              <div className="font-extrabold text-slate-900">Properes sortides</div>
+              <div className="text-sm text-gray-600 mt-2">
+                {nextTrips.length ? (
+                  <ul className="list-disc pl-5 space-y-1">
+                    {nextTrips.map((t: any) => (
+                      <li key={t.id}>
+                        <b>{t.title || "Sortida"}</b> {t.date ? `· ${t.date}` : ""}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  "No hi ha elements publicats."
+                )}
+              </div>
+            </div>
+
+            <div className="bg-white border rounded-2xl p-5 shadow-sm">
+              <div className="font-extrabold text-slate-900">Propers cursos</div>
+              <div className="text-sm text-gray-600 mt-2">
+                {nextCourses.length ? (
+                  <ul className="list-disc pl-5 space-y-1">
+                    {nextCourses.map((c: any) => (
+                      <li key={c.id}>
+                        <b>{c.title || "Curs"}</b> {c.date ? `· ${c.date}` : ""}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  "No hi ha elements publicats."
+                )}
+              </div>
+            </div>
+
+            <div className="bg-white border rounded-2xl p-5 shadow-sm">
+              <div className="font-extrabold text-slate-900">Propers esdeveniments</div>
+              <div className="text-sm text-gray-600 mt-2">
+                {nextEvents.length ? (
+                  <ul className="list-disc pl-5 space-y-1">
+                    {nextEvents.map((e: any) => (
+                      <li key={e.id}>
+                        <b>{e.title || "Esdeveniment"}</b> {e.date ? `· ${e.date}` : ""}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  "No hi ha elements publicats."
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ✅ NO admin: panell normal (sense “perfil” com a CTA principal)
+  return (
+    <div className="bg-slate-50 min-h-screen">
+      <PageHero
+        title={`Hola, ${currentUser.name || "Soci/a"}`}
+        subtitle="Consulta pròximes activitats i recursos del club."
+        badge={
+          <span>
+            Àrea privada · Rol: <b>{currentUser.role}</b> · Estat:{" "}
+            <b>{currentUser.status}</b>
+          </span>
         }
       />
 
       <div className="max-w-6xl mx-auto px-4 py-10 space-y-6">
-        {isAdmin && <AdminManagementCards />}
+        <div className="bg-white border rounded-2xl shadow-sm p-6">
+          <h2 className="text-xl font-extrabold text-slate-900">Accés ràpid</h2>
+          <p className="text-gray-600 mt-1 text-sm">Seccions principals.</p>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="bg-white border rounded-2xl p-5">
-            <div className="font-extrabold">Properes sortides</div>
-            {nextTrips.length ? nextTrips.map((t:any)=>(
-              <div key={t.id}>{t.title}</div>
-            )) : "—"}
-          </div>
+          <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <button
+              onClick={() => navigate("/calendar")}
+              className="bg-white border rounded-2xl p-5 text-left hover:shadow-sm"
+            >
+              <div className="font-extrabold text-slate-900">Calendari</div>
+              <div className="text-gray-600 text-sm mt-1">Veure tot el que ve</div>
+            </button>
 
-          <div className="bg-white border rounded-2xl p-5">
-            <div className="font-extrabold">Propers cursos</div>
-            {nextCourses.length ? nextCourses.map((c:any)=>(
-              <div key={c.id}>{c.title}</div>
-            )) : "—"}
-          </div>
+            <button
+              onClick={() => navigate("/trips")}
+              className="bg-white border rounded-2xl p-5 text-left hover:shadow-sm"
+            >
+              <div className="font-extrabold text-slate-900">Sortides</div>
+              <div className="text-gray-600 text-sm mt-1">Apunta’t</div>
+            </button>
 
-          <div className="bg-white border rounded-2xl p-5">
-            <div className="font-extrabold">Propers esdeveniments</div>
-            {nextEvents.length ? nextEvents.map((e:any)=>(
-              <div key={e.id}>{e.title}</div>
-            )) : "—"}
+            <button
+              onClick={() => navigate("/courses-private")}
+              className="bg-white border rounded-2xl p-5 text-left hover:shadow-sm"
+            >
+              <div className="font-extrabold text-slate-900">Formació</div>
+              <div className="text-gray-600 text-sm mt-1">Cursos del club</div>
+            </button>
+
+            <button
+              onClick={() => navigate("/social-events")}
+              className="bg-white border rounded-2xl p-5 text-left hover:shadow-sm"
+            >
+              <div className="font-extrabold text-slate-900">Esdeveniments</div>
+              <div className="text-gray-600 text-sm mt-1">Quedades i activitats</div>
+            </button>
           </div>
         </div>
       </div>
     </div>
   );
 };
-
