@@ -40,30 +40,39 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-10 space-y-6">
-      {/* ✅ TARGETES ADMIN (si és admin) */}
+      {/* ✅ ADMIN: targetes de gestió visibles i ràpides */}
       {isAdmin && <AdminManagementCards />}
 
       <div className="bg-white border rounded-2xl shadow-sm p-6">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-3xl font-extrabold text-slate-900">
-              Hola, {currentUser.name || "Soci/a"}
+              {isAdmin ? "Panell d’Administració" : `Hola, ${currentUser.name || "Soci/a"}`}
             </h1>
             <div className="text-gray-700 mt-1 text-sm">
               Rol: <b>{currentUser.role}</b> · Estat: <b>{currentUser.status}</b>
             </div>
           </div>
 
-          {/* ✅ Botó de dalt: per admin -> Perfil (la gestió ja està en targetes) */}
-          <button
-            onClick={() => navigate("/profile")}
-            className="px-5 py-2.5 rounded-xl bg-black text-white font-extrabold hover:bg-gray-900"
-          >
-            El meu perfil
-          </button>
+          {/* ✅ ADMIN: botó directe a gestió socis/es */}
+          {isAdmin ? (
+            <button
+              onClick={() => navigate("/admin-users")}
+              className="px-5 py-2.5 rounded-xl bg-black text-yellow-300 font-extrabold hover:bg-gray-900"
+            >
+              Gestió Socis/es
+            </button>
+          ) : (
+            <button
+              onClick={() => navigate("/profile")}
+              className="px-5 py-2.5 rounded-xl bg-black text-white font-extrabold hover:bg-gray-900"
+            >
+              El meu perfil
+            </button>
+          )}
         </div>
 
-        {/* ✅ Aquest grid és per tots (admin i socis) */}
+        {/* ✅ Accés ràpid (admin també pot veure-ho, però està orientat a socis) */}
         <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <button
             onClick={() => navigate("/calendar")}
@@ -81,7 +90,6 @@ export const Dashboard: React.FC = () => {
             <div className="text-gray-600 text-sm mt-1">Apunta’t (amb aprovació)</div>
           </button>
 
-          {/* ✅ IMPORTANT: formació privada ha d’anar a /courses-private (no /courses) */}
           <button
             onClick={() => navigate("/courses-private")}
             className="bg-white border rounded-2xl p-5 text-left hover:shadow-sm"
