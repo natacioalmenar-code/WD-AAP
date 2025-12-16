@@ -149,12 +149,38 @@ export interface SocialEvent {
 }
 
 export interface ClubSettings {
+  // ja existents (els tens a Firestore)
   logoUrl: string;
   navbarPreTitle: string;
   heroTitle: string;
-  appBackgroundUrl?: string;
+  appBackgroundUrl?: string;      // opcional
+  homeHeroImageUrl?: string;      // opcional (la farem servir com a fons del hero)
+
+  // ✅ nous (per fer editable tota la home)
+  heroSubtitle?: string;
+
+  heroPrimaryButtonText?: string;     // ex: "Accés Socis/es"
+  heroPrimaryButtonHref?: string;     // ex: "/login"
+  heroSecondaryButtonText?: string;   // ex: "Contacta'ns"
+  heroSecondaryButtonHref?: string;   // ex: "#contacte"
+
+  homeSectionTitle?: string;          // ex: "Tot el teu busseig, en una sola App"
+  homeSectionText?: string;           // paràgraf
+  homeSectionImageUrl?: string;       // imatge gran (la de baix)
+
+  homeBullet1Title?: string;
+  homeBullet1Text?: string;
+  homeBullet2Title?: string;
+  homeBullet2Text?: string;
+  homeBullet3Title?: string;
+  homeBullet3Text?: string;
+
+  homeCtaText?: string;               // ex: "Sol·licita el teu accés →"
+  homeCtaHref?: string;               // ex: "/register"
+
   updatedAt?: any;
 }
+
 
 /** ✅ MATERIAL / RESOURCES */
 export type ResourceCategory =
