@@ -1,163 +1,246 @@
 import React, { useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useApp } from "../context/AppContext";
 
-type Bullet = { title: string; desc: string };
-
-function safeStr(v: any, fallback = "") {
-  return typeof v === "string" ? v : fallback;
-}
-
-function safeUrl(v: any, fallback = "") {
-  const s = safeStr(v, fallback).trim();
-  return s;
-}
-
-function safeBullets(v: any): Bullet[] {
-  if (Array.isArray(v)) {
-    return v
-      .map((x) => ({
-        title: safeStr(x?.title, "").trim(),
-        desc: safeStr(x?.desc, "").trim(),
-      }))
-      .filter((b) => b.title || b.desc);
-  }
-  return [];
-}
-
 export const Home: React.FC = () => {
-  const { clubSettings } = useApp();
+  const navigate = useNavigate();
+  const { clubSettings, currentUser, canManageSystem } = useApp();
 
-  // ✅ tot amb fallback per NO petar mai
-  const heroTitle = safeStr((clubSettings as any)?.heroTitle, "WEST DIVERS");
-  const heroSubtitle = safeStr(
-    (clubSettings as any)?.heroSubtitle,
-    "El teu club de busseig per excel·lència."
-  );
+  const heroBg = useMemo(() => {
+    // Prioritat: appBackgroundUrl (panell admin) -> homeHeroImageUrl (si existeix) -> fallback
+    const anySettings = clubSettings as any;
+    return (
+      (clubSettings?.appBackgroundUrl || "").trim() ||
+      (anySettings?.homeHeroImageUrl || "").trim() ||
+      "https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=2400&q=70"
+    );
+  }, [clubSettings]);
 
-  // Fons hero (gris -> imatge)
-  const heroBackgroundUrl = safeUrl((clubSettings as any)?.homeHeroImageUrl, "");
-  // Imatge de la secció (la gran de baix)
-  const homeImageUrl = safeUrl((clubSettings as any)?.homeImageUrl, "");
+  const heroTitle = (clubSettings?.heroTitle || "WEST DIVERS").trim();
+  const heroSub = (clubSettings as any)?.heroSubtitle?.trim?.() || "El teu club de busseig per excel·lència.";
 
-  const ctaPrimaryText = safeStr((clubSettings as any)?.homeCtaPrimaryText, "Accés Socis/es");
-  const ctaPrimaryLink = safeStr((clubSettings as any)?.homeCtaPrimaryLink, "/login");
-  const ctaSecondaryText = safeStr((clubSettings as any)?.homeCtaSecondaryText, "Contacta'ns");
-  const ctaSecondaryLink = safeStr((clubSettings as any)?.homeCtaSecondaryLink, "#contacte");
+  const navbarPreTitle = (clubSettings?.navbarPreTitle || "CLUB DE BUSSEIG").trim();
+  const logoUrl = (clubSettings?.logoUrl || "/westdivers-logo.png").trim();
 
-  const bullets: Bullet[] = useMemo(() => {
-    const fromSettings = safeBullets((clubSettings as any)?.homeBullets);
-    if (fromSettings.length) return fromSettings;
-    // fallback si encara no tens res a Firestore
+  const appImage = useMemo(() => {
+    const anySettings = clubSettings as any;
+    return (
+      (anySettings?.homeAppImageUrl || "").trim() ||
+      "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1800&q=70"
+    );
+  }, [clubSettings]);
+
+  const appTitle = (clubSettings as any)?.homeAppTitle?.trim?.() || "Tot el teu busseig, en una sola App";
+  const appText =
+    (clubSettings as any)?.homeAppText?.trim?.() ||
+    "Els socis i sòcies tenen accés exclusiu a la nostra aplicació privada.";
+
+  const bullets: string[] = useMemo(() => {
+    const anySettings = clubSettings as any;
+    const fromDb = anySettings?.homeBullets;
+    if (Array.isArray(fromDb) && fromDb.length) return fromDb.filter(Boolean);
     return [
-      { title: "Inscripció a sortides amb un sol clic", desc: "" },
-      { title: "Registre digital de titulacions i assegurança", desc: "" },
-      { title: "Comunitat i xarrades exclusives", desc: "" },
+      "Inscripció a sortides amb un sol clic",
+      "Registre digital de titulacions i assegurança",
+      "Comunitat i xarrades exclusives",
     ];
   }, [clubSettings]);
 
+  const goPanel = () => {
+    if (currentUser) navigate("/dashboard");
+    else navigate("/login");
+  };
+
   return (
-    <div className="w-full">
-      {/* HERO */}
-      <section
-        className="relative w-full"
-        style={{
-          minHeight: "70vh",
-          backgroundImage: heroBackgroundUrl ? `url(${heroBackgroundUrl})` : undefined,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }}
-      >
-        {/* overlay perquè el text es llegeixi */}
-        <div className="absolute inset-0 bg-black/45" />
+    <div className="min-h-screen bg-white">
+      {/* NAVBAR */}
+      <header className="sticky top-0 z-50 bg-black text-white">
+        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
+          <Link to="/" className="flex items-center gap-3 min-w-0">
+            <img src={logoUrl} alt="logo" className="h-9 w-9 rounded-md bg-white object-contain" />
+            <div className="leading-tight min-w-0">
+              <div className="text-[10px] opacity-80 font-bold tracking-wider">{navbarPreTitle}</div>
+              <div className="text-sm font-extrabold tracking-wide truncate">{heroTitle}</div>
+            </div>
+          </Link>
 
-        <div className="relative max-w-6xl mx-auto px-4 py-20 flex items-center" style={{ minHeight: "70vh" }}>
-          <div className="max-w-2xl">
-            <h1 className="text-white text-4xl md:text-5xl font-extrabold leading-tight">
-              {heroTitle}
-            </h1>
-            <p className="text-white/90 mt-4 text-lg md:text-xl">
-              {heroSubtitle}
-            </p>
+          <nav className="hidden md:flex items-center gap-6 text-sm font-bold">
+            <button onClick={() => navigate("/")} className="opacity-90 hover:opacity-100">
+              Inici
+            </button>
+            <button onClick={() => navigate("/trips")} className="opacity-90 hover:opacity-100">
+              Sortides
+            </button>
+            <button onClick={() => navigate("/courses")} className="opacity-90 hover:opacity-100">
+              Cursos
+            </button>
+            <button onClick={() => navigate("/social-events")} className="opacity-90 hover:opacity-100">
+              Esdeveniments
+            </button>
+            <button onClick={() => navigate("/help")} className="opacity-90 hover:opacity-100">
+              Ajuda
+            </button>
 
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link
-                to={ctaPrimaryLink}
-                className="inline-flex items-center justify-center px-6 py-3 rounded-2xl font-extrabold bg-yellow-400 text-black hover:bg-yellow-500 transition"
+            {canManageSystem?.() ? (
+              <button
+                onClick={() => navigate("/admin")}
+                className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15"
               >
-                {ctaPrimaryText}
-              </Link>
+                Gestió
+              </button>
+            ) : null}
+          </nav>
 
-              {/* si és un hash (#contacte) fem <a>, si és ruta fem Link */}
-              {ctaSecondaryLink.startsWith("#") ? (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={goPanel}
+              className="px-4 py-2 rounded-xl bg-yellow-400 text-black font-extrabold hover:bg-yellow-500"
+            >
+              {currentUser ? "Panell" : "Accés Socis/es"}
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* HERO */}
+      <section className="relative">
+        <div
+          className="h-[560px] w-full"
+          style={{
+            backgroundImage: `url("${heroBg}")`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        />
+        <div className="absolute inset-0 bg-black/55" />
+
+        <div className="absolute inset-0 flex items-center">
+          <div className="max-w-6xl mx-auto px-4 w-full">
+            <div className="max-w-2xl">
+              <h1 className="text-white text-4xl sm:text-5xl font-extrabold leading-tight">
+                {heroTitle}
+              </h1>
+              <p className="mt-4 text-white/90 text-lg">{heroSub}</p>
+
+              <div className="mt-8 flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={goPanel}
+                  className="px-6 py-3 rounded-2xl bg-yellow-400 text-black font-extrabold hover:bg-yellow-500"
+                >
+                  {currentUser ? "Entrar al panell" : "Accés Socis/es"}
+                </button>
+
                 <a
-                  href={ctaSecondaryLink}
-                  className="inline-flex items-center justify-center px-6 py-3 rounded-2xl font-extrabold bg-white/10 text-white border border-white/25 hover:bg-white/15 transition"
+                  href="mailto:thewestdivers@gmail.com"
+                  className="px-6 py-3 rounded-2xl bg-white/10 text-white font-extrabold hover:bg-white/15 text-center"
                 >
-                  {ctaSecondaryText}
+                  Contacta’ns
                 </a>
-              ) : (
-                <Link
-                  to={ctaSecondaryLink}
-                  className="inline-flex items-center justify-center px-6 py-3 rounded-2xl font-extrabold bg-white/10 text-white border border-white/25 hover:bg-white/15 transition"
-                >
-                  {ctaSecondaryText}
-                </Link>
-              )}
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* SECCIÓ INFO */}
-      <section className="max-w-6xl mx-auto px-4 py-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
-          <div className="rounded-3xl overflow-hidden border bg-white shadow-sm">
-            {homeImageUrl ? (
-              <img src={homeImageUrl} alt="Imatge home" className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full aspect-[16/10] bg-gray-100 flex items-center justify-center text-gray-500 font-bold">
-                (Pots posar una imatge des del panell d’admin)
+      {/* ESPECIALITATS (secció decorativa) */}
+      <section className="bg-[#0b1730] text-white py-16">
+        <div className="max-w-6xl mx-auto px-4">
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-yellow-400 text-center">
+            ESPECIALITATS FECDAS / CMAS
+          </h2>
+
+          <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              { title: "Nitrox", desc: "Busseja més temps amb més seguretat.", icon: "O2" },
+              { title: "Profunda", desc: "Descobreix què s’amaga a més profunditat.", icon: "⚓" },
+              { title: "Vestit Sec", desc: "Submergeix-te tot l’any sense passar fred.", icon: "🛡️" },
+              { title: "Salvament", desc: "Aprèn a gestionar situacions d’emergència.", icon: "👥" },
+            ].map((c) => (
+              <div key={c.title} className="bg-white/5 border border-white/10 rounded-2xl p-6 text-center">
+                <div className="mx-auto w-16 h-16 rounded-full bg-blue-600/40 flex items-center justify-center text-xl font-extrabold">
+                  {c.icon}
+                </div>
+                <div className="mt-4 font-extrabold text-lg">{c.title}</div>
+                <div className="mt-2 text-sm text-white/80">{c.desc}</div>
               </div>
-            )}
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* APP SECTION */}
+      <section className="py-16 bg-white">
+        <div className="max-w-6xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+          <div>
+            <img
+              src={appImage}
+              alt="app"
+              className="w-full max-h-[420px] object-cover rounded-3xl border"
+            />
           </div>
 
           <div>
-            <h2 className="text-3xl font-extrabold text-slate-900">
-              {safeStr((clubSettings as any)?.homeSectionTitle, "Tot el teu busseig, en una sola App")}
-            </h2>
-            <p className="text-gray-600 mt-3">
-              {safeStr(
-                (clubSettings as any)?.homeSectionSubtitle,
-                "Els socis i sòcies tenen accés exclusiu a la nostra aplicació privada."
-              )}
-            </p>
+            <h2 className="text-3xl font-extrabold text-slate-900">{appTitle}</h2>
+            <p className="mt-3 text-gray-700">{appText}</p>
 
             <div className="mt-6 space-y-3">
               {bullets.map((b, idx) => (
                 <div key={idx} className="flex items-start gap-3">
-                  <div className="mt-1 w-9 h-9 rounded-xl bg-yellow-400/90 flex items-center justify-center font-extrabold">
+                  <div className="mt-1 h-7 w-7 rounded-full bg-yellow-400 flex items-center justify-center font-extrabold">
                     ✓
                   </div>
-                  <div>
-                    <div className="font-extrabold text-slate-900">{b.title}</div>
-                    {b.desc ? <div className="text-sm text-gray-600 mt-1">{b.desc}</div> : null}
-                  </div>
+                  <div className="text-slate-800 font-bold">{b}</div>
                 </div>
               ))}
             </div>
 
             <div className="mt-8">
-              <Link to="/register" className="text-blue-700 font-extrabold hover:underline">
-                {safeStr((clubSettings as any)?.homeLinkText, "Sol·licita el teu accés →")}
+              <Link to="/register" className="text-blue-600 font-extrabold hover:underline">
+                Sol·licita el teu accés →
               </Link>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ANCLA CONTACTE (per el botó Contacta'ns) */}
-      <div id="contacte" />
+      {/* FOOTER */}
+      <footer className="bg-black text-white py-12">
+        <div className="max-w-6xl mx-auto px-4 grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div>
+            <div className="font-extrabold text-lg">WEST DIVERS</div>
+            <div className="text-white/70 mt-2 text-sm">
+              El club de referència a les terres de Lleida per als amants del món subaquàtic.
+              Formació, sortides i bon ambient.
+            </div>
+          </div>
+
+          <div>
+            <div className="font-extrabold text-lg">Contacte</div>
+            <div className="text-white/70 mt-2 text-sm space-y-1">
+              <div>📍 Carrer Trullets, 26 baixos · 25126 Almenar, Lleida</div>
+              <div>📞 625 57 22 00 · 644 79 40 11</div>
+              <div>✉️ natacioalmenar@gmail.com</div>
+              <div>✉️ thewestdivers@gmail.com</div>
+            </div>
+          </div>
+
+          <div>
+            <div className="font-extrabold text-lg">Enllaços</div>
+            <div className="text-white/70 mt-2 text-sm space-y-2">
+              <Link to="/login" className="block hover:underline">
+                Àrea Privada
+              </Link>
+              <a className="block hover:underline" href="#/">
+                FECDAS
+              </a>
+              <a className="block hover:underline" href="#/">
+                CMAS
+              </a>
+              <div className="text-white/40 text-xs pt-2">© {new Date().getFullYear()} West Divers</div>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };
