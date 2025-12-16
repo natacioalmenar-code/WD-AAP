@@ -35,6 +35,13 @@ export const AdminUsers: React.FC = () => {
     const needle = q.trim().toLowerCase();
     if (!needle) return base;
 
+    console.log("ADMIN USERS DEBUG:", {
+  currentUser,
+  isAdmin,
+  usersLen: (users || []).length,
+});
+
+
     return base.filter((u) => {
       return (
         (u.name || "").toLowerCase().includes(needle) ||
