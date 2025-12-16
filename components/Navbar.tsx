@@ -3,8 +3,7 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import { LogOut, Menu, X } from "lucide-react";
 import { useApp } from "../context/AppContext";
 
-const itemBase =
-  "px-3 py-2 rounded-xl font-extrabold transition whitespace-nowrap";
+const itemBase = "px-3 py-2 rounded-xl font-extrabold transition whitespace-nowrap";
 const itemInactive = "text-white/90 hover:text-yellow-300 hover:bg-white/10";
 const itemActive = "text-yellow-300 bg-white/10";
 
@@ -24,12 +23,9 @@ export const Navbar: React.FC = () => {
     const role = (currentUser.role || "").toString().toLowerCase();
     const status = (currentUser.status || "").toString().toLowerCase();
 
-    if (role === "admin")
-      return { text: "ADMIN", cls: "border-red-400/40 bg-red-500/10 text-red-200" };
-
+    if (role === "admin") return { text: "ADMIN", cls: "border-red-400/40 bg-red-500/10 text-red-200" };
     if (role === "pending" || status === "pending")
       return { text: "PENDING", cls: "border-yellow-300/40 bg-yellow-300/10 text-yellow-200" };
-
     return { text: "ACTIU", cls: "border-emerald-300/40 bg-emerald-300/10 text-emerald-200" };
   }, [currentUser]);
 
@@ -40,12 +36,30 @@ export const Navbar: React.FC = () => {
     navigate("/login");
   }
 
+  // Helper per no repetir codi
+  const N = ({
+    to,
+    children,
+    onClick,
+  }: {
+    to: string;
+    children: React.ReactNode;
+    onClick?: () => void;
+  }) => (
+    <NavLink
+      to={to}
+      onClick={onClick}
+      className={({ isActive }) => `${itemBase} ${isActive ? itemActive : itemInactive}`}
+    >
+      {children}
+    </NavLink>
+  );
+
   return (
     <>
-      {/* BARRA SUPERIOR NEGRA */}
       <header className="sticky top-0 z-50 bg-black border-b border-white/10">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-3">
-          {/* LOGO + NOM CLUB (ESQUERRA) */}
+          {/* Logo + nom */}
           <Link to="/" className="flex items-center gap-3 min-w-0">
             <img
               src={logoUrl}
@@ -62,109 +76,50 @@ export const Navbar: React.FC = () => {
             </div>
           </Link>
 
-          {/* MENU DESKTOP */}
+          {/* Desktop menu */}
           <nav className="hidden md:flex items-center gap-1">
-            <NavLink
-              to="/"
-              className={({ isActive }) =>
-                `${itemBase} ${isActive ? itemActive : itemInactive}`
-              }
-            >
-              Inici
-            </NavLink>
+            <N to="/">Inici</N>
 
+            {/* Públic */}
             {!currentUser && (
               <>
-                <NavLink
-                  to="/courses-public"
-                  className={({ isActive }) =>
-                    `${itemBase} ${isActive ? itemActive : itemInactive}`
-                  }
-                >
-                  Cursos
-                </NavLink>
-                <NavLink
-                  to="/register"
-                  className={({ isActive }) =>
-                    `${itemBase} ${isActive ? itemActive : itemInactive}`
-                  }
-                >
-                  Inscripció
-                </NavLink>
-                <NavLink
-                  to="/login"
-                  className={({ isActive }) =>
-                    `${itemBase} ${isActive ? itemActive : itemInactive}`
-                  }
-                >
-                  Entrar
-                </NavLink>
+                <N to="/courses-public">Cursos</N>
+                <N to="/register">Inscripció</N>
+                <N to="/login">Entrar</N>
               </>
             )}
 
+            {/* Socis */}
             {currentUser && (
               <>
-                <NavLink
-                  to="/dashboard"
-                  className={({ isActive }) =>
-                    `${itemBase} ${isActive ? itemActive : itemInactive}`
-                  }
-                >
-                  Panell
-                </NavLink>
-                <NavLink
-                  to="/trips"
-                  className={({ isActive }) =>
-                    `${itemBase} ${isActive ? itemActive : itemInactive}`
-                  }
-                >
-                  Sortides
-                </NavLink>
-                <NavLink
-                  to="/calendar"
-                  className={({ isActive }) =>
-                    `${itemBase} ${isActive ? itemActive : itemInactive}`
-                  }
-                >
-                  Calendari
-                </NavLink>
-                <NavLink
-                  to="/resources"
-                  className={({ isActive }) =>
-                    `${itemBase} ${isActive ? itemActive : itemInactive}`
-                  }
-                >
-                  Recursos
-                </NavLink>
-                <NavLink
-                  to="/profile"
-                  className={({ isActive }) =>
-                    `${itemBase} ${isActive ? itemActive : itemInactive}`
-                  }
-                >
-                  Perfil
-                </NavLink>
+                <N to="/dashboard">Panell</N>
+                <N to="/trips">Sortides</N>
+                <N to="/courses-private">Formació</N>
+                <N to="/social-events">Esdeveniments</N>
+                <N to="/social-wall">Comunitat</N>
+                <N to="/resources">Recursos</N>
+                <N to="/calendar">Calendari</N>
+                <N to="/profile">Perfil</N>
+              </>
+            )}
 
-                {canManageSystem?.() && (
-                  <NavLink
-                    to="/admin-users"
-                    className={({ isActive }) =>
-                      `${itemBase} ${isActive ? itemActive : itemInactive}`
-                    }
-                  >
-                    Gestió
-                  </NavLink>
-                )}
+            {/* Admin */}
+            {currentUser && canManageSystem?.() && (
+              <>
+                <span className="mx-2 text-white/20">|</span>
+                <N to="/admin-users">Admin Socis</N>
+                <N to="/admin-trips">Admin Sortides</N>
+                <N to="/admin-courses">Admin Cursos</N>
+                <N to="/admin-events">Admin Events</N>
+                <N to="/admin-settings">Admin Config</N>
               </>
             )}
           </nav>
 
-          {/* DRETA: CHIP + BOTÓ ACCÉS/SORTIR + HAMBURGUESA */}
+          {/* Right controls */}
           <div className="flex items-center gap-2">
             {currentUser && roleChip && (
-              <span
-                className={`hidden sm:inline-flex items-center rounded-full px-3 py-1 text-xs font-black border ${roleChip.cls}`}
-              >
+              <span className={`hidden sm:inline-flex items-center rounded-full px-3 py-1 text-xs font-black border ${roleChip.cls}`}>
                 {roleChip.text}
                 {currentUser.name ? ` · ${currentUser.name}` : ""}
               </span>
@@ -199,55 +154,19 @@ export const Navbar: React.FC = () => {
           </div>
         </div>
 
-        {/* MENU MOBILE */}
+        {/* Mobile menu */}
         {open && (
           <div className="md:hidden border-t border-white/10 bg-black">
             <div className="max-w-6xl mx-auto px-4 py-3 flex flex-col gap-2">
-              <NavLink
-                onClick={() => setOpen(false)}
-                to="/"
-                className={({ isActive }) =>
-                  `${itemBase} ${isActive ? itemActive : itemInactive}`
-                }
-              >
-                Inici
-              </NavLink>
+              <N to="/" onClick={() => setOpen(false)}>Inici</N>
 
               {!currentUser ? (
                 <>
-                  <NavLink
-                    onClick={() => setOpen(false)}
-                    to="/courses-public"
-                    className={({ isActive }) =>
-                      `${itemBase} ${isActive ? itemActive : itemInactive}`
-                    }
-                  >
-                    Cursos
-                  </NavLink>
-                  <NavLink
-                    onClick={() => setOpen(false)}
-                    to="/register"
-                    className={({ isActive }) =>
-                      `${itemBase} ${isActive ? itemActive : itemInactive}`
-                    }
-                  >
-                    Inscripció
-                  </NavLink>
-                  <NavLink
-                    onClick={() => setOpen(false)}
-                    to="/login"
-                    className={({ isActive }) =>
-                      `${itemBase} ${isActive ? itemActive : itemInactive}`
-                    }
-                  >
-                    Entrar
-                  </NavLink>
-
+                  <N to="/courses-public" onClick={() => setOpen(false)}>Cursos</N>
+                  <N to="/register" onClick={() => setOpen(false)}>Inscripció</N>
+                  <N to="/login" onClick={() => setOpen(false)}>Entrar</N>
                   <button
-                    onClick={() => {
-                      setOpen(false);
-                      navigate("/login");
-                    }}
+                    onClick={() => { setOpen(false); navigate("/login"); }}
                     className="mt-2 px-4 py-3 rounded-xl bg-yellow-400 text-black font-black hover:bg-yellow-500 transition"
                   >
                     Accés Socis/es
@@ -255,62 +174,24 @@ export const Navbar: React.FC = () => {
                 </>
               ) : (
                 <>
-                  <NavLink
-                    onClick={() => setOpen(false)}
-                    to="/dashboard"
-                    className={({ isActive }) =>
-                      `${itemBase} ${isActive ? itemActive : itemInactive}`
-                    }
-                  >
-                    Panell
-                  </NavLink>
-                  <NavLink
-                    onClick={() => setOpen(false)}
-                    to="/trips"
-                    className={({ isActive }) =>
-                      `${itemBase} ${isActive ? itemActive : itemInactive}`
-                    }
-                  >
-                    Sortides
-                  </NavLink>
-                  <NavLink
-                    onClick={() => setOpen(false)}
-                    to="/calendar"
-                    className={({ isActive }) =>
-                      `${itemBase} ${isActive ? itemActive : itemInactive}`
-                    }
-                  >
-                    Calendari
-                  </NavLink>
-                  <NavLink
-                    onClick={() => setOpen(false)}
-                    to="/resources"
-                    className={({ isActive }) =>
-                      `${itemBase} ${isActive ? itemActive : itemInactive}`
-                    }
-                  >
-                    Recursos
-                  </NavLink>
-                  <NavLink
-                    onClick={() => setOpen(false)}
-                    to="/profile"
-                    className={({ isActive }) =>
-                      `${itemBase} ${isActive ? itemActive : itemInactive}`
-                    }
-                  >
-                    Perfil
-                  </NavLink>
+                  <N to="/dashboard" onClick={() => setOpen(false)}>Panell</N>
+                  <N to="/trips" onClick={() => setOpen(false)}>Sortides</N>
+                  <N to="/courses-private" onClick={() => setOpen(false)}>Formació</N>
+                  <N to="/social-events" onClick={() => setOpen(false)}>Esdeveniments</N>
+                  <N to="/social-wall" onClick={() => setOpen(false)}>Comunitat</N>
+                  <N to="/resources" onClick={() => setOpen(false)}>Recursos</N>
+                  <N to="/calendar" onClick={() => setOpen(false)}>Calendari</N>
+                  <N to="/profile" onClick={() => setOpen(false)}>Perfil</N>
 
                   {canManageSystem?.() && (
-                    <NavLink
-                      onClick={() => setOpen(false)}
-                      to="/admin-users"
-                      className={({ isActive }) =>
-                        `${itemBase} ${isActive ? itemActive : itemInactive}`
-                      }
-                    >
-                      Gestió
-                    </NavLink>
+                    <>
+                      <div className="h-px bg-white/10 my-2" />
+                      <N to="/admin-users" onClick={() => setOpen(false)}>Admin Socis</N>
+                      <N to="/admin-trips" onClick={() => setOpen(false)}>Admin Sortides</N>
+                      <N to="/admin-courses" onClick={() => setOpen(false)}>Admin Cursos</N>
+                      <N to="/admin-events" onClick={() => setOpen(false)}>Admin Events</N>
+                      <N to="/admin-settings" onClick={() => setOpen(false)}>Admin Config</N>
+                    </>
                   )}
 
                   <button
@@ -329,17 +210,13 @@ export const Navbar: React.FC = () => {
         )}
       </header>
 
-      {/* MODAL CONFIRMAR SORTIR (amb estil institucional) */}
+      {/* Confirm logout */}
       {confirmLogout && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
           <div className="w-full max-w-sm rounded-2xl bg-white shadow-xl border">
             <div className="p-6">
-              <h2 className="text-xl font-black text-slate-900">
-                Vols sortir del compte?
-              </h2>
-              <p className="mt-2 text-slate-600">
-                Tancaràs la sessió actual i hauràs de tornar a entrar.
-              </p>
+              <h2 className="text-xl font-black text-slate-900">Vols sortir del compte?</h2>
+              <p className="mt-2 text-slate-600">Tancaràs la sessió actual i hauràs de tornar a entrar.</p>
 
               <div className="mt-6 flex gap-2 justify-end">
                 <button
