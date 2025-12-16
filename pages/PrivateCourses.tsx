@@ -8,6 +8,7 @@ import {
   Plus,
   X,
 } from "lucide-react";
+import { PageHero } from "../components/PageHero";
 
 export const PrivateCourses: React.FC = () => {
   const {
@@ -82,25 +83,25 @@ export const PrivateCourses: React.FC = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="mb-8 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Formació continuada</h1>
-          <p className="text-gray-600 mt-2">
-            Millora el teu nivell i especialitza’t amb el nostre equip.
-          </p>
-        </div>
+    <div className="bg-slate-50">
+      <PageHero
+        title="Formació"
+        subtitle="Cursos del club i formació continuada. Inscripció ràpida i gestió de places."
+        badge="Club / Formació"
+        right={
+          canCreateHere ? (
+            <button
+              onClick={() => setOpen(true)}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl font-black bg-yellow-400 text-black hover:bg-yellow-500 transition shadow"
+            >
+              <Plus size={18} />
+              Crear curs
+            </button>
+          ) : null
+        }
+      />
 
-        {canCreateHere && (
-          <button
-            onClick={() => setOpen(true)}
-            className="inline-flex items-center gap-2 px-5 py-2 rounded-xl font-bold bg-slate-900 text-yellow-300 hover:bg-slate-800 transition"
-          >
-            <Plus size={18} />
-            Crear curs
-          </button>
-        )}
-      </div>
+      <div className="max-w-7xl mx-auto px-4 py-10">
 
       <div className="space-y-6">
         {sorted.length === 0 ? (
@@ -224,6 +225,8 @@ export const PrivateCourses: React.FC = () => {
             );
           })
         )}
+      </div>
+
       </div>
 
       {/* MODAL CREAR CURS */}
