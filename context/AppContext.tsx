@@ -69,7 +69,6 @@ interface AppContextValue extends AppState {
     certification: string;
   }) => Promise<void>;
 
-  // ✅ PERFIL (usuari edita el seu propi nom/avatar/certificació)
   updateMyProfile: (data: {
     name?: string;
     avatarUrl?: string;
@@ -79,11 +78,10 @@ interface AppContextValue extends AppState {
   approveUser: (userId: string) => Promise<void>;
   setUserRole: (userId: string, role: Role) => Promise<void>;
 
-  canManageTrips: () => boolean; // admin o instructor (instructor: active)
-  canManageSystem: () => boolean; // admin
-  isActiveMember: () => boolean; // active i role != pending
+  canManageTrips: () => boolean;
+  canManageSystem: () => boolean;
+  isActiveMember: () => boolean;
 
-  // Trips
   createTrip: (
     data: Omit<
       Trip,
@@ -100,7 +98,6 @@ interface AppContextValue extends AppState {
   setTripPublished: (tripId: string, published: boolean) => Promise<void>;
   cancelTrip: (tripId: string, reason?: string) => Promise<void>;
 
-  // Courses
   createCourse: (
     data: Omit<
       Course,
@@ -117,7 +114,6 @@ interface AppContextValue extends AppState {
   setCoursePublished: (courseId: string, published: boolean) => Promise<void>;
   cancelCourse: (courseId: string, reason?: string) => Promise<void>;
 
-  // Social events (NOMÉS ADMIN)
   createSocialEvent: (
     data: Omit<
       SocialEvent,
@@ -134,7 +130,6 @@ interface AppContextValue extends AppState {
   setSocialEventPublished: (eventId: string, published: boolean) => Promise<void>;
   cancelSocialEvent: (eventId: string, reason?: string) => Promise<void>;
 
-  // Inscripcions
   joinTrip: (tripId: string) => Promise<void>;
   leaveTrip: (tripId: string) => Promise<void>;
   joinCourse: (courseId: string) => Promise<void>;
@@ -142,10 +137,8 @@ interface AppContextValue extends AppState {
   joinSocialEvent: (eventId: string) => Promise<void>;
   leaveSocialEvent: (eventId: string) => Promise<void>;
 
-  // Settings
   updateClubSettings: (data: Partial<ClubSettings>) => Promise<void>;
 
-  // ✅ MATERIAL
   createResource: (
     data: Omit<ResourceItem, "id" | "createdBy" | "createdAt" | "updatedAt">
   ) => Promise<void>;
@@ -153,7 +146,6 @@ interface AppContextValue extends AppState {
   deleteResource: (resourceId: string) => Promise<void>;
   swapResourceOrder: (aId: string, bId: string) => Promise<void>;
 
-  // ✅ MUR SOCIAL
   createSocialPost: (data: { text: string; imageUrl?: string }) => Promise<void>;
   togglePostLike: (postId: string) => Promise<void>;
   addPostComment: (postId: string, text: string) => Promise<void>;
@@ -200,7 +192,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const unsubUsers = onSnapshot(
       query(collection(db, "users"), orderBy("createdAt", "asc")),
       (snap) => {
-        const users = snap.docs.map((d) => d.data() as User);
+        // ✅ FIX IMPORTANT: sempre incloem l'id del document
+        const users = snap.docs.map((d) => ({ ...(d.data() as any), id: d.id })) as User[];
+
         setState((prev) => {
           const cur = prev.currentUser
             ? users.find((u) => u.id === prev.currentUser!.id) ?? prev.currentUser
@@ -260,20 +254,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     );
 
     const settingsRef = doc(db, "clubSettings", "main");
-const unsubSettings = onSnapshot(settingsRef, (snap) => {
-  if (!snap.exists()) {
-    setDoc(settingsRef, { ...defaultClubSettings, updatedAt: serverTimestamp() }).catch(() => {});
-    setState((prev) => ({ ...prev, clubSettings: defaultClubSettings }));
-    return;
-  }
+    const unsubSettings = onSnapshot(settingsRef, (snap) => {
+      if (!snap.exists()) {
+        setDoc(settingsRef, { ...defaultClubSettings, updatedAt: serverTimestamp() }).catch(() => {});
+        setState((prev) => ({ ...prev, clubSettings: defaultClubSettings }));
+        return;
+      }
 
-  // ✅ IMPORTANT: sempre barregem defaults + dades de Firestore
-  const data = snap.data() as any;
-  const merged = { ...defaultClubSettings, ...data };
-
-  setState((prev) => ({ ...prev, clubSettings: merged }));
-});
-
+      const data = snap.data() as any;
+      const merged = { ...defaultClubSettings, ...data };
+      setState((prev) => ({ ...prev, clubSettings: merged }));
+    });
 
     return () => {
       unsubUsers();
@@ -306,7 +297,6 @@ const unsubSettings = onSnapshot(settingsRef, (snap) => {
         if (userSnap.exists()) userDocData = userSnap.data() as User;
       }
 
-      // Si NO existeix doc encara, el creem com pending
       if (!userDocData) {
         const newUser: User = {
           id: uid,
@@ -331,7 +321,6 @@ const unsubSettings = onSnapshot(settingsRef, (snap) => {
       if (userDocData.avatarUrl === undefined) patched.avatarUrl = "";
       if (!userDocData.email) patched.email = email;
 
-      // ✅ si el nom és buit o "Nou/va soci/a" i Auth té displayName, el reparem
       const authName = (fbUser.displayName || "").trim();
       const currentName = (userDocData.name || "").trim();
       if (authName && (!currentName || currentName === "Nou/va soci/a")) {
@@ -383,7 +372,6 @@ const unsubSettings = onSnapshot(settingsRef, (snap) => {
     } catch {}
   };
 
-  // ✅ REGISTRE (pendent d'aprovació)
   const registerUser: AppContextValue["registerUser"] = async ({
     name,
     email,
@@ -443,7 +431,6 @@ const unsubSettings = onSnapshot(settingsRef, (snap) => {
     }
   };
 
-  // ✅ PERFIL (cada usuari edita el seu doc)
   const updateMyProfile: AppContextValue["updateMyProfile"] = async (data) => {
     if (!state.currentUser) {
       alert("No autenticat/da");
@@ -496,7 +483,6 @@ const unsubSettings = onSnapshot(settingsRef, (snap) => {
     });
   };
 
-  // ====== GUARDS ======
   const ensureCanManageTripsAndCourses = () => {
     if (!canManageTrips()) {
       alert("Només administració o instructors poden gestionar això.");
@@ -587,7 +573,7 @@ const unsubSettings = onSnapshot(settingsRef, (snap) => {
     });
   };
 
-  // ====== SOCIAL EVENTS (NOMÉS ADMIN) ======
+  // ====== SOCIAL EVENTS ======
   const createSocialEvent: AppContextValue["createSocialEvent"] = async (data) => {
     if (!ensureCanManageSocialEvents()) return;
     assertAuthed(state.currentUser);
@@ -616,7 +602,7 @@ const unsubSettings = onSnapshot(settingsRef, (snap) => {
       cancelledAt: serverTimestamp(),
       cancelledReason: reason || "",
       updatedAt: serverTimestamp(),
-    });
+      });
   };
 
   // ====== JOIN/LEAVE ======
