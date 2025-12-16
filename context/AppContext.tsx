@@ -260,14 +260,20 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     );
 
     const settingsRef = doc(db, "clubSettings", "main");
-    const unsubSettings = onSnapshot(settingsRef, (snap) => {
-      if (!snap.exists()) {
-        setDoc(settingsRef, { ...defaultClubSettings, updatedAt: serverTimestamp() }).catch(() => {});
-        setState((prev) => ({ ...prev, clubSettings: defaultClubSettings }));
-        return;
-      }
-      setState((prev) => ({ ...prev, clubSettings: snap.data() as ClubSettings }));
-    });
+const unsubSettings = onSnapshot(settingsRef, (snap) => {
+  if (!snap.exists()) {
+    setDoc(settingsRef, { ...defaultClubSettings, updatedAt: serverTimestamp() }).catch(() => {});
+    setState((prev) => ({ ...prev, clubSettings: defaultClubSettings }));
+    return;
+  }
+
+  // ✅ IMPORTANT: sempre barregem defaults + dades de Firestore
+  const data = snap.data() as any;
+  const merged = { ...defaultClubSettings, ...data };
+
+  setState((prev) => ({ ...prev, clubSettings: merged }));
+});
+
 
     return () => {
       unsubUsers();
