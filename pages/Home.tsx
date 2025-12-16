@@ -1,167 +1,128 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useApp } from "../context/AppContext";
 
 export const Home: React.FC = () => {
   const { clubSettings } = useApp();
 
-  // ✅ HERO
-  const heroBg =
-    clubSettings.homeHeroImageUrl ||
-    "https://images.unsplash.com/photo-1500375592092-40eb2168fd21?auto=format&fit=crop&w=2200&q=80"; // mar suau
+  // ✅ valors segurs (mai undefined)
+  const s = useMemo(() => {
+    return {
+      logoUrl: clubSettings?.logoUrl || "/westdivers-logo.png",
+      navbarPreTitle: clubSettings?.navbarPreTitle || "CLUB DE BUSSEIG",
+      heroTitle: clubSettings?.heroTitle || "WEST DIVERS",
+      appBackgroundUrl: clubSettings?.appBackgroundUrl || "",
+      homeHeroImageUrl: (clubSettings as any)?.homeHeroImageUrl || "", // per si encara no existeix al tipus
+      homeTitle: (clubSettings as any)?.homeTitle || "El teu club de busseig per excel·lència.",
+      homeCtaPrimary: (clubSettings as any)?.homeCtaPrimary || "Accés Socis/es",
+      homeCtaSecondary: (clubSettings as any)?.homeCtaSecondary || "Contacta'ns",
+      homeImageUrl: (clubSettings as any)?.homeImageUrl || "",
+      homeFeature1: (clubSettings as any)?.homeFeature1 || "Inscripció a sortides amb un sol clic",
+      homeFeature2: (clubSettings as any)?.homeFeature2 || "Registre digital de titulacions i assegurança",
+      homeFeature3: (clubSettings as any)?.homeFeature3 || "Comunitat i xarrades exclusives",
+    };
+  }, [clubSettings]);
 
-  const heroTitle = clubSettings.heroTitle || "WEST DIVERS";
-  const heroSubtitle =
-    clubSettings.heroSubtitle || "El teu club de busseig per excel·lència.";
-
-  const primaryText = clubSettings.heroPrimaryButtonText || "Accés Socis/es";
-  const primaryHref = clubSettings.heroPrimaryButtonHref || "/login";
-
-  const secondaryText = clubSettings.heroSecondaryButtonText || "Contacta'ns";
-  const secondaryHref = clubSettings.heroSecondaryButtonHref || "#contacte";
-
-  // ✅ SECTION
-  const sectionTitle =
-    clubSettings.homeSectionTitle || "Tot el teu busseig, en una sola App";
-  const sectionText =
-    clubSettings.homeSectionText ||
-    "Els socis i sòcies tenen accés exclusiu a la nostra aplicació privada.";
-
-  const sectionImg =
-    clubSettings.homeSectionImageUrl ||
-    "https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1600&q=80";
-
-  const b1t = clubSettings.homeBullet1Title || "Inscripció a sortides amb un sol clic";
-  const b1x = clubSettings.homeBullet1Text || "Apunta’t fàcilment i controla participants.";
-  const b2t = clubSettings.homeBullet2Title || "Registre digital de titulacions i assegurança";
-  const b2x = clubSettings.homeBullet2Text || "Tot el teu perfil i certificacions sempre a mà.";
-  const b3t = clubSettings.homeBullet3Title || "Comunitat i xarrades exclusives";
-  const b3x = clubSettings.homeBullet3Text || "Mur social i comunicacions del club.";
-
-  const ctaText = clubSettings.homeCtaText || "Sol·licita el teu accés →";
-  const ctaHref = clubSettings.homeCtaHref || "/register";
-
-  const isInternalLink = (href: string) => href.startsWith("/");
-
-  const HeroButton = ({ href, children, primary }: any) => {
-    if (isInternalLink(href)) {
-      return (
-        <Link
-          to={href}
-          className={
-            primary
-              ? "px-6 py-3 rounded-full font-extrabold bg-yellow-400 text-black hover:bg-yellow-300 transition"
-              : "px-6 py-3 rounded-full font-extrabold border border-white/60 text-white hover:bg-white/10 transition"
-          }
-        >
-          {children}
-        </Link>
-      );
-    }
-    return (
-      <a
-        href={href}
-        className={
-          primary
-            ? "px-6 py-3 rounded-full font-extrabold bg-yellow-400 text-black hover:bg-yellow-300 transition"
-            : "px-6 py-3 rounded-full font-extrabold border border-white/60 text-white hover:bg-white/10 transition"
-        }
-      >
-        {children}
-      </a>
-    );
-  };
+  const heroBg = s.homeHeroImageUrl || s.appBackgroundUrl;
 
   return (
-    <div className="w-full">
+    <div className="min-h-screen bg-white">
       {/* HERO */}
       <section
-        className="relative"
+        className="relative min-h-[520px] flex items-center justify-center"
         style={{
-          backgroundImage: `url("${heroBg}")`,
+          backgroundImage: heroBg ? `url(${heroBg})` : undefined,
           backgroundSize: "cover",
           backgroundPosition: "center",
         }}
       >
-        {/* overlay perquè el text sempre es llegeixi bé */}
+        {/* overlay perquè el text es lligui bé */}
         <div className="absolute inset-0 bg-black/45" />
 
-        <div className="relative max-w-6xl mx-auto px-4 py-24">
-          <div className="max-w-2xl">
-            <h1 className="text-white text-4xl md:text-5xl font-extrabold leading-tight">
-              {heroTitle}
-            </h1>
-            <p className="mt-4 text-white/90 text-lg">{heroSubtitle}</p>
-
-            <div className="mt-8 flex flex-wrap gap-3">
-              <HeroButton href={primaryHref} primary>
-                {primaryText}
-              </HeroButton>
-              <HeroButton href={secondaryHref}>{secondaryText}</HeroButton>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* SECTION */}
-      <section className="max-w-6xl mx-auto px-4 py-16">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
-          <div>
-            <h2 className="text-3xl font-extrabold text-slate-900">{sectionTitle}</h2>
-            <p className="mt-3 text-gray-700">{sectionText}</p>
-
-            <div className="mt-6 space-y-3">
-              <div className="flex gap-3">
-                <div className="w-10 h-10 rounded-full bg-yellow-400 flex-shrink-0" />
-                <div>
-                  <div className="font-extrabold">{b1t}</div>
-                  <div className="text-sm text-gray-600">{b1x}</div>
-                </div>
-              </div>
-
-              <div className="flex gap-3">
-                <div className="w-10 h-10 rounded-full bg-yellow-400 flex-shrink-0" />
-                <div>
-                  <div className="font-extrabold">{b2t}</div>
-                  <div className="text-sm text-gray-600">{b2x}</div>
-                </div>
-              </div>
-
-              <div className="flex gap-3">
-                <div className="w-10 h-10 rounded-full bg-yellow-400 flex-shrink-0" />
-                <div>
-                  <div className="font-extrabold">{b3t}</div>
-                  <div className="text-sm text-gray-600">{b3x}</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6">
-              {isInternalLink(ctaHref) ? (
-                <Link to={ctaHref} className="text-blue-700 font-extrabold hover:underline">
-                  {ctaText}
-                </Link>
-              ) : (
-                <a href={ctaHref} className="text-blue-700 font-extrabold hover:underline">
-                  {ctaText}
-                </a>
-              )}
-            </div>
-          </div>
-
-          <div className="w-full">
+        <div className="relative z-10 max-w-5xl mx-auto px-6 text-center">
+          <div className="flex items-center justify-center gap-3 mb-4">
             <img
-              src={sectionImg}
-              alt="imatge secció"
-              className="w-full rounded-3xl border shadow-sm object-cover"
+              src={s.logoUrl}
+              alt="West Divers"
+              className="w-14 h-14 rounded-full bg-white/10 border border-white/20 object-contain"
             />
+            <div className="text-left">
+              <div className="text-xs font-extrabold tracking-widest text-white/90">
+                {s.navbarPreTitle}
+              </div>
+              <div className="text-xl font-extrabold text-white">{s.heroTitle}</div>
+            </div>
+          </div>
+
+          <h1 className="text-2xl sm:text-4xl font-extrabold text-white">
+            {s.homeTitle}
+          </h1>
+
+          <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
+            <Link
+              to="/login"
+              className="inline-flex items-center justify-center px-6 py-3 rounded-full font-extrabold bg-yellow-400 text-black hover:bg-yellow-500"
+            >
+              {s.homeCtaPrimary}
+            </Link>
+
+            <a
+              href="mailto:thewestdivers@gmail.com"
+              className="inline-flex items-center justify-center px-6 py-3 rounded-full font-extrabold border-2 border-white text-white hover:bg-white/10"
+            >
+              {s.homeCtaSecondary}
+            </a>
           </div>
         </div>
       </section>
 
-      {/* ANCLA CONTACTE (si el fas servir al footer o més avall) */}
-      <div id="contacte" />
+      {/* CONTINGUT */}
+      <section className="max-w-6xl mx-auto px-6 py-14 grid md:grid-cols-2 gap-10 items-center">
+        <div className="bg-white border rounded-3xl p-7 shadow-sm">
+          <h2 className="text-2xl font-extrabold text-slate-900">
+            Tot el teu busseig, en una sola App
+          </h2>
+
+          <p className="text-slate-600 mt-3">
+            Els socis i sòcies tenen accés exclusiu a la nostra aplicació privada.
+          </p>
+
+          <ul className="mt-6 space-y-3">
+            <li className="flex gap-3">
+              <span className="w-9 h-9 rounded-full bg-yellow-400/30 flex items-center justify-center font-extrabold">✓</span>
+              <span className="font-bold text-slate-900">{s.homeFeature1}</span>
+            </li>
+            <li className="flex gap-3">
+              <span className="w-9 h-9 rounded-full bg-yellow-400/30 flex items-center justify-center font-extrabold">✓</span>
+              <span className="font-bold text-slate-900">{s.homeFeature2}</span>
+            </li>
+            <li className="flex gap-3">
+              <span className="w-9 h-9 rounded-full bg-yellow-400/30 flex items-center justify-center font-extrabold">✓</span>
+              <span className="font-bold text-slate-900">{s.homeFeature3}</span>
+            </li>
+          </ul>
+
+          <div className="mt-6">
+            <Link to="/register" className="text-blue-600 font-extrabold hover:underline">
+              Sol·licita el teu accés →
+            </Link>
+          </div>
+        </div>
+
+        <div className="rounded-3xl overflow-hidden border shadow-sm bg-gray-100">
+          {s.homeImageUrl ? (
+            <img
+              src={s.homeImageUrl}
+              alt="Imatge"
+              className="w-full h-[340px] object-cover"
+            />
+          ) : (
+            <div className="w-full h-[340px] flex items-center justify-center text-slate-500 font-bold">
+              (Encara no hi ha imatge configurada)
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   );
 };
-
