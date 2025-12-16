@@ -24,8 +24,12 @@ export const Dashboard: React.FC = () => {
     return (
       <div className="max-w-3xl mx-auto px-4 py-12">
         <div className="bg-white border rounded-2xl shadow-sm p-8">
-          <h1 className="text-2xl font-extrabold text-slate-900">Has d’iniciar sessió</h1>
-          <p className="text-gray-600 mt-2">Per entrar al panell, primer fes login.</p>
+          <h1 className="text-2xl font-extrabold text-slate-900">
+            Has d’iniciar sessió
+          </h1>
+          <p className="text-gray-600 mt-2">
+            Per entrar al panell, primer fes login.
+          </p>
           <button
             onClick={() => navigate("/login")}
             className="mt-6 px-6 py-3 rounded-xl bg-yellow-400 text-black font-extrabold hover:bg-yellow-500"
@@ -42,7 +46,9 @@ export const Dashboard: React.FC = () => {
   return (
     <div className="bg-slate-50">
       <PageHero
-        title={isAdmin ? "Panell d’Administració" : `Hola, ${currentUser.name || "Soci/a"}`}
+        title={
+          isAdmin ? "Panell d’Administració" : `Hola, ${currentUser.name || "Soci/a"}`
+        }
         subtitle={
           isAdmin
             ? "Gestió ràpida del club: socis/es, sortides, cursos i esdeveniments."
@@ -50,7 +56,8 @@ export const Dashboard: React.FC = () => {
         }
         badge={
           <span>
-            {isAdmin ? "ADMIN" : "Àrea privada"} · Rol: <b>{currentUser.role}</b> · Estat: <b>{currentUser.status}</b>
+            {isAdmin ? "ADMIN" : "Àrea privada"} · Rol:{" "}
+            <b>{currentUser.role}</b> · Estat: <b>{currentUser.status}</b>
           </span>
         }
         right={
@@ -73,9 +80,10 @@ export const Dashboard: React.FC = () => {
       />
 
       <div className="max-w-6xl mx-auto px-4 py-10 space-y-6">
-        {/* ✅ ADMIN: targetes de gestió visibles i ràpides */}
+        {/* ADMIN: targetes de gestió */}
         {isAdmin && <AdminManagementCards />}
 
+        {/* Accés ràpid */}
         <div className="bg-white border rounded-2xl shadow-sm p-6">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
@@ -86,7 +94,6 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* ✅ Accés ràpid (admin també pot veure-ho, però està orientat a socis) */}
           <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <button
               onClick={() => navigate("/calendar")}
@@ -120,9 +127,11 @@ export const Dashboard: React.FC = () => {
               <div className="text-gray-600 text-sm mt-1">Quedades i activitats</div>
             </button>
           </div>
+        </div>
 
-        <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="bg-white border rounded-2xl p-5">
+        {/* Resum d’activitats */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="bg-white border rounded-2xl p-5 shadow-sm">
             <div className="font-extrabold text-slate-900">Properes sortides</div>
             <div className="text-sm text-gray-600 mt-2">
               {nextTrips.length ? (
@@ -139,7 +148,7 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-white border rounded-2xl p-5">
+          <div className="bg-white border rounded-2xl p-5 shadow-sm">
             <div className="font-extrabold text-slate-900">Propers cursos</div>
             <div className="text-sm text-gray-600 mt-2">
               {nextCourses.length ? (
@@ -156,7 +165,7 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-white border rounded-2xl p-5">
+          <div className="bg-white border rounded-2xl p-5 shadow-sm">
             <div className="font-extrabold text-slate-900">Propers esdeveniments</div>
             <div className="text-sm text-gray-600 mt-2">
               {nextEvents.length ? (
