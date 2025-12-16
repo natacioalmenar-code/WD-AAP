@@ -2,6 +2,61 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body {
-  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans";
+/* Base */
+:root {
+  --radius: 16px;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
+
+/* Components */
+@layer components {
+  .container-app {
+    @apply max-w-6xl mx-auto px-4;
+  }
+
+  .card {
+    @apply bg-white border border-slate-200 rounded-2xl shadow-sm;
+  }
+
+  .card-pad {
+    @apply p-6 md:p-8;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl font-extrabold transition
+           px-4 py-3 select-none;
+  }
+  .btn-primary {
+    @apply bg-yellow-400 text-black hover:bg-yellow-500;
+  }
+  .btn-ghost {
+    @apply bg-transparent hover:bg-slate-100 border border-slate-200;
+  }
+  .btn-danger {
+    @apply bg-red-600 text-white hover:bg-red-700;
+  }
+
+  .input {
+    @apply w-full rounded-xl border border-slate-200 bg-white px-3 py-3 outline-none
+           focus:ring-2 focus:ring-yellow-300 focus:border-yellow-300;
+  }
+
+  .label {
+    @apply text-sm font-extrabold text-slate-700;
+  }
+
+  .muted {
+    @apply text-slate-600;
+  }
+
+  .chip {
+    @apply inline-flex items-center rounded-full px-3 py-1 text-xs font-bold border;
+  }
 }
