@@ -1,33 +1,53 @@
 import React from "react";
+import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
 
-function App() {
+function Home() {
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#0f172a",
-        color: "white",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontFamily: "system-ui",
-        textAlign: "center",
-        padding: 24,
-      }}
-    >
-      <div>
-        <h1 style={{ fontSize: 32, fontWeight: 800 }}>
-          ✅ WEST DIVERS APP
-        </h1>
-        <p style={{ marginTop: 12, fontSize: 18 }}>
-          React està funcionant correctament.
-        </p>
-        <p style={{ marginTop: 8, opacity: 0.8 }}>
-          Si veus això, el problema NO és Vercel ni el navegador.
-        </p>
-      </div>
+    <div style={pageStyle}>
+      <h1>🏠 HOME</h1>
+      <Link to="/login">Anar a Login</Link>
     </div>
   );
 }
 
-export default App;
+function Login() {
+  return (
+    <div style={pageStyle}>
+      <h1>🔐 LOGIN</h1>
+      <Link to="/dashboard">Entrar al panell</Link>
+    </div>
+  );
+}
+
+function Dashboard() {
+  return (
+    <div style={pageStyle}>
+      <h1>📊 PANELL</h1>
+      <Link to="/">Tornar a Home</Link>
+    </div>
+  );
+}
+
+const pageStyle: React.CSSProperties = {
+  minHeight: "100vh",
+  background: "#020617",
+  color: "white",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 16,
+  fontFamily: "system-ui",
+};
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
