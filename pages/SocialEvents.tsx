@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { Plus, X, Calendar, Clock, MapPin, Users } from "lucide-react";
+import { PageHero } from "../components/PageHero";
 
 export const SocialEvents: React.FC = () => {
   const {
@@ -77,20 +78,25 @@ export const SocialEvents: React.FC = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-10">
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <h1 className="text-3xl font-extrabold">Esdeveniments</h1>
+    <div className="bg-slate-50">
+      <PageHero
+        title="Esdeveniments"
+        subtitle="Quedades i activitats socials del club. Apunta’t i participa!"
+        badge="Club / Esdeveniments"
+        right={
+          isAdmin ? (
+            <button
+              onClick={() => setOpen(true)}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl font-black bg-yellow-400 text-black hover:bg-yellow-500 transition shadow"
+            >
+              <Plus size={18} />
+              Crear esdeveniment
+            </button>
+          ) : null
+        }
+      />
 
-        {isAdmin && (
-          <button
-            onClick={() => setOpen(true)}
-            className="inline-flex items-center gap-2 px-5 py-2 rounded-xl font-bold bg-slate-900 text-yellow-300 hover:bg-slate-800 transition"
-          >
-            <Plus size={18} />
-            Crear esdeveniment
-          </button>
-        )}
-      </div>
+      <div className="max-w-6xl mx-auto px-4 py-10">
 
       <div className="grid gap-4">
         {list.length === 0 && <div>No hi ha esdeveniments.</div>}
@@ -190,6 +196,8 @@ export const SocialEvents: React.FC = () => {
             </div>
           );
         })}
+      </div>
+
       </div>
 
       {/* MODAL CREAR ESDEVENIMENT */}
