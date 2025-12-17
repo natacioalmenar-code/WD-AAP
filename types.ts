@@ -5,8 +5,7 @@ export type Status = "active" | "pending";
 export type PublishableStatus = "active" | "cancelled";
 
 /**
- * ✅ Titulacions FECDAS / CMAS que vols usar
- * (PENDENT és estat intern del sistema)
+ * ✅ Titulacions FECDAS / CMAS
  */
 export type FecdAsLevel =
   | "B1E"
@@ -29,10 +28,6 @@ export const FECDAS_LEVELS: FecdAsLevel[] = [
   "PENDENT",
 ];
 
-/**
- * ✅ Llista inicial d’especialitats (editable quan vulgues)
- * Pots afegir-ne més sense tocar la DB.
- */
 export const FECDAS_SPECIALTIES: string[] = [
   "Nitrox",
   "Administració d’oxigen",
@@ -58,24 +53,22 @@ export interface User {
   role: Role;
   status: Status;
 
-  /**
-   * ✅ Camp històric (es manté per compatibilitat amb pantalles ja fetes)
-   * Ex: "B2E"
-   */
   level: FecdAsLevel | string;
-
-  /**
-   * ✅ Nou (multi-selecció)
-   */
   levels?: FecdAsLevel[];
-
-  /**
-   * ✅ Nou (multi-selecció)
-   */
   specialties?: string[];
 
   avatarUrl: string;
   certification?: string;
+
+  // ✅ DADES CARNET SOCI/A (NOVES)
+  licenseInsurance?: string;
+  insuranceExpiry?: string; // YYYY-MM-DD
+  licenseInsuranceUrl?: string;
+
+  medicalCertificate?: string;
+  medicalExpiry?: string; // YYYY-MM-DD
+  medicalCertificateUrl?: string;
+
   createdAt?: any;
   updatedAt?: any;
 }
@@ -149,24 +142,22 @@ export interface SocialEvent {
 }
 
 export interface ClubSettings {
-  // ja existents (els tens a Firestore)
   logoUrl: string;
   navbarPreTitle: string;
   heroTitle: string;
-  appBackgroundUrl?: string;      // opcional
-  homeHeroImageUrl?: string;      // opcional (la farem servir com a fons del hero)
+  appBackgroundUrl?: string;
+  homeHeroImageUrl?: string;
 
-  // ✅ nous (per fer editable tota la home)
   heroSubtitle?: string;
 
-  heroPrimaryButtonText?: string;     // ex: "Accés Socis/es"
-  heroPrimaryButtonHref?: string;     // ex: "/login"
-  heroSecondaryButtonText?: string;   // ex: "Contacta'ns"
-  heroSecondaryButtonHref?: string;   // ex: "#contacte"
+  heroPrimaryButtonText?: string;
+  heroPrimaryButtonHref?: string;
+  heroSecondaryButtonText?: string;
+  heroSecondaryButtonHref?: string;
 
-  homeSectionTitle?: string;          // ex: "Tot el teu busseig, en una sola App"
-  homeSectionText?: string;           // paràgraf
-  homeSectionImageUrl?: string;       // imatge gran (la de baix)
+  homeSectionTitle?: string;
+  homeSectionText?: string;
+  homeSectionImageUrl?: string;
 
   homeBullet1Title?: string;
   homeBullet1Text?: string;
@@ -175,14 +166,12 @@ export interface ClubSettings {
   homeBullet3Title?: string;
   homeBullet3Text?: string;
 
-  homeCtaText?: string;               // ex: "Sol·licita el teu accés →"
-  homeCtaHref?: string;               // ex: "/register"
+  homeCtaText?: string;
+  homeCtaHref?: string;
 
   updatedAt?: any;
 }
 
-
-/** ✅ MATERIAL / RESOURCES */
 export type ResourceCategory =
   | "Seguretat"
   | "Formació"
@@ -206,7 +195,6 @@ export interface ResourceItem {
   updatedAt?: any;
 }
 
-/** ✅ MUR SOCIAL */
 export interface PostComment {
   id: string;
   userId: string;
