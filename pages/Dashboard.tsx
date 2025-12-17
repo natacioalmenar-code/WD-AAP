@@ -74,11 +74,9 @@ export const Dashboard: React.FC = () => {
               <b>{stats.active}</b> · Total: <b>{stats.total}</b>
             </span>
           }
-          // ✅ sense botó repetit al hero
         />
 
         <div className="max-w-6xl mx-auto px-4 py-10 space-y-6">
-          {/* ✅ Gestió de socis/es com a principal (baix) */}
           <div className="bg-white border rounded-2xl shadow-sm p-6">
             <div className="flex items-start justify-between gap-4 flex-wrap">
               <div>
@@ -134,10 +132,8 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* Secundari */}
           <AdminManagementCards />
 
-          {/* Resum */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="bg-white border rounded-2xl p-5 shadow-sm">
               <div className="font-extrabold text-slate-900">
@@ -202,61 +198,109 @@ export const Dashboard: React.FC = () => {
     );
   }
 
-  // NO admin
+  // ✅ SOCI — PREMIUM
   return (
-    <div className="bg-slate-50 min-h-screen">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-slate-100 to-slate-200">
       <PageHero
         title={`Hola, ${currentUser.name || "Soci/a"}`}
-        subtitle="Consulta pròximes activitats i recursos del club."
+        subtitle="Àrea privada del club · El teu carnet digital."
         badge={
           <span>
-            Àrea privada · Rol: <b>{currentUser.role}</b> · Estat:{" "}
-            <b>{currentUser.status}</b>
+            Soci/a · Estat: <b>{currentUser.status}</b>
           </span>
         }
       />
 
       <div className="max-w-6xl mx-auto px-4 py-10 space-y-6">
-        <div className="bg-white border rounded-2xl shadow-sm p-6">
+        {/* Carnet */}
+        <div className="rounded-3xl bg-white/70 backdrop-blur border shadow-sm p-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+            <div className="flex items-center gap-4">
+              <div className="h-16 w-16 rounded-2xl bg-slate-900 overflow-hidden flex items-center justify-center">
+                {currentUser.avatarUrl ? (
+                  <img
+                    src={currentUser.avatarUrl}
+                    alt="Avatar"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <span className="text-yellow-300 font-black text-xl">
+                    {(currentUser.name || "S").slice(0, 1).toUpperCase()}
+                  </span>
+                )}
+              </div>
+
+              <div>
+                <div className="text-xs font-black text-slate-500">
+                  CARNET SOCI/A
+                </div>
+                <div className="text-xl font-black text-slate-900">
+                  {currentUser.name}
+                </div>
+                <div className="text-sm text-slate-600">
+                  {currentUser.certification || "Certificació no indicada"}
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => navigate("/profile")}
+              className="px-6 py-3 rounded-2xl bg-slate-900 text-yellow-300 font-black hover:opacity-90"
+            >
+              Editar perfil
+            </button>
+          </div>
+
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="rounded-2xl border bg-white/60 p-4">
+              <div className="text-xs font-black text-slate-500">
+                ASSEGURANÇA / LLICÈNCIA
+              </div>
+              <div className="mt-1 font-extrabold text-slate-900">
+                {currentUser.licenseInsurance || "No indicada"}
+              </div>
+              <div className="text-sm text-slate-600 mt-1">
+                Caduca: {currentUser.insuranceExpiry || "—"}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border bg-white/60 p-4">
+              <div className="text-xs font-black text-slate-500">
+                CERTIFICAT MÈDIC
+              </div>
+              <div className="mt-1 font-extrabold text-slate-900">
+                {currentUser.medicalCertificate || "No indicat"}
+              </div>
+              <div className="text-sm text-slate-600 mt-1">
+                Caduca: {currentUser.medicalExpiry || "—"}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Accés ràpid */}
+        <div className="rounded-3xl bg-white/70 backdrop-blur border shadow-sm p-6">
           <h2 className="text-xl font-extrabold text-slate-900">Accés ràpid</h2>
-          <p className="text-gray-600 mt-1 text-sm">Seccions principals.</p>
+          <p className="text-gray-600 mt-1 text-sm">
+            Seccions principals del club.
+          </p>
 
           <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <button
-              onClick={() => navigate("/calendar")}
-              className="bg-white border rounded-2xl p-5 text-left hover:shadow-sm"
-            >
-              <div className="font-extrabold text-slate-900">Calendari</div>
-              <div className="text-gray-600 text-sm mt-1">
-                Veure tot el que ve
-              </div>
-            </button>
-
-            <button
-              onClick={() => navigate("/trips")}
-              className="bg-white border rounded-2xl p-5 text-left hover:shadow-sm"
-            >
-              <div className="font-extrabold text-slate-900">Sortides</div>
-              <div className="text-gray-600 text-sm mt-1">Apunta’t</div>
-            </button>
-
-            <button
-              onClick={() => navigate("/courses-private")}
-              className="bg-white border rounded-2xl p-5 text-left hover:shadow-sm"
-            >
-              <div className="font-extrabold text-slate-900">Formació</div>
-              <div className="text-gray-600 text-sm mt-1">Cursos del club</div>
-            </button>
-
-            <button
-              onClick={() => navigate("/social-events")}
-              className="bg-white border rounded-2xl p-5 text-left hover:shadow-sm"
-            >
-              <div className="font-extrabold text-slate-900">Esdeveniments</div>
-              <div className="text-gray-600 text-sm mt-1">
-                Quedades i activitats
-              </div>
-            </button>
+            {[
+              { label: "Calendari", path: "/calendar" },
+              { label: "Sortides", path: "/trips" },
+              { label: "Formació", path: "/courses-private" },
+              { label: "Esdeveniments", path: "/social-events" },
+            ].map((item) => (
+              <button
+                key={item.path}
+                onClick={() => navigate(item.path)}
+                className="rounded-2xl border bg-white/60 p-5 text-left hover:shadow-sm"
+              >
+                <div className="font-extrabold text-slate-900">{item.label}</div>
+                <div className="text-gray-600 text-sm mt-1">Accedir</div>
+              </button>
+            ))}
           </div>
         </div>
       </div>
