@@ -1,324 +1,329 @@
 import React, { useMemo, useState } from "react";
+import { PageHero } from "../components/PageHero";
 import { useApp } from "../context/AppContext";
-import { FECDAS_LEVELS, FECDAS_SPECIALTIES, type FecdAsLevel } from "../types";
-import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "../firebase/firebase";
-import { BadgeCheck, Star, Plus, X } from "lucide-react";
 
-function uniqueStrings(list: string[]) {
-  return Array.from(new Set(list.map((x) => x.trim()).filter(Boolean)));
-}
-
-function rankLevel(level: string): number {
-  // Ordre de “nivell principal” (el més alt que marque)
-  const order: string[] = ["B1E", "B2E", "B3E", "GG", "IN1E", "IN2E", "IN3E"];
-  const idx = order.indexOf(level);
-  return idx === -1 ? -1 : idx;
-}
-
-function computePrimaryLevel(levels: FecdAsLevel[]) {
-  const filtered = levels.filter((l) => l !== "PENDENT");
-  if (!filtered.length) return "B1E";
-  return filtered.sort((a, b) => rankLevel(b) - rankLevel(a))[0] || "B1E";
-}
+const Badge: React.FC<{ tone?: "good" | "warn" | "neutral"; children: React.ReactNode }> = ({
+  tone = "neutral",
+  children,
+}) => {
+  const cls =
+    tone === "good"
+      ? "bg-emerald-50 border-emerald-200 text-emerald-900"
+      : tone === "warn"
+      ? "bg-yellow-50 border-yellow-200 text-yellow-900"
+      : "bg-slate-50 border-slate-200 text-slate-700";
+  return (
+    <span className={`inline-flex items-center text-xs font-black px-3 py-1 rounded-full border ${cls}`}>
+      {children}
+    </span>
+  );
+};
 
 export const Profile: React.FC = () => {
-  const { currentUser } = useApp();
+  const { currentUser, updateMyProfile } = useApp();
+
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
 
   const [name, setName] = useState(currentUser?.name || "");
   const [avatarUrl, setAvatarUrl] = useState(currentUser?.avatarUrl || "");
   const [certification, setCertification] = useState(currentUser?.certification || "");
 
-  // ✅ Nivells: si ja té levels, usem això. Si no, fem fallback a level.
-  const initialLevels: FecdAsLevel[] = useMemo(() => {
-    const fromArray = (currentUser?.levels || []).filter(Boolean) as FecdAsLevel[];
-    if (fromArray.length) return uniqueStrings(fromArray) as FecdAsLevel[];
+  const [licenseInsurance, setLicenseInsurance] = useState((currentUser as any)?.licenseInsurance || "");
+  const [licenseInsuranceUrl, setLicenseInsuranceUrl] = useState((currentUser as any)?.licenseInsuranceUrl || "");
+  const [insuranceExpiry, setInsuranceExpiry] = useState((currentUser as any)?.insuranceExpiry || "");
 
-    const single = (currentUser?.level || "B1E") as string;
-    if (FECDAS_LEVELS.includes(single as FecdAsLevel)) return [single as FecdAsLevel];
+  const [medicalCertificate, setMedicalCertificate] = useState((currentUser as any)?.medicalCertificate || "");
+  const [medicalCertificateUrl, setMedicalCertificateUrl] = useState((currentUser as any)?.medicalCertificateUrl || "");
+  const [medicalExpiry, setMedicalExpiry] = useState((currentUser as any)?.medicalExpiry || "");
 
-    return ["B1E"];
+  const statusTone = useMemo(() => {
+    if (!currentUser) return "neutral";
+    return currentUser.status === "active" ? "good" : "warn";
   }, [currentUser]);
 
-  const [levels, setLevels] = useState<FecdAsLevel[]>(initialLevels);
+  const insuranceTone = useMemo(() => {
+    if (!insuranceExpiry) return "warn";
+    const t = Date.parse(insuranceExpiry);
+    if (Number.isNaN(t)) return "warn";
+    return t >= Date.now() ? "good" : "warn";
+  }, [insuranceExpiry]);
 
-  // ✅ Especialitats
-  const initialSpecialties: string[] = useMemo(() => {
-    const arr = (currentUser?.specialties || []).filter(Boolean) as string[];
-    return uniqueStrings(arr);
-  }, [currentUser]);
+  const medicalTone = useMemo(() => {
+    if (!medicalExpiry) return "warn";
+    const t = Date.parse(medicalExpiry);
+    if (Number.isNaN(t)) return "warn";
+    return t >= Date.now() ? "good" : "warn";
+  }, [medicalExpiry]);
 
-  const [specialties, setSpecialties] = useState<string[]>(initialSpecialties);
-  const [customSpecialty, setCustomSpecialty] = useState("");
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser) return;
 
-  const [saving, setSaving] = useState(false);
-
-  const canEdit = useMemo(() => !!currentUser, [currentUser]);
-
-  if (!currentUser) {
-    return (
-      <div className="max-w-3xl mx-auto px-4 py-10">
-        <div className="bg-white border rounded-2xl shadow-sm p-6">
-          <p className="text-gray-700">Has d’iniciar sessió per veure el perfil.</p>
-        </div>
-      </div>
-    );
-  }
-
-  const toggleLevel = (lvl: FecdAsLevel) => {
-    setLevels((prev) => {
-      const has = prev.includes(lvl);
-      const next = has ? prev.filter((x) => x !== lvl) : [...prev, lvl];
-
-      // Evitem quedar-nos a 0 (mínim 1)
-      if (next.length === 0) return ["B1E"];
-      return next;
-    });
-  };
-
-  const toggleSpecialty = (sp: string) => {
-    setSpecialties((prev) => {
-      const has = prev.includes(sp);
-      return has ? prev.filter((x) => x !== sp) : [...prev, sp];
-    });
-  };
-
-  const addCustomSpecialty = () => {
-    const t = customSpecialty.trim();
-    if (!t) return;
-    setSpecialties((prev) => uniqueStrings([...prev, t]));
-    setCustomSpecialty("");
-  };
-
-  const removeSpecialty = (sp: string) => {
-    setSpecialties((prev) => prev.filter((x) => x !== sp));
-  };
-
-  const save = async () => {
-    if (!canEdit) return;
-
-    const trimmedName = name.trim();
-    if (!trimmedName) {
-      alert("El nom no pot estar buit.");
-      return;
-    }
-
-    const cleanLevels = uniqueStrings(levels) as FecdAsLevel[];
-    const cleanSpecialties = uniqueStrings(specialties);
-
-    // ✅ mantenim camp “level” antic com a “principal” (el més alt seleccionat)
-    const primary = computePrimaryLevel(cleanLevels);
-
+    setMsg("");
     setSaving(true);
     try {
-      await updateDoc(doc(db, "users", currentUser.id), {
-        name: trimmedName,
-        avatarUrl: avatarUrl.trim(),
-        certification: certification.trim(),
-
-        // antic + nou
-        level: primary,
-        levels: cleanLevels,
-        specialties: cleanSpecialties,
-
-        updatedAt: serverTimestamp(),
+      await updateMyProfile({
+        name,
+        avatarUrl,
+        certification,
+        // @ts-ignore
+        licenseInsurance,
+        // @ts-ignore
+        licenseInsuranceUrl,
+        // @ts-ignore
+        insuranceExpiry,
+        // @ts-ignore
+        medicalCertificate,
+        // @ts-ignore
+        medicalCertificateUrl,
+        // @ts-ignore
+        medicalExpiry,
       });
-      alert("Perfil actualitzat ✅");
+
+      setMsg("Perfil actualitzat ✅");
+      setTimeout(() => setMsg(""), 2500);
     } catch {
-      alert("No s’ha pogut guardar el perfil.");
+      setMsg("No s’ha pogut guardar ❌");
     } finally {
       setSaving(false);
     }
   };
 
-  const allLevels = FECDAS_LEVELS.filter((l) => l !== "PENDENT");
-  const allSpecialties = FECDAS_SPECIALTIES;
+  if (!currentUser) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-12">
+        <div className="bg-white border rounded-2xl shadow-sm p-8">
+          <h1 className="text-2xl font-extrabold text-slate-900">Has d’iniciar sessió</h1>
+          <p className="text-slate-600 mt-2">Per veure el perfil, primer fes login.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-10">
-      <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
-        <div className="p-6 border-b">
-          <h1 className="text-2xl font-extrabold text-slate-900">El meu perfil</h1>
-          <p className="text-sm text-gray-600 mt-1">
-            Actualitza la teua informació i les teues titulacions/especialitats.
-          </p>
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-slate-50 to-slate-100">
+      <PageHero
+        compact
+        title="Perfil"
+        subtitle="El teu carnet digital i documents del club."
+        badge={
+          <span>
+            Rol: <b>{currentUser.role}</b> · Estat: <b>{currentUser.status}</b>
+          </span>
+        }
+      />
+
+      <div className="max-w-6xl mx-auto px-4 py-10 grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {/* Carnet */}
+        <div className="lg:col-span-2">
+          <div className="rounded-3xl border bg-white/70 backdrop-blur shadow-sm p-6 overflow-hidden relative">
+            <div
+              className="absolute inset-0 opacity-10"
+              style={{
+                backgroundImage:
+                  "radial-gradient(circle at 1px 1px, rgba(0,0,0,0.25) 1px, transparent 0)",
+                backgroundSize: "18px 18px",
+              }}
+            />
+            <div className="relative">
+              <div className="flex items-center gap-4">
+                <div className="h-16 w-16 rounded-2xl bg-slate-900 overflow-hidden flex items-center justify-center">
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-yellow-300 font-black text-xl">
+                      {(currentUser.name || "S").slice(0, 1).toUpperCase()}
+                    </span>
+                  )}
+                </div>
+
+                <div className="min-w-0">
+                  <div className="text-xs font-black text-slate-500">CARNET SOCI/A</div>
+                  <div className="text-xl font-black text-slate-900 truncate">
+                    {currentUser.name || "Soci/a"}
+                  </div>
+                  <div className="text-sm text-slate-600 truncate">{currentUser.email}</div>
+                </div>
+              </div>
+
+              <div className="mt-5 flex flex-wrap gap-2">
+                <Badge tone={statusTone as any}>{currentUser.status === "active" ? "ACTIU" : "PENDENT"}</Badge>
+                <Badge>{String(currentUser.level || "").toUpperCase() || "NIVELL"}</Badge>
+                <Badge>{String(currentUser.role || "").toUpperCase()}</Badge>
+              </div>
+
+              <div className="mt-6 space-y-3">
+                <div className="rounded-2xl border bg-white/60 p-4">
+                  <div className="text-xs font-black text-slate-500">CERTIFICACIÓ</div>
+                  <div className="mt-1 font-extrabold text-slate-900">
+                    {certification ? certification : "No indicada"}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border bg-white/60 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-xs font-black text-slate-500">ASSEGURANÇA / LLICÈNCIA</div>
+                      <div className="mt-1 font-extrabold text-slate-900">
+                        {licenseInsurance ? licenseInsurance : "No indicada"}
+                      </div>
+                    </div>
+                    <Badge tone={insuranceTone as any}>
+                      {insuranceExpiry ? `Fins ${insuranceExpiry}` : "Falta data"}
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border bg-white/60 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-xs font-black text-slate-500">CERTIFICAT MÈDIC</div>
+                      <div className="mt-1 font-extrabold text-slate-900">
+                        {medicalCertificate ? medicalCertificate : "No indicat"}
+                      </div>
+                    </div>
+                    <Badge tone={medicalTone as any}>
+                      {medicalExpiry ? `Fins ${medicalExpiry}` : "Falta data"}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 text-xs text-slate-500">
+                Consell: puja els documents a Google Drive/Dropbox i pega ací l’enllaç.
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="p-6 space-y-8">
-          {/* Dades personals */}
-          <section className="space-y-5">
-            <div className="flex items-center gap-4">
-              <img
-                src={avatarUrl || currentUser.avatarUrl || "/avatar-default.png"}
-                alt="avatar"
-                className="w-16 h-16 rounded-full border object-cover"
-              />
-              <div className="flex-1">
-                <label className="text-sm font-bold text-slate-700">Avatar URL</label>
+        {/* Formulari */}
+        <div className="lg:col-span-3">
+          <div className="rounded-3xl border bg-white/70 backdrop-blur shadow-sm p-8">
+            <h2 className="text-2xl font-black text-slate-900">Editar perfil</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Mantén al dia la teua certificació i documents.
+            </p>
+
+            {msg ? (
+              <div className="mt-5 rounded-2xl border bg-slate-900 text-yellow-300 px-4 py-3 text-sm font-black">
+                {msg}
+              </div>
+            ) : null}
+
+            <form onSubmit={save} className="mt-6 space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-black text-slate-900">Nom</label>
+                  <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="mt-2 w-full rounded-2xl border px-4 py-3 bg-white/80 focus:outline-none"
+                    placeholder="Nom i cognoms"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-black text-slate-900">Foto (URL)</label>
+                  <input
+                    value={avatarUrl}
+                    onChange={(e) => setAvatarUrl(e.target.value)}
+                    className="mt-2 w-full rounded-2xl border px-4 py-3 bg-white/80 focus:outline-none"
+                    placeholder="https://..."
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-black text-slate-900">Certificació</label>
                 <input
-                  className="mt-1 w-full rounded-xl border px-3 py-2"
-                  value={avatarUrl}
-                  onChange={(e) => setAvatarUrl(e.target.value)}
-                  placeholder="https://..."
+                  value={certification}
+                  onChange={(e) => setCertification(e.target.value)}
+                  className="mt-2 w-full rounded-2xl border px-4 py-3 bg-white/80 focus:outline-none"
+                  placeholder="Ex: FECDAS/CMAS · B1E  |  PADI · AOWD  |  SSI · OWD..."
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  (Opcional) URL d’una imatge pública.
-                </p>
               </div>
-            </div>
 
-            <div>
-              <label className="text-sm font-bold text-slate-700">Nom i cognoms</label>
-              <input
-                className="mt-1 w-full rounded-xl border px-3 py-2"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
+              <div className="rounded-3xl border bg-slate-900 text-white p-6">
+                <div className="text-xs font-black text-yellow-300">DOCUMENTACIÓ</div>
+                <div className="mt-1 text-lg font-black">Llicència / Assegurança i Certificat Mèdic</div>
+                <div className="mt-1 text-sm text-white/75">
+                  Guarda el número o informació i, si vols, un enllaç al PDF/foto.
+                </div>
 
-            <div>
-              <label className="text-sm font-bold text-slate-700">Certificació (opcional)</label>
-              <input
-                className="mt-1 w-full rounded-xl border px-3 py-2"
-                value={certification}
-                onChange={(e) => setCertification(e.target.value)}
-                placeholder="Ex: FECDAS/CMAS, PADI, SSI..."
-              />
-            </div>
-          </section>
-
-          {/* Titulacions */}
-          <section className="bg-gray-50 border rounded-2xl p-5">
-            <div className="flex items-center gap-2">
-              <BadgeCheck className="text-green-700" />
-              <h2 className="text-lg font-extrabold text-slate-900">Titulacions (nivells)</h2>
-            </div>
-            <p className="text-sm text-gray-600 mt-1">
-              Marca tots els nivells que tens. (El sistema guarda també un nivell principal automàtic.)
-            </p>
-
-            <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {allLevels.map((lvl) => {
-                const checked = levels.includes(lvl);
-                return (
-                  <label
-                    key={lvl}
-                    className={`flex items-center justify-between gap-3 p-3 rounded-2xl border cursor-pointer transition ${
-                      checked ? "bg-white border-black" : "bg-white/60 hover:bg-white border-gray-200"
-                    }`}
-                  >
-                    <span className="font-extrabold text-slate-900">{lvl}</span>
+                <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-black text-white/90">Llicència / Assegurança (text)</label>
                     <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggleLevel(lvl)}
-                      className="h-5 w-5"
+                      value={licenseInsurance}
+                      onChange={(e) => setLicenseInsurance(e.target.value)}
+                      className="mt-2 w-full rounded-2xl px-4 py-3 bg-white/10 border border-white/15 text-white placeholder:text-white/60 focus:outline-none"
+                      placeholder="Ex: Assegurança DAN · nº 12345"
                     />
-                  </label>
-                );
-              })}
-            </div>
+                  </div>
 
-            <div className="mt-4 text-xs text-gray-600">
-              Nivell principal guardat:{" "}
-              <span className="font-extrabold text-slate-900">
-                {computePrimaryLevel(levels)}
-              </span>
-            </div>
-          </section>
-
-          {/* Especialitats */}
-          <section className="bg-gray-50 border rounded-2xl p-5">
-            <div className="flex items-center gap-2">
-              <Star className="text-yellow-600" />
-              <h2 className="text-lg font-extrabold text-slate-900">Especialitats</h2>
-            </div>
-            <p className="text-sm text-gray-600 mt-1">
-              Marca les especialitats que tens. Si no està a la llista, pots afegir-la.
-            </p>
-
-            {/* Selecció */}
-            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {allSpecialties.map((sp) => {
-                const checked = specialties.includes(sp);
-                return (
-                  <label
-                    key={sp}
-                    className={`flex items-center justify-between gap-3 p-3 rounded-2xl border cursor-pointer transition ${
-                      checked ? "bg-white border-black" : "bg-white/60 hover:bg-white border-gray-200"
-                    }`}
-                  >
-                    <span className="font-bold text-slate-900">{sp}</span>
+                  <div>
+                    <label className="text-xs font-black text-white/90">Caducitat assegurança</label>
                     <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggleSpecialty(sp)}
-                      className="h-5 w-5"
+                      value={insuranceExpiry}
+                      onChange={(e) => setInsuranceExpiry(e.target.value)}
+                      className="mt-2 w-full rounded-2xl px-4 py-3 bg-white/10 border border-white/15 text-white placeholder:text-white/60 focus:outline-none"
+                      placeholder="YYYY-MM-DD"
                     />
-                  </label>
-                );
-              })}
-            </div>
+                  </div>
 
-            {/* Afegir manual */}
-            <div className="mt-4 flex flex-col sm:flex-row gap-2">
-              <input
-                className="w-full rounded-xl border px-3 py-2"
-                placeholder="Afegir especialitat (manual) ex: Apnea, Scooter, etc."
-                value={customSpecialty}
-                onChange={(e) => setCustomSpecialty(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") addCustomSpecialty();
-                }}
-              />
+                  <div className="md:col-span-2">
+                    <label className="text-xs font-black text-white/90">Enllaç document (PDF/foto)</label>
+                    <input
+                      value={licenseInsuranceUrl}
+                      onChange={(e) => setLicenseInsuranceUrl(e.target.value)}
+                      className="mt-2 w-full rounded-2xl px-4 py-3 bg-white/10 border border-white/15 text-white placeholder:text-white/60 focus:outline-none"
+                      placeholder="https://drive.google.com/..."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-black text-white/90">Certificat mèdic (text)</label>
+                    <input
+                      value={medicalCertificate}
+                      onChange={(e) => setMedicalCertificate(e.target.value)}
+                      className="mt-2 w-full rounded-2xl px-4 py-3 bg-white/10 border border-white/15 text-white placeholder:text-white/60 focus:outline-none"
+                      placeholder="Ex: Centre mèdic / observacions"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-black text-white/90">Caducitat certificat mèdic</label>
+                    <input
+                      value={medicalExpiry}
+                      onChange={(e) => setMedicalExpiry(e.target.value)}
+                      className="mt-2 w-full rounded-2xl px-4 py-3 bg-white/10 border border-white/15 text-white placeholder:text-white/60 focus:outline-none"
+                      placeholder="YYYY-MM-DD"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="text-xs font-black text-white/90">Enllaç certificat (PDF/foto)</label>
+                    <input
+                      value={medicalCertificateUrl}
+                      onChange={(e) => setMedicalCertificateUrl(e.target.value)}
+                      className="mt-2 w-full rounded-2xl px-4 py-3 bg-white/10 border border-white/15 text-white placeholder:text-white/60 focus:outline-none"
+                      placeholder="https://dropbox.com/..."
+                    />
+                  </div>
+                </div>
+              </div>
+
               <button
-                onClick={addCustomSpecialty}
-                className="px-4 py-2 rounded-xl bg-black text-white font-extrabold hover:bg-gray-900 inline-flex items-center gap-2"
+                disabled={saving}
+                className={`w-full px-6 py-3 rounded-2xl font-black shadow ${
+                  saving ? "bg-slate-200 text-slate-500 cursor-not-allowed" : "bg-yellow-400 text-black hover:bg-yellow-500"
+                }`}
+                type="submit"
               >
-                <Plus size={18} /> Afegir
+                {saving ? "Guardant..." : "Guardar canvis"}
               </button>
-            </div>
-
-            {/* Resum seleccionades */}
-            {specialties.length > 0 && (
-              <div className="mt-4">
-                <div className="text-sm font-extrabold text-slate-900 mb-2">
-                  Especialitats seleccionades:
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {specialties.map((sp) => (
-                    <span
-                      key={sp}
-                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border text-sm font-bold text-slate-800"
-                    >
-                      {sp}
-                      <button
-                        onClick={() => removeSpecialty(sp)}
-                        className="p-1 rounded-full hover:bg-gray-100"
-                        title="Eliminar"
-                      >
-                        <X size={14} />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </section>
-
-          {/* Guardar */}
-          <div className="pt-1 flex justify-end">
-            <button
-              onClick={save}
-              disabled={saving}
-              className={`px-6 py-2.5 rounded-xl font-extrabold ${
-                saving
-                  ? "bg-gray-300 text-gray-600 cursor-not-allowed"
-                  : "bg-orange-600 text-white hover:bg-orange-700"
-              }`}
-            >
-              {saving ? "Guardant..." : "Guardar canvis"}
-            </button>
+            </form>
           </div>
         </div>
       </div>
