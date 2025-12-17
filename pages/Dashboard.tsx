@@ -6,7 +6,8 @@ import { PageHero } from "../components/PageHero";
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { currentUser, users, trips, courses, socialEvents, canManageSystem } = useApp();
+  const { currentUser, users, trips, courses, socialEvents, canManageSystem } =
+    useApp();
 
   const isAdmin = canManageSystem?.() ?? false;
 
@@ -21,24 +22,23 @@ export const Dashboard: React.FC = () => {
       (u: any) => u._status === "active" || u._status === "approved"
     ).length;
 
-    return {
-      total: list.length,
-      pending,
-      active,
-    };
+    return { total: list.length, pending, active };
   }, [users]);
 
-  const nextTrips = useMemo(() => {
-    return (trips || []).filter((t: any) => t.published).slice(0, 3);
-  }, [trips]);
+  const nextTrips = useMemo(
+    () => (trips || []).filter((t: any) => t.published).slice(0, 3),
+    [trips]
+  );
 
-  const nextCourses = useMemo(() => {
-    return (courses || []).filter((c: any) => c.published).slice(0, 3);
-  }, [courses]);
+  const nextCourses = useMemo(
+    () => (courses || []).filter((c: any) => c.published).slice(0, 3),
+    [courses]
+  );
 
-  const nextEvents = useMemo(() => {
-    return (socialEvents || []).filter((e: any) => e.published).slice(0, 3);
-  }, [socialEvents]);
+  const nextEvents = useMemo(
+    () => (socialEvents || []).filter((e: any) => e.published).slice(0, 3),
+    [socialEvents]
+  );
 
   if (!currentUser) {
     return (
@@ -61,11 +61,11 @@ export const Dashboard: React.FC = () => {
     );
   }
 
-  // ✅ ADMIN: el panell ha de ser “Administració”
   if (isAdmin) {
     return (
       <div className="bg-slate-50 min-h-screen">
         <PageHero
+          compact
           title="Panell d’Administració"
           subtitle="Control del club: socis/es, sortides, cursos i esdeveniments."
           badge={
@@ -74,18 +74,11 @@ export const Dashboard: React.FC = () => {
               <b>{stats.active}</b> · Total: <b>{stats.total}</b>
             </span>
           }
-          right={
-            <button
-              onClick={() => navigate("/admin-users")}
-              className="px-5 py-2.5 rounded-2xl bg-yellow-400 text-black font-black hover:bg-yellow-500 shadow"
-            >
-              Gestió de socis/es
-            </button>
-          }
+          // ✅ sense botó repetit al hero
         />
 
         <div className="max-w-6xl mx-auto px-4 py-10 space-y-6">
-          {/* ✅ “Gestió de Socis/es” com a secció principal */}
+          {/* ✅ Gestió de socis/es com a principal (baix) */}
           <div className="bg-white border rounded-2xl shadow-sm p-6">
             <div className="flex items-start justify-between gap-4 flex-wrap">
               <div>
@@ -100,20 +93,20 @@ export const Dashboard: React.FC = () => {
                 </p>
               </div>
 
-              <div className="flex gap-3">
-                <button
-                  onClick={() => navigate("/admin-users")}
-                  className="px-5 py-3 rounded-2xl bg-slate-900 text-yellow-300 font-black hover:opacity-90"
-                >
-                  Obrir gestió
-                </button>
-              </div>
+              <button
+                onClick={() => navigate("/admin-users")}
+                className="px-5 py-3 rounded-2xl bg-slate-900 text-yellow-300 font-black hover:opacity-90"
+              >
+                Obrir gestió
+              </button>
             </div>
 
             <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="border rounded-2xl p-5 bg-slate-50">
                 <div className="text-xs font-bold text-slate-600">Pendents</div>
-                <div className="mt-2 text-4xl font-black text-slate-900">{stats.pending}</div>
+                <div className="mt-2 text-4xl font-black text-slate-900">
+                  {stats.pending}
+                </div>
                 <div className="text-sm text-slate-600 mt-1">
                   Persones a punt d’entrar
                 </div>
@@ -121,7 +114,9 @@ export const Dashboard: React.FC = () => {
 
               <div className="border rounded-2xl p-5 bg-slate-50">
                 <div className="text-xs font-bold text-slate-600">Actius</div>
-                <div className="mt-2 text-4xl font-black text-slate-900">{stats.active}</div>
+                <div className="mt-2 text-4xl font-black text-slate-900">
+                  {stats.active}
+                </div>
                 <div className="text-sm text-slate-600 mt-1">
                   Socis/es amb accés
                 </div>
@@ -129,7 +124,9 @@ export const Dashboard: React.FC = () => {
 
               <div className="border rounded-2xl p-5 bg-slate-50">
                 <div className="text-xs font-bold text-slate-600">Total</div>
-                <div className="mt-2 text-4xl font-black text-slate-900">{stats.total}</div>
+                <div className="mt-2 text-4xl font-black text-slate-900">
+                  {stats.total}
+                </div>
                 <div className="text-sm text-slate-600 mt-1">
                   Registres al sistema
                 </div>
@@ -137,19 +134,22 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* ✅ La resta de gestions, però secundàries */}
+          {/* Secundari */}
           <AdminManagementCards />
 
-          {/* Resum (opcional) */}
+          {/* Resum */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="bg-white border rounded-2xl p-5 shadow-sm">
-              <div className="font-extrabold text-slate-900">Properes sortides</div>
+              <div className="font-extrabold text-slate-900">
+                Properes sortides
+              </div>
               <div className="text-sm text-gray-600 mt-2">
                 {nextTrips.length ? (
                   <ul className="list-disc pl-5 space-y-1">
                     {nextTrips.map((t: any) => (
                       <li key={t.id}>
-                        <b>{t.title || "Sortida"}</b> {t.date ? `· ${t.date}` : ""}
+                        <b>{t.title || "Sortida"}</b>
+                        {t.date ? ` · ${t.date}` : ""}
                       </li>
                     ))}
                   </ul>
@@ -166,7 +166,8 @@ export const Dashboard: React.FC = () => {
                   <ul className="list-disc pl-5 space-y-1">
                     {nextCourses.map((c: any) => (
                       <li key={c.id}>
-                        <b>{c.title || "Curs"}</b> {c.date ? `· ${c.date}` : ""}
+                        <b>{c.title || "Curs"}</b>
+                        {c.date ? ` · ${c.date}` : ""}
                       </li>
                     ))}
                   </ul>
@@ -177,13 +178,16 @@ export const Dashboard: React.FC = () => {
             </div>
 
             <div className="bg-white border rounded-2xl p-5 shadow-sm">
-              <div className="font-extrabold text-slate-900">Propers esdeveniments</div>
+              <div className="font-extrabold text-slate-900">
+                Propers esdeveniments
+              </div>
               <div className="text-sm text-gray-600 mt-2">
                 {nextEvents.length ? (
                   <ul className="list-disc pl-5 space-y-1">
                     {nextEvents.map((e: any) => (
                       <li key={e.id}>
-                        <b>{e.title || "Esdeveniment"}</b> {e.date ? `· ${e.date}` : ""}
+                        <b>{e.title || "Esdeveniment"}</b>
+                        {e.date ? ` · ${e.date}` : ""}
                       </li>
                     ))}
                   </ul>
@@ -198,7 +202,7 @@ export const Dashboard: React.FC = () => {
     );
   }
 
-  // ✅ NO admin: panell normal (sense “perfil” com a CTA principal)
+  // NO admin
   return (
     <div className="bg-slate-50 min-h-screen">
       <PageHero
@@ -223,7 +227,9 @@ export const Dashboard: React.FC = () => {
               className="bg-white border rounded-2xl p-5 text-left hover:shadow-sm"
             >
               <div className="font-extrabold text-slate-900">Calendari</div>
-              <div className="text-gray-600 text-sm mt-1">Veure tot el que ve</div>
+              <div className="text-gray-600 text-sm mt-1">
+                Veure tot el que ve
+              </div>
             </button>
 
             <button
@@ -247,7 +253,9 @@ export const Dashboard: React.FC = () => {
               className="bg-white border rounded-2xl p-5 text-left hover:shadow-sm"
             >
               <div className="font-extrabold text-slate-900">Esdeveniments</div>
-              <div className="text-gray-600 text-sm mt-1">Quedades i activitats</div>
+              <div className="text-gray-600 text-sm mt-1">
+                Quedades i activitats
+              </div>
             </button>
           </div>
         </div>
