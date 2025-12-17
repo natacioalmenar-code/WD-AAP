@@ -69,7 +69,7 @@ interface AppContextValue extends AppState {
     certification: string;
   }) => Promise<void>;
 
-  // ✅ PERFIL PREMIUM (usuari edita nom/avatar/certificació + assegurança + mèdic)
+  // ✅ PERFIL PREMIUM
   updateMyProfile: (data: {
     name?: string;
     avatarUrl?: string;
@@ -84,12 +84,15 @@ interface AppContextValue extends AppState {
     medicalCertificateUrl?: string;
   }) => Promise<void>;
 
-  approveUser: (userId: string) => Promise<void>;
+  // ✅ ARA: aprovar com member o instructor
+  approveUser: (userId: string, role?: Role) => Promise<void>;
+
+  // ✅ canviar rol d’un usuari actiu
   setUserRole: (userId: string, role: Role) => Promise<void>;
 
-  canManageTrips: () => boolean; // admin o instructor (instructor: active)
-  canManageSystem: () => boolean; // admin
-  isActiveMember: () => boolean; // active i role != pending
+  canManageTrips: () => boolean;
+  canManageSystem: () => boolean;
+  isActiveMember: () => boolean;
 
   // Trips
   createTrip: (
@@ -205,7 +208,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   // ====== SNAPSHOTS ======
   useEffect(() => {
-    // ✅ FIX DEFINITIU: NO fem orderBy("createdAt") per evitar que “desapareguin” docs sense createdAt
     const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
       const users = snap.docs.map((d) => ({ ...(d.data() as any), id: d.id })) as User[];
 
@@ -310,7 +312,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         if (userSnap.exists()) userDocData = userSnap.data() as User;
       }
 
-      // Si NO existeix doc encara, el creem com pending
       if (!userDocData) {
         const newUser: User = {
           id: uid,
@@ -386,7 +387,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     } catch {}
   };
 
-  // ✅ REGISTRE (pendent d'aprovació)
   const registerUser: AppContextValue["registerUser"] = async ({
     name,
     email,
@@ -446,7 +446,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // ✅ PERFIL PREMIUM (cada usuari edita el seu doc)
+  // ✅ PERFIL PREMIUM
   const updateMyProfile: AppContextValue["updateMyProfile"] = async (data) => {
     if (!state.currentUser) {
       alert("No autenticat/da");
@@ -458,19 +458,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (typeof data.avatarUrl === "string") allowedData.avatarUrl = data.avatarUrl.trim();
     if (typeof data.certification === "string") allowedData.certification = data.certification.trim();
 
-    if (typeof data.licenseInsurance === "string")
-      allowedData.licenseInsurance = data.licenseInsurance.trim();
-    if (typeof data.insuranceExpiry === "string")
-      allowedData.insuranceExpiry = data.insuranceExpiry.trim();
-    if (typeof data.licenseInsuranceUrl === "string")
-      allowedData.licenseInsuranceUrl = data.licenseInsuranceUrl.trim();
+    if (typeof data.licenseInsurance === "string") allowedData.licenseInsurance = data.licenseInsurance.trim();
+    if (typeof data.insuranceExpiry === "string") allowedData.insuranceExpiry = data.insuranceExpiry.trim();
+    if (typeof data.licenseInsuranceUrl === "string") allowedData.licenseInsuranceUrl = data.licenseInsuranceUrl.trim();
 
-    if (typeof data.medicalCertificate === "string")
-      allowedData.medicalCertificate = data.medicalCertificate.trim();
-    if (typeof data.medicalExpiry === "string")
-      allowedData.medicalExpiry = data.medicalExpiry.trim();
-    if (typeof data.medicalCertificateUrl === "string")
-      allowedData.medicalCertificateUrl = data.medicalCertificateUrl.trim();
+    if (typeof data.medicalCertificate === "string") allowedData.medicalCertificate = data.medicalCertificate.trim();
+    if (typeof data.medicalExpiry === "string") allowedData.medicalExpiry = data.medicalExpiry.trim();
+    if (typeof data.medicalCertificateUrl === "string") allowedData.medicalCertificateUrl = data.medicalCertificateUrl.trim();
 
     if (Object.keys(allowedData).length === 0) return;
 
@@ -486,15 +480,19 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // ====== USERS ADMIN ======
-  const approveUser: AppContextValue["approveUser"] = async (userId) => {
+  // ✅ ARA: aprovar triant rol (member/instructor). Per defecte: member.
+  const approveUser: AppContextValue["approveUser"] = async (userId, role) => {
     if (!canManageSystem()) {
       alert("Només administració pot aprovar persones sòcies.");
       return;
     }
+
+    const finalRole: Role = role === "instructor" ? "instructor" : "member";
+
     await updateDoc(doc(db, "users", userId), {
       status: "active" as Status,
-      role: "member" as Role,
-      level: "B1E",
+      role: finalRole,
+      level: roleToLevel(finalRole),
       updatedAt: serverTimestamp(),
     });
   };
