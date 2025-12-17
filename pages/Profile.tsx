@@ -19,6 +19,11 @@ const Badge: React.FC<{ tone?: "good" | "warn" | "neutral"; children: React.Reac
   );
 };
 
+const isHttpUrl = (v: string) => {
+  const t = (v || "").trim();
+  return !t || /^https?:\/\//i.test(t);
+};
+
 export const Profile: React.FC = () => {
   const { currentUser, updateMyProfile } = useApp();
 
@@ -29,13 +34,13 @@ export const Profile: React.FC = () => {
   const [avatarUrl, setAvatarUrl] = useState(currentUser?.avatarUrl || "");
   const [certification, setCertification] = useState(currentUser?.certification || "");
 
-  const [licenseInsurance, setLicenseInsurance] = useState((currentUser as any)?.licenseInsurance || "");
-  const [licenseInsuranceUrl, setLicenseInsuranceUrl] = useState((currentUser as any)?.licenseInsuranceUrl || "");
-  const [insuranceExpiry, setInsuranceExpiry] = useState((currentUser as any)?.insuranceExpiry || "");
+  const [licenseInsurance, setLicenseInsurance] = useState(currentUser?.licenseInsurance || "");
+  const [licenseInsuranceUrl, setLicenseInsuranceUrl] = useState(currentUser?.licenseInsuranceUrl || "");
+  const [insuranceExpiry, setInsuranceExpiry] = useState(currentUser?.insuranceExpiry || "");
 
-  const [medicalCertificate, setMedicalCertificate] = useState((currentUser as any)?.medicalCertificate || "");
-  const [medicalCertificateUrl, setMedicalCertificateUrl] = useState((currentUser as any)?.medicalCertificateUrl || "");
-  const [medicalExpiry, setMedicalExpiry] = useState((currentUser as any)?.medicalExpiry || "");
+  const [medicalCertificate, setMedicalCertificate] = useState(currentUser?.medicalCertificate || "");
+  const [medicalCertificateUrl, setMedicalCertificateUrl] = useState(currentUser?.medicalCertificateUrl || "");
+  const [medicalExpiry, setMedicalExpiry] = useState(currentUser?.medicalExpiry || "");
 
   const statusTone = useMemo(() => {
     if (!currentUser) return "neutral";
@@ -60,24 +65,38 @@ export const Profile: React.FC = () => {
     e.preventDefault();
     if (!currentUser) return;
 
+    const aUrl = avatarUrl.trim();
+    const liUrl = licenseInsuranceUrl.trim();
+    const mcUrl = medicalCertificateUrl.trim();
+
+    // validació suau (premium: millor feedback)
+    if (!isHttpUrl(aUrl)) {
+      setMsg("La foto ha de ser una URL que comence per http:// o https://");
+      return;
+    }
+    if (!isHttpUrl(liUrl)) {
+      setMsg("L’enllaç de l’assegurança ha de ser http:// o https://");
+      return;
+    }
+    if (!isHttpUrl(mcUrl)) {
+      setMsg("L’enllaç del certificat mèdic ha de ser http:// o https://");
+      return;
+    }
+
     setMsg("");
     setSaving(true);
     try {
       await updateMyProfile({
         name,
-        avatarUrl,
+        avatarUrl: aUrl,
         certification,
-        // @ts-ignore
+
         licenseInsurance,
-        // @ts-ignore
-        licenseInsuranceUrl,
-        // @ts-ignore
+        licenseInsuranceUrl: liUrl,
         insuranceExpiry,
-        // @ts-ignore
+
         medicalCertificate,
-        // @ts-ignore
-        medicalCertificateUrl,
-        // @ts-ignore
+        medicalCertificateUrl: mcUrl,
         medicalExpiry,
       });
 
@@ -102,7 +121,7 @@ export const Profile: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-slate-50 to-slate-100">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-slate-100 to-slate-200">
       <PageHero
         compact
         title="Perfil"
@@ -163,11 +182,21 @@ export const Profile: React.FC = () => {
 
                 <div className="rounded-2xl border bg-white/60 p-4">
                   <div className="flex items-center justify-between gap-3">
-                    <div>
+                    <div className="min-w-0">
                       <div className="text-xs font-black text-slate-500">ASSEGURANÇA / LLICÈNCIA</div>
-                      <div className="mt-1 font-extrabold text-slate-900">
+                      <div className="mt-1 font-extrabold text-slate-900 truncate">
                         {licenseInsurance ? licenseInsurance : "No indicada"}
                       </div>
+                      {licenseInsuranceUrl ? (
+                        <a
+                          href={licenseInsuranceUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-block mt-2 text-sm font-black text-slate-900 underline decoration-yellow-400 underline-offset-4"
+                        >
+                          Obrir document →
+                        </a>
+                      ) : null}
                     </div>
                     <Badge tone={insuranceTone as any}>
                       {insuranceExpiry ? `Fins ${insuranceExpiry}` : "Falta data"}
@@ -177,11 +206,21 @@ export const Profile: React.FC = () => {
 
                 <div className="rounded-2xl border bg-white/60 p-4">
                   <div className="flex items-center justify-between gap-3">
-                    <div>
+                    <div className="min-w-0">
                       <div className="text-xs font-black text-slate-500">CERTIFICAT MÈDIC</div>
-                      <div className="mt-1 font-extrabold text-slate-900">
+                      <div className="mt-1 font-extrabold text-slate-900 truncate">
                         {medicalCertificate ? medicalCertificate : "No indicat"}
                       </div>
+                      {medicalCertificateUrl ? (
+                        <a
+                          href={medicalCertificateUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-block mt-2 text-sm font-black text-slate-900 underline decoration-yellow-400 underline-offset-4"
+                        >
+                          Obrir document →
+                        </a>
+                      ) : null}
                     </div>
                     <Badge tone={medicalTone as any}>
                       {medicalExpiry ? `Fins ${medicalExpiry}` : "Falta data"}
@@ -191,7 +230,7 @@ export const Profile: React.FC = () => {
               </div>
 
               <div className="mt-6 text-xs text-slate-500">
-                Consell: puja els documents a Google Drive/Dropbox i pega ací l’enllaç.
+                Consell: puja els documents a Google Drive/Dropbox i pega ací l’enllaç (compartició pública o amb link).
               </div>
             </div>
           </div>
@@ -317,7 +356,9 @@ export const Profile: React.FC = () => {
               <button
                 disabled={saving}
                 className={`w-full px-6 py-3 rounded-2xl font-black shadow ${
-                  saving ? "bg-slate-200 text-slate-500 cursor-not-allowed" : "bg-yellow-400 text-black hover:bg-yellow-500"
+                  saving
+                    ? "bg-slate-200 text-slate-500 cursor-not-allowed"
+                    : "bg-yellow-400 text-black hover:bg-yellow-500"
                 }`}
                 type="submit"
               >
