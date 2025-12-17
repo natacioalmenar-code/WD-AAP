@@ -1,126 +1,179 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Mail, Lock, ArrowLeft, AlertTriangle } from "lucide-react";
+import { PageHero } from "../components/PageHero";
 import { useApp } from "../context/AppContext";
 
 export const Login: React.FC = () => {
-  const { loginWithEmail, currentUser } = useApp();
   const navigate = useNavigate();
+  const { loginWithEmail } = useApp();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [err, setErr] = useState<string>("");
 
-  // ✅ Si ja està loguejat, redirigim segons estat
-  useEffect(() => {
-    if (!currentUser) return;
-
-    const isPending =
-      currentUser.role === "pending" || currentUser.status === "pending";
-
-    if (isPending) navigate("/pending", { replace: true });
-    else navigate("/dashboard", { replace: true });
-  }, [currentUser, navigate]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
-    setLoading(true);
+    setErr("");
+
+    const em = email.trim().toLowerCase();
+    if (!em || !password) {
+      setErr("Introdueix l’email i la contrasenya.");
+      return;
+    }
 
     try {
-      await loginWithEmail(email.trim().toLowerCase(), password);
-      // El redirect el fa el useEffect quan currentUser s’actualitza
-    } catch {
-      setError("Correu o contrasenya incorrectes.");
+      setLoading(true);
+      await loginWithEmail(em, password);
+      navigate("/dashboard");
+    } catch (e: any) {
+      setErr("Email o contrasenya incorrectes.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="max-w-md mx-auto px-4 py-10">
-      <button
-        onClick={() => navigate("/")}
-        className="flex items-center gap-2 text-sm font-bold text-slate-700 hover:underline"
-      >
-        <ArrowLeft size={16} /> Tornar a l’inici
-      </button>
+    <div className="bg-slate-50 min-h-screen">
+      <PageHero
+        compact
+        title="Accés"
+        subtitle="Entra a l’àrea privada del club."
+        badge={<span>Socis/es · Àrea privada</span>}
+      />
 
-      <div className="bg-white border rounded-2xl shadow-sm p-8 mt-4">
-        <h1 className="text-3xl font-extrabold text-slate-900 text-center">
-          Accés socis/es
-        </h1>
+      <div className="max-w-6xl mx-auto px-4 py-12 grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Columna esquerra */}
+        <div className="bg-white border rounded-3xl shadow-sm p-8">
+          <div className="inline-flex items-center gap-2 text-xs font-black rounded-full bg-slate-900 text-yellow-300 px-3 py-1">
+            WEST DIVERS · CLUB
+          </div>
 
-        <p className="text-gray-600 mt-2 text-center">
-          Introdueix el teu correu i contrasenya.
-        </p>
+          <h2 className="mt-4 text-3xl font-black text-slate-900">
+            Benvingut/da de nou 👋
+          </h2>
 
-        <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-900">
-          <b>Important:</b> si t’acabes de registrar, el teu compte pot estar{" "}
-          <b>pendent d’aprovació</b> fins que l’administració el validi.
+          <p className="mt-3 text-slate-600 font-semibold leading-relaxed">
+            Accedeix a l’àrea privada per consultar sortides, cursos,
+            esdeveniments i recursos del club.
+          </p>
+
+          <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="border rounded-2xl p-5 bg-slate-50">
+              <div className="text-xs font-black text-slate-600">SORTIDES</div>
+              <div className="mt-1 font-extrabold text-slate-900">
+                Apunta’t fàcilment
+              </div>
+              <div className="mt-1 text-sm text-slate-600">
+                Consulta dates i places.
+              </div>
+            </div>
+
+            <div className="border rounded-2xl p-5 bg-slate-50">
+              <div className="text-xs font-black text-slate-600">FORMACIÓ</div>
+              <div className="mt-1 font-extrabold text-slate-900">
+                Cursos del club
+              </div>
+              <div className="mt-1 text-sm text-slate-600">
+                Aprèn i evoluciona.
+              </div>
+            </div>
+
+            <div className="border rounded-2xl p-5 bg-slate-50">
+              <div className="text-xs font-black text-slate-600">COMUNITAT</div>
+              <div className="mt-1 font-extrabold text-slate-900">
+                Activitat social
+              </div>
+              <div className="mt-1 text-sm text-slate-600">
+                Quedades i esdeveniments.
+              </div>
+            </div>
+
+            <div className="border rounded-2xl p-5 bg-slate-50">
+              <div className="text-xs font-black text-slate-600">GESTIÓ</div>
+              <div className="mt-1 font-extrabold text-slate-900">
+                Àrea privada
+              </div>
+              <div className="mt-1 text-sm text-slate-600">
+                Tot centralitzat.
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-8 text-sm text-slate-600">
+            Encara no tens compte?{" "}
+            <Link to="/register" className="font-black text-slate-900 underline">
+              Fes la inscripció
+            </Link>
+          </div>
         </div>
 
-        {error && (
-          <div className="mt-4 bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700 flex gap-2">
-            <AlertTriangle size={18} />
-            <span>{error}</span>
-          </div>
-        )}
+        {/* Columna dreta – Formulari */}
+        <div className="bg-white border rounded-3xl shadow-sm p-8">
+          <h3 className="text-2xl font-black text-slate-900">
+            Inicia sessió
+          </h3>
+          <p className="mt-2 text-sm text-slate-600">
+            Introdueix les teues dades per accedir.
+          </p>
 
-        <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-          {/* Email */}
-          <div>
-            <label className="text-sm font-bold text-slate-700">Correu</label>
-            <div className="mt-1 flex items-center gap-2 rounded-xl border px-3 py-2">
-              <Mail size={18} className="text-slate-400" />
+          {err ? (
+            <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900 font-semibold">
+              {err}
+            </div>
+          ) : null}
+
+          <form onSubmit={submit} className="mt-6 space-y-4">
+            <div>
+              <label className="text-sm font-black text-slate-900">Email</label>
               <input
-                type="email"
-                className="w-full outline-none"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="exemple@correu.com"
-                required
+                className="mt-2 w-full rounded-2xl border px-4 py-3 bg-white focus:outline-none"
+                placeholder="nom@gmail.com"
+                type="email"
+                autoComplete="email"
               />
             </div>
-          </div>
 
-          {/* Password */}
-          <div>
-            <label className="text-sm font-bold text-slate-700">
-              Contrasenya
-            </label>
-            <div className="mt-1 flex items-center gap-2 rounded-xl border px-3 py-2">
-              <Lock size={18} className="text-slate-400" />
+            <div>
+              <label className="text-sm font-black text-slate-900">
+                Contrasenya
+              </label>
               <input
-                type="password"
-                className="w-full outline-none"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="********"
-                required
+                className="mt-2 w-full rounded-2xl border px-4 py-3 bg-white focus:outline-none"
+                placeholder="La teua contrasenya"
+                type="password"
+                autoComplete="current-password"
               />
             </div>
-          </div>
 
-          <button
-            disabled={loading}
-            className={`w-full mt-2 px-4 py-3 rounded-xl font-extrabold transition ${
-              loading
-                ? "bg-gray-300 text-gray-600 cursor-not-allowed"
-                : "bg-yellow-400 text-black hover:bg-yellow-500"
-            }`}
-          >
-            {loading ? "Entrant…" : "Entrar"}
-          </button>
-        </form>
+            <button
+              disabled={loading}
+              className={`w-full mt-2 px-6 py-3 rounded-2xl font-black shadow ${
+                loading
+                  ? "bg-slate-200 text-slate-500 cursor-not-allowed"
+                  : "bg-yellow-400 text-black hover:bg-yellow-500"
+              }`}
+              type="submit"
+            >
+              {loading ? "Accedint..." : "Entrar"}
+            </button>
 
-        <div className="mt-6 text-center text-sm text-gray-600">
-          Encara no tens compte?{" "}
-          <Link to="/register" className="font-extrabold text-slate-900 hover:underline">
-            Inscriu-te aquí
-          </Link>
+            <div className="text-xs text-slate-500 leading-relaxed">
+              Si el teu compte està pendent d’aprovació, encara no podràs accedir
+              fins que l’administració el valide.
+            </div>
+
+            <div className="text-sm text-slate-600">
+              No tens compte?{" "}
+              <Link to="/register" className="font-black text-slate-900 underline">
+                Inscripció
+              </Link>
+            </div>
+          </form>
         </div>
       </div>
     </div>
