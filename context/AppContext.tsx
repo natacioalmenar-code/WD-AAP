@@ -69,11 +69,19 @@ interface AppContextValue extends AppState {
     certification: string;
   }) => Promise<void>;
 
-  // ✅ PERFIL (usuari edita el seu propi nom/avatar/certificació)
+  // ✅ PERFIL PREMIUM (usuari edita nom/avatar/certificació + assegurança + mèdic)
   updateMyProfile: (data: {
     name?: string;
     avatarUrl?: string;
     certification?: string;
+
+    licenseInsurance?: string;
+    insuranceExpiry?: string;
+    licenseInsuranceUrl?: string;
+
+    medicalCertificate?: string;
+    medicalExpiry?: string;
+    medicalCertificateUrl?: string;
   }) => Promise<void>;
 
   approveUser: (userId: string) => Promise<void>;
@@ -438,7 +446,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // ✅ PERFIL (cada usuari edita el seu doc)
+  // ✅ PERFIL PREMIUM (cada usuari edita el seu doc)
   const updateMyProfile: AppContextValue["updateMyProfile"] = async (data) => {
     if (!state.currentUser) {
       alert("No autenticat/da");
@@ -449,6 +457,20 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (typeof data.name === "string") allowedData.name = data.name.trim();
     if (typeof data.avatarUrl === "string") allowedData.avatarUrl = data.avatarUrl.trim();
     if (typeof data.certification === "string") allowedData.certification = data.certification.trim();
+
+    if (typeof data.licenseInsurance === "string")
+      allowedData.licenseInsurance = data.licenseInsurance.trim();
+    if (typeof data.insuranceExpiry === "string")
+      allowedData.insuranceExpiry = data.insuranceExpiry.trim();
+    if (typeof data.licenseInsuranceUrl === "string")
+      allowedData.licenseInsuranceUrl = data.licenseInsuranceUrl.trim();
+
+    if (typeof data.medicalCertificate === "string")
+      allowedData.medicalCertificate = data.medicalCertificate.trim();
+    if (typeof data.medicalExpiry === "string")
+      allowedData.medicalExpiry = data.medicalExpiry.trim();
+    if (typeof data.medicalCertificateUrl === "string")
+      allowedData.medicalCertificateUrl = data.medicalCertificateUrl.trim();
 
     if (Object.keys(allowedData).length === 0) return;
 
