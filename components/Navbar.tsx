@@ -18,6 +18,7 @@ export const Navbar: React.FC = () => {
   return (
     <div className="bg-black">
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+        {/* LOGO */}
         <Link to="/" className="flex items-center gap-3">
           <img
             src={clubSettings?.logoUrl || "/westdivers-logo.png"}
@@ -34,14 +35,24 @@ export const Navbar: React.FC = () => {
           </div>
         </Link>
 
+        {/* LINKS CENTRALS */}
         <div className="flex items-center gap-2">
           <Link to="/" className={linkClass("/")}>
             Inici
           </Link>
 
-          <Link to="/dashboard" className={linkClass("/dashboard")}>
-            Panell
-          </Link>
+          {currentUser && (
+            <Link to="/dashboard" className={linkClass("/dashboard")}>
+              Panell
+            </Link>
+          )}
+
+          {/* ✅ XAT — per SOCI / INSTRUCTOR / ADMIN */}
+          {currentUser && (
+            <Link to="/chat" className={linkClass("/chat")}>
+              Xat
+            </Link>
+          )}
 
           {/* ✅ Perfil només si NO és admin */}
           {currentUser && !isAdmin && (
@@ -51,6 +62,7 @@ export const Navbar: React.FC = () => {
           )}
         </div>
 
+        {/* DRETA */}
         <div className="flex items-center gap-2">
           {isAdmin && (
             <span className="px-3 py-1 rounded-full text-xs font-black bg-yellow-400 text-black">
