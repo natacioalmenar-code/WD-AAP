@@ -60,7 +60,6 @@ const StatusPill: React.FC<{ published: boolean; status?: string; canSeeDrafts: 
 };
 
 function formatDayLabel(isoDate: string) {
-  // isoDate: YYYY-MM-DD
   if (!isoDate) return "";
   const [y, m, d] = isoDate.split("-").map((x) => Number(x));
   if (!y || !m || !d) return isoDate;
@@ -74,11 +73,10 @@ function formatDayLabel(isoDate: string) {
 }
 
 function safeDateKey(d: string) {
-  // Ensure we can sort even if empty
   return typeof d === "string" && d.trim() ? d.trim() : "9999-12-31";
 }
 
-export const Calendar: React.FC = () => {
+export const CalendarPage: React.FC = () => {
   const { currentUser, trips, courses, socialEvents, canManageTrips, canManageSystem } = useApp();
 
   const [q, setQ] = useState("");
@@ -88,7 +86,6 @@ export const Calendar: React.FC = () => {
   const [showPast, setShowPast] = useState(false);
 
   const canSeeDrafts = useMemo(() => {
-    // Admin i instructor (canManageTrips) poden veure ocults
     return (canManageSystem?.() ?? false) || (canManageTrips?.() ?? false);
   }, [canManageSystem, canManageTrips]);
 
@@ -157,10 +154,8 @@ export const Calendar: React.FC = () => {
         if (!showCourses && it.type === "course") return false;
         if (!showEvents && it.type === "event") return false;
 
-        // Socis/es: només publicats (i no cancel·lats si vols amagar-los; jo els mostre però marcats)
         if (!canSeeDrafts && !it.published) return false;
 
-        // Past
         if (!showPast && safeDateKey(it.date) < nowKey) return false;
 
         if (!needle) return true;
@@ -179,13 +174,11 @@ export const Calendar: React.FC = () => {
       map.set(key, arr);
     });
 
-    // Order keys
     const keys = Array.from(map.keys()).sort((a, b) => a.localeCompare(b));
     return keys.map((k) => ({
       date: k,
       label: formatDayLabel(k),
       items: (map.get(k) || []).sort((a, b) => {
-        // sort within day: by type then title
         const order = (x: ItemType) => (x === "trip" ? 1 : x === "course" ? 2 : 3);
         const d = order(a.type) - order(b.type);
         if (d !== 0) return d;
@@ -218,7 +211,6 @@ export const Calendar: React.FC = () => {
       />
 
       <div className="max-w-6xl mx-auto px-4 py-10 space-y-6">
-        {/* Controls premium */}
         <div className="rounded-3xl border bg-white/70 backdrop-blur shadow-sm p-6">
           <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
             <div className="min-w-0">
@@ -272,7 +264,6 @@ export const Calendar: React.FC = () => {
           </div>
         </div>
 
-        {/* Calendari en “quadres per dia” */}
         <div className="space-y-5">
           {grouped.length === 0 ? (
             <div className="rounded-3xl border bg-white/70 backdrop-blur shadow-sm p-10 text-center text-slate-600">
@@ -296,9 +287,7 @@ export const Calendar: React.FC = () => {
                             <StatusPill published={it.published} status={it.status} canSeeDrafts={canSeeDrafts} />
                           </div>
 
-                          <div className="mt-3 text-base font-black text-slate-900 break-words">
-                            {it.title}
-                          </div>
+                          <div className="mt-3 text-base font-black text-slate-900 break-words">{it.title}</div>
 
                           <div className="mt-2 text-sm text-slate-600">
                             {it.time ? <span className="font-bold">{it.time}</span> : null}
