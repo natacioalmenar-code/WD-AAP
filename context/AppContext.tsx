@@ -45,6 +45,7 @@ import type {
   ResourceItem,
   SocialPost,
   PostComment,
+  ApprovalStatus,
 } from "../types";
 
 interface AppState {
@@ -69,7 +70,6 @@ interface AppContextValue extends AppState {
     certification: string;
   }) => Promise<void>;
 
-  // ✅ PERFIL PREMIUM
   updateMyProfile: (data: {
     name?: string;
     avatarUrl?: string;
@@ -84,15 +84,16 @@ interface AppContextValue extends AppState {
     medicalCertificateUrl?: string;
   }) => Promise<void>;
 
-  // ✅ ARA: aprovar com member o instructor
   approveUser: (userId: string, role?: Role) => Promise<void>;
-
-  // ✅ canviar rol d’un usuari actiu
   setUserRole: (userId: string, role: Role) => Promise<void>;
 
   canManageTrips: () => boolean;
   canManageSystem: () => boolean;
   isActiveMember: () => boolean;
+
+  // ✅ NOVETAT: aprovacions
+  approveTrip: (tripId: string) => Promise<void>;
+  approveCourse: (courseId: string) => Promise<void>;
 
   // Trips
   createTrip: (
@@ -104,6 +105,9 @@ interface AppContextValue extends AppState {
       | "pendingParticipants"
       | "published"
       | "status"
+      | "approvalStatus"
+      | "approvedAt"
+      | "approvedBy"
     >
   ) => Promise<void>;
   updateTrip: (tripId: string, data: Partial<Trip>) => Promise<void>;
@@ -121,6 +125,9 @@ interface AppContextValue extends AppState {
       | "pendingParticipants"
       | "published"
       | "status"
+      | "approvalStatus"
+      | "approvedAt"
+      | "approvedBy"
     >
   ) => Promise<void>;
   updateCourse: (courseId: string, data: Partial<Course>) => Promise<void>;
@@ -128,7 +135,7 @@ interface AppContextValue extends AppState {
   setCoursePublished: (courseId: string, published: boolean) => Promise<void>;
   cancelCourse: (courseId: string, reason?: string) => Promise<void>;
 
-  // Social events (NOMÉS ADMIN)
+  // Social events (ADMIN)
   createSocialEvent: (
     data: Omit<
       SocialEvent,
@@ -140,10 +147,7 @@ interface AppContextValue extends AppState {
       | "status"
     >
   ) => Promise<void>;
-  updateSocialEvent: (
-    eventId: string,
-    data: Partial<SocialEvent>
-  ) => Promise<void>;
+  updateSocialEvent: (eventId: string, data: Partial<SocialEvent>) => Promise<void>;
   deleteSocialEvent: (eventId: string) => Promise<void>;
   setSocialEventPublished: (eventId: string, published: boolean) => Promise<void>;
   cancelSocialEvent: (eventId: string, reason?: string) => Promise<void>;
@@ -159,18 +163,15 @@ interface AppContextValue extends AppState {
   // Settings
   updateClubSettings: (data: Partial<ClubSettings>) => Promise<void>;
 
-  // ✅ MATERIAL
+  // Material
   createResource: (
     data: Omit<ResourceItem, "id" | "createdBy" | "createdAt" | "updatedAt">
   ) => Promise<void>;
-  updateResource: (
-    resourceId: string,
-    data: Partial<ResourceItem>
-  ) => Promise<void>;
+  updateResource: (resourceId: string, data: Partial<ResourceItem>) => Promise<void>;
   deleteResource: (resourceId: string) => Promise<void>;
   swapResourceOrder: (aId: string, bId: string) => Promise<void>;
 
-  // ✅ MUR SOCIAL
+  // Mur social
   createSocialPost: (data: { text: string; imageUrl?: string }) => Promise<void>;
   togglePostLike: (postId: string) => Promise<void>;
   addPostComment: (postId: string, text: string) => Promise<void>;
@@ -198,32 +199,6 @@ function roleToLevel(role: Role) {
 
 function assertAuthed(currentUser: User | null): asserts currentUser is User {
   if (!currentUser) throw new Error("No autenticat/da.");
-}
-
-/** ✅ Firestore NO accepta undefined. Això elimina undefined recursivament. */
-function cleanFirestoreData<T>(input: T): T {
-  if (Array.isArray(input)) {
-    return input.map((x) => cleanFirestoreData(x)) as any;
-  }
-  if (input && typeof input === "object") {
-    const out: any = {};
-    for (const [k, v] of Object.entries(input as any)) {
-      if (v === undefined) continue;
-      out[k] = cleanFirestoreData(v);
-    }
-    return out;
-  }
-  return input;
-}
-
-function toNumberOrUndefined(v: any) {
-  if (v === null || v === undefined) return undefined;
-  if (typeof v === "number") return Number.isFinite(v) ? v : undefined;
-  if (typeof v === "string") {
-    const n = Number(v);
-    return Number.isFinite(n) ? n : undefined;
-  }
-  return undefined;
 }
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
@@ -405,7 +380,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       state.currentUser.role !== "pending";
   }, [state.currentUser]);
 
-  // ====== AUTH METHODS ======
+  // ====== AUTH ======
   const loginWithEmail: AppContextValue["loginWithEmail"] = async (email, password) => {
     const trimmed = email.trim().toLowerCase();
     if (!trimmed || !password) throw new Error("missing_credentials");
@@ -458,9 +433,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     } catch (err: any) {
       console.error("REGISTER ERROR:", err);
 
-      try {
-        await signOut(auth);
-      } catch {}
+      try { await signOut(auth); } catch {}
 
       if (err?.code === "auth/email-already-in-use") {
         alert(
@@ -478,36 +451,36 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // ✅ PERFIL PREMIUM
+  // ====== PERFIL PREMIUM ======
   const updateMyProfile: AppContextValue["updateMyProfile"] = async (data) => {
     if (!state.currentUser) {
       alert("No autenticat/da");
       return;
     }
 
-    const allowedData: any = {};
-    if (typeof data.name === "string") allowedData.name = data.name.trim();
-    if (typeof data.avatarUrl === "string") allowedData.avatarUrl = data.avatarUrl.trim();
-    if (typeof data.certification === "string") allowedData.certification = data.certification.trim();
+    const allowed: any = {};
+    if (typeof data.name === "string") allowed.name = data.name.trim();
+    if (typeof data.avatarUrl === "string") allowed.avatarUrl = data.avatarUrl.trim();
+    if (typeof data.certification === "string") allowed.certification = data.certification.trim();
 
-    if (typeof data.licenseInsurance === "string") allowedData.licenseInsurance = data.licenseInsurance.trim();
-    if (typeof data.insuranceExpiry === "string") allowedData.insuranceExpiry = data.insuranceExpiry.trim();
-    if (typeof data.licenseInsuranceUrl === "string") allowedData.licenseInsuranceUrl = data.licenseInsuranceUrl.trim();
+    if (typeof data.licenseInsurance === "string") allowed.licenseInsurance = data.licenseInsurance.trim();
+    if (typeof data.insuranceExpiry === "string") allowed.insuranceExpiry = data.insuranceExpiry.trim();
+    if (typeof data.licenseInsuranceUrl === "string") allowed.licenseInsuranceUrl = data.licenseInsuranceUrl.trim();
 
-    if (typeof data.medicalCertificate === "string") allowedData.medicalCertificate = data.medicalCertificate.trim();
-    if (typeof data.medicalExpiry === "string") allowedData.medicalExpiry = data.medicalExpiry.trim();
-    if (typeof data.medicalCertificateUrl === "string") allowedData.medicalCertificateUrl = data.medicalCertificateUrl.trim();
+    if (typeof data.medicalCertificate === "string") allowed.medicalCertificate = data.medicalCertificate.trim();
+    if (typeof data.medicalExpiry === "string") allowed.medicalExpiry = data.medicalExpiry.trim();
+    if (typeof data.medicalCertificateUrl === "string") allowed.medicalCertificateUrl = data.medicalCertificateUrl.trim();
 
-    if (Object.keys(allowedData).length === 0) return;
+    if (Object.keys(allowed).length === 0) return;
 
     try {
       await updateDoc(doc(db, "users", state.currentUser.id), {
-        ...cleanFirestoreData(allowedData),
+        ...allowed,
         updatedAt: serverTimestamp(),
       });
-    } catch (err: any) {
+    } catch (err) {
       console.error("UPDATE PROFILE ERROR", err);
-      alert(`No s’ha pogut canviar el perfil: ${err?.code || err?.message || "unknown"}`);
+      alert("No s’ha pogut canviar el perfil");
     }
   };
 
@@ -541,7 +514,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  // ====== GUARDS ======
   const ensureCanManageTripsAndCourses = () => {
     if (!canManageTrips()) {
       alert("Només administració o instructors poden gestionar això.");
@@ -568,55 +540,79 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     updatedAt: serverTimestamp(),
   });
 
+  // ✅ decideix aprovació segons rol
+  const approvalDefaults = (): {
+    approvalStatus: ApprovalStatus;
+    approvedBy?: string;
+    approvedAt?: any;
+  } => {
+    if (canManageSystem()) {
+      return {
+        approvalStatus: "approved",
+        approvedBy: state.currentUser?.id,
+        approvedAt: serverTimestamp(),
+      };
+    }
+    return { approvalStatus: "pending" };
+  };
+
+  // ====== APROVACIÓ (ADMIN) ======
+  const approveTrip: AppContextValue["approveTrip"] = async (tripId) => {
+    if (!canManageSystem()) return alert("Només administració pot aprovar.");
+    assertAuthed(state.currentUser);
+
+    await updateDoc(doc(db, "trips", tripId), {
+      approvalStatus: "approved",
+      approvedBy: state.currentUser.id,
+      approvedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  };
+
+  const approveCourse: AppContextValue["approveCourse"] = async (courseId) => {
+    if (!canManageSystem()) return alert("Només administració pot aprovar.");
+    assertAuthed(state.currentUser);
+
+    await updateDoc(doc(db, "courses", courseId), {
+      approvalStatus: "approved",
+      approvedBy: state.currentUser.id,
+      approvedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  };
+
   // ====== TRIPS ======
   const createTrip: AppContextValue["createTrip"] = async (data) => {
     if (!ensureCanManageTripsAndCourses()) return;
     assertAuthed(state.currentUser);
 
-    // ✅ convertim números i netegem undefined
-    const payload: any = {
+    await addDoc(collection(db, "trips"), {
       ...baseDefaults(state.currentUser.id),
+      ...approvalDefaults(),
       ...data,
-      maxSpots: toNumberOrUndefined((data as any).maxSpots),
-    };
-
-    try {
-      await addDoc(collection(db, "trips"), cleanFirestoreData(payload));
-    } catch (err: any) {
-      console.error("CREATE TRIP ERROR:", err);
-      alert(`No s’ha pogut crear la sortida.\nDetall: ${err?.code || err?.message || "unknown"}`);
-    }
+    });
   };
 
   const updateTrip: AppContextValue["updateTrip"] = async (tripId, data) => {
     if (!ensureCanManageTripsAndCourses()) return;
-
-    const payload: any = {
-      ...data,
-      maxSpots: data.maxSpots !== undefined ? toNumberOrUndefined((data as any).maxSpots) : undefined,
-      updatedAt: serverTimestamp(),
-    };
-
-    try {
-      await updateDoc(doc(db, "trips", tripId), cleanFirestoreData(payload));
-    } catch (err: any) {
-      console.error("UPDATE TRIP ERROR:", err);
-      alert(`No s’ha pogut guardar la sortida.\nDetall: ${err?.code || err?.message || "unknown"}`);
-    }
+    await updateDoc(doc(db, "trips", tripId), { ...data, updatedAt: serverTimestamp() });
   };
 
   const deleteTrip: AppContextValue["deleteTrip"] = async (tripId) => {
     if (!canManageSystem()) return alert("Només administració pot esborrar definitivament.");
-    try {
-      await deleteDoc(doc(db, "trips", tripId));
-    } catch (err: any) {
-      console.error("DELETE TRIP ERROR:", err);
-      alert(`No s’ha pogut eliminar la sortida.\nDetall: ${err?.code || err?.message || "unknown"}`);
-    }
+    await deleteDoc(doc(db, "trips", tripId));
   };
 
   const setTripPublished: AppContextValue["setTripPublished"] = async (tripId, published) => {
     if (!ensureCanManageTripsAndCourses()) return;
+
+    const t = state.trips.find((x) => x.id === tripId);
+    const status = (t as any)?.approvalStatus || "pending";
+    if (published && status !== "approved") {
+      alert("Aquesta sortida està pendent d’aprovació. L’admin l’ha d’aprovar abans de publicar.");
+      return;
+    }
+
     await updateDoc(doc(db, "trips", tripId), { published, updatedAt: serverTimestamp() });
   };
 
@@ -635,49 +631,33 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (!ensureCanManageTripsAndCourses()) return;
     assertAuthed(state.currentUser);
 
-    const payload: any = {
+    await addDoc(collection(db, "courses"), {
       ...baseDefaults(state.currentUser.id),
+      ...approvalDefaults(),
       ...data,
-      maxSpots: toNumberOrUndefined((data as any).maxSpots),
-    };
-
-    try {
-      await addDoc(collection(db, "courses"), cleanFirestoreData(payload));
-    } catch (err: any) {
-      console.error("CREATE COURSE ERROR:", err);
-      alert(`No s’ha pogut crear el curs.\nDetall: ${err?.code || err?.message || "unknown"}`);
-    }
+    });
   };
 
   const updateCourse: AppContextValue["updateCourse"] = async (courseId, data) => {
     if (!ensureCanManageTripsAndCourses()) return;
-
-    const payload: any = {
-      ...data,
-      maxSpots: data.maxSpots !== undefined ? toNumberOrUndefined((data as any).maxSpots) : undefined,
-      updatedAt: serverTimestamp(),
-    };
-
-    try {
-      await updateDoc(doc(db, "courses", courseId), cleanFirestoreData(payload));
-    } catch (err: any) {
-      console.error("UPDATE COURSE ERROR:", err);
-      alert(`No s’ha pogut guardar el curs.\nDetall: ${err?.code || err?.message || "unknown"}`);
-    }
+    await updateDoc(doc(db, "courses", courseId), { ...data, updatedAt: serverTimestamp() });
   };
 
   const deleteCourse: AppContextValue["deleteCourse"] = async (courseId) => {
     if (!canManageSystem()) return alert("Només administració pot esborrar definitivament.");
-    try {
-      await deleteDoc(doc(db, "courses", courseId));
-    } catch (err: any) {
-      console.error("DELETE COURSE ERROR:", err);
-      alert(`No s’ha pogut eliminar el curs.\nDetall: ${err?.code || err?.message || "unknown"}`);
-    }
+    await deleteDoc(doc(db, "courses", courseId));
   };
 
   const setCoursePublished: AppContextValue["setCoursePublished"] = async (courseId, published) => {
     if (!ensureCanManageTripsAndCourses()) return;
+
+    const c = state.courses.find((x) => x.id === courseId);
+    const status = (c as any)?.approvalStatus || "pending";
+    if (published && status !== "approved") {
+      alert("Aquest curs està pendent d’aprovació. L’admin l’ha d’aprovar abans de publicar.");
+      return;
+    }
+
     await updateDoc(doc(db, "courses", courseId), { published, updatedAt: serverTimestamp() });
   };
 
@@ -691,52 +671,21 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  // ====== SOCIAL EVENTS (NOMÉS ADMIN) ======
+  // ====== SOCIAL EVENTS (ADMIN) ======
   const createSocialEvent: AppContextValue["createSocialEvent"] = async (data) => {
     if (!ensureCanManageSocialEvents()) return;
     assertAuthed(state.currentUser);
-
-    const payload: any = {
-      ...baseDefaults(state.currentUser.id),
-      ...data,
-      maxSpots: toNumberOrUndefined((data as any).maxSpots),
-    };
-
-    try {
-      await addDoc(collection(db, "socialEvents"), cleanFirestoreData(payload));
-    } catch (err: any) {
-      console.error("CREATE EVENT ERROR:", err);
-      alert(`No s’ha pogut crear l’esdeveniment.\nDetall: ${err?.code || err?.message || "unknown"}`);
-    }
+    await addDoc(collection(db, "socialEvents"), { ...baseDefaults(state.currentUser.id), ...data });
   };
 
   const updateSocialEvent: AppContextValue["updateSocialEvent"] = async (eventId, data) => {
     if (!ensureCanManageSocialEvents()) return;
-
-    const payload: any = {
-      ...data,
-      maxSpots: data.maxSpots !== undefined ? toNumberOrUndefined((data as any).maxSpots) : undefined,
-      updatedAt: serverTimestamp(),
-    };
-
-    try {
-      await updateDoc(doc(db, "socialEvents", eventId), cleanFirestoreData(payload));
-    } catch (err: any) {
-      console.error("UPDATE EVENT ERROR:", err);
-      alert(`No s’ha pogut guardar l’esdeveniment.\nDetall: ${err?.code || err?.message || "unknown"}`);
-    }
+    await updateDoc(doc(db, "socialEvents", eventId), { ...data, updatedAt: serverTimestamp() });
   };
 
   const deleteSocialEvent: AppContextValue["deleteSocialEvent"] = async (eventId) => {
-    // ✅ Admin: pot eliminar qualsevol event
-    if (!canManageSystem()) return alert("Només administració pot eliminar esdeveniments.");
-
-    try {
-      await deleteDoc(doc(db, "socialEvents", eventId));
-    } catch (err: any) {
-      console.error("DELETE EVENT ERROR:", err);
-      alert(`No s’ha pogut eliminar l’esdeveniment.\nDetall: ${err?.code || err?.message || "unknown"}`);
-    }
+    if (!ensureCanManageSocialEvents()) return;
+    await deleteDoc(doc(db, "socialEvents", eventId));
   };
 
   const setSocialEventPublished: AppContextValue["setSocialEventPublished"] = async (eventId, published) => {
@@ -819,7 +768,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (!canManageSystem()) return alert("Només administració pot modificar la web/app.");
     await setDoc(
       doc(db, "clubSettings", "main"),
-      { ...cleanFirestoreData(data), updatedAt: serverTimestamp() },
+      { ...data, updatedAt: serverTimestamp() },
       { merge: true }
     );
   };
@@ -828,17 +777,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const createResource: AppContextValue["createResource"] = async (data) => {
     if (!ensureCanManageTripsAndCourses()) return;
     assertAuthed(state.currentUser);
-    await addDoc(collection(db, "resources"), cleanFirestoreData({
+    await addDoc(collection(db, "resources"), {
       ...data,
       createdBy: state.currentUser.id,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    }));
+    });
   };
 
   const updateResource: AppContextValue["updateResource"] = async (resourceId, data) => {
     if (!ensureCanManageTripsAndCourses()) return;
-    await updateDoc(doc(db, "resources", resourceId), cleanFirestoreData({ ...data, updatedAt: serverTimestamp() }));
+    await updateDoc(doc(db, "resources", resourceId), { ...data, updatedAt: serverTimestamp() });
   };
 
   const deleteResource: AppContextValue["deleteResource"] = async (resourceId) => {
@@ -882,16 +831,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const t = text.trim();
     const img = (imageUrl || "").trim();
 
-    if (!t) {
-      alert("Escriu algun text per publicar.");
-      return;
-    }
+    if (!t) return alert("Escriu algun text per publicar.");
     if (img && !/^https?:\/\//i.test(img)) {
-      alert("La URL de la imatge ha de començar per http:// o https://");
-      return;
+      return alert("La URL de la imatge ha de començar per http:// o https://");
     }
 
-    await addDoc(collection(db, "socialPosts"), cleanFirestoreData({
+    await addDoc(collection(db, "socialPosts"), {
       text: t,
       imageUrl: img || "",
       createdBy: state.currentUser.id,
@@ -901,7 +846,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       comments: [],
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    }));
+    });
   };
 
   const togglePostLike: AppContextValue["togglePostLike"] = async (postId) => {
@@ -954,10 +899,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (!post) return;
 
     const allowed = canManageTrips() || post.createdBy === state.currentUser.id;
-    if (!allowed) {
-      alert("No tens permisos per eliminar aquesta publicació.");
-      return;
-    }
+    if (!allowed) return alert("No tens permisos per eliminar aquesta publicació.");
 
     await deleteDoc(doc(db, "socialPosts", postId));
   };
@@ -977,6 +919,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     canManageTrips,
     canManageSystem,
     isActiveMember,
+
+    approveTrip,
+    approveCourse,
 
     createTrip,
     updateTrip,
