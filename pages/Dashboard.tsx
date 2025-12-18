@@ -61,7 +61,7 @@ export const Dashboard: React.FC = () => {
     );
   }
 
-  if (isAdmin) {
+   if (isAdmin) {
     return (
       <div className="bg-slate-50 min-h-screen">
         <PageHero
@@ -73,6 +73,22 @@ export const Dashboard: React.FC = () => {
               <b>ADMIN</b> · Pendents: <b>{stats.pending}</b> · Actius:{" "}
               <b>{stats.active}</b> · Total: <b>{stats.total}</b>
             </span>
+          }
+          right={
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => navigate("/calendar")}
+                className="px-5 py-2.5 rounded-2xl bg-slate-900 text-yellow-300 font-black hover:opacity-90 shadow"
+              >
+                Calendari
+              </button>
+              <button
+                onClick={() => navigate("/admin-users")}
+                className="px-5 py-2.5 rounded-2xl bg-yellow-400 text-black font-black hover:bg-yellow-500 shadow"
+              >
+                Gestió Socis/es
+              </button>
+            </div>
           }
         />
 
@@ -91,12 +107,21 @@ export const Dashboard: React.FC = () => {
                 </p>
               </div>
 
-              <button
-                onClick={() => navigate("/admin-users")}
-                className="px-5 py-3 rounded-2xl bg-slate-900 text-yellow-300 font-black hover:opacity-90"
-              >
-                Obrir gestió
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => navigate("/calendar")}
+                  className="px-5 py-3 rounded-2xl border font-black hover:bg-slate-50"
+                >
+                  Veure calendari
+                </button>
+
+                <button
+                  onClick={() => navigate("/admin-users")}
+                  className="px-5 py-3 rounded-2xl bg-slate-900 text-yellow-300 font-black hover:opacity-90"
+                >
+                  Obrir gestió
+                </button>
+              </div>
             </div>
 
             <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
