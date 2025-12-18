@@ -5,6 +5,8 @@ import { AppProvider, useApp } from "./context/AppContext";
 import { Navbar } from "./components/Navbar";
 import { Footer } from "./components/Footer";
 
+import { VirtualDiveMaster } from "./pages/VirtualDiveMaster";
+
 import { Home } from "./pages/Home";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
@@ -69,6 +71,7 @@ const AppContent = () => {
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/cookies" element={<Cookies />} />
+          <Route path="/chat" element={<VirtualDiveMaster />} />
 
           {/* Cursos públics */}
           <Route path="/courses-public" element={<CoursesPublic />} />
