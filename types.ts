@@ -4,6 +4,9 @@ export type Role = "admin" | "instructor" | "member" | "pending";
 export type Status = "active" | "pending";
 export type PublishableStatus = "active" | "cancelled";
 
+// ✅ NOVETAT: aprovació per cursos/sortides
+export type ApprovalStatus = "pending" | "approved";
+
 /**
  * ✅ Titulacions FECDAS / CMAS
  */
@@ -60,13 +63,13 @@ export interface User {
   avatarUrl: string;
   certification?: string;
 
-  // ✅ DADES CARNET SOCI/A (NOVES)
+  // ✅ PERFIL PREMIUM (documents)
   licenseInsurance?: string;
-  insuranceExpiry?: string; // YYYY-MM-DD
+  insuranceExpiry?: string;
   licenseInsuranceUrl?: string;
 
   medicalCertificate?: string;
-  medicalExpiry?: string; // YYYY-MM-DD
+  medicalExpiry?: string;
   medicalCertificateUrl?: string;
 
   createdAt?: any;
@@ -89,6 +92,12 @@ export interface Trip {
 
   published: boolean;
   status: PublishableStatus;
+
+  // ✅ NOVETAT: aprovació
+  approvalStatus?: ApprovalStatus;
+  approvedBy?: string;
+  approvedAt?: any;
+
   cancelledReason?: string;
   cancelledAt?: any;
 
@@ -112,6 +121,12 @@ export interface Course {
 
   published: boolean;
   status: PublishableStatus;
+
+  // ✅ NOVETAT: aprovació
+  approvalStatus?: ApprovalStatus;
+  approvedBy?: string;
+  approvedAt?: any;
+
   cancelledReason?: string;
   cancelledAt?: any;
 
@@ -200,23 +215,6 @@ export interface PostComment {
   userId: string;
   userName: string;
   userAvatarUrl?: string;
-  text: string;
-  createdAt?: any;
-}
-
-export interface Chat {
-  id: string;
-  memberIds: string[]; // 2 usuaris
-  lastMessageText?: string;
-  lastMessageAt?: any;
-  createdAt?: any;
-  updatedAt?: any;
-}
-
-export interface ChatMessage {
-  id: string;
-  chatId: string;
-  senderId: string;
   text: string;
   createdAt?: any;
 }
