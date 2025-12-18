@@ -86,11 +86,13 @@ interface AppContextValue extends AppState {
 
   // ✅ ARA: aprovar com member o instructor
   approveUser: (userId: string, role?: Role) => Promise<void>;
+
+  // ✅ canviar rol d’un usuari actiu
   setUserRole: (userId: string, role: Role) => Promise<void>;
 
-  canManageTrips: () => boolean;      // admin o instructor (actiu)
-  canManageSystem: () => boolean;     // admin
-  isActiveMember: () => boolean;      // active i role != pending
+  canManageTrips: () => boolean;
+  canManageSystem: () => boolean;
+  isActiveMember: () => boolean;
 
   // Trips
   createTrip: (
@@ -138,7 +140,10 @@ interface AppContextValue extends AppState {
       | "status"
     >
   ) => Promise<void>;
-  updateSocialEvent: (eventId: string, data: Partial<SocialEvent>) => Promise<void>;
+  updateSocialEvent: (
+    eventId: string,
+    data: Partial<SocialEvent>
+  ) => Promise<void>;
   deleteSocialEvent: (eventId: string) => Promise<void>;
   setSocialEventPublished: (eventId: string, published: boolean) => Promise<void>;
   cancelSocialEvent: (eventId: string, reason?: string) => Promise<void>;
@@ -158,7 +163,10 @@ interface AppContextValue extends AppState {
   createResource: (
     data: Omit<ResourceItem, "id" | "createdBy" | "createdAt" | "updatedAt">
   ) => Promise<void>;
-  updateResource: (resourceId: string, data: Partial<ResourceItem>) => Promise<void>;
+  updateResource: (
+    resourceId: string,
+    data: Partial<ResourceItem>
+  ) => Promise<void>;
   deleteResource: (resourceId: string) => Promise<void>;
   swapResourceOrder: (aId: string, bId: string) => Promise<void>;
 
@@ -190,6 +198,32 @@ function roleToLevel(role: Role) {
 
 function assertAuthed(currentUser: User | null): asserts currentUser is User {
   if (!currentUser) throw new Error("No autenticat/da.");
+}
+
+/** ✅ Firestore NO accepta undefined. Això elimina undefined recursivament. */
+function cleanFirestoreData<T>(input: T): T {
+  if (Array.isArray(input)) {
+    return input.map((x) => cleanFirestoreData(x)) as any;
+  }
+  if (input && typeof input === "object") {
+    const out: any = {};
+    for (const [k, v] of Object.entries(input as any)) {
+      if (v === undefined) continue;
+      out[k] = cleanFirestoreData(v);
+    }
+    return out;
+  }
+  return input;
+}
+
+function toNumberOrUndefined(v: any) {
+  if (v === null || v === undefined) return undefined;
+  if (typeof v === "number") return Number.isFinite(v) ? v : undefined;
+  if (typeof v === "string") {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : undefined;
+  }
+  return undefined;
 }
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
@@ -468,7 +502,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       await updateDoc(doc(db, "users", state.currentUser.id), {
-        ...allowedData,
+        ...cleanFirestoreData(allowedData),
         updatedAt: serverTimestamp(),
       });
     } catch (err: any) {
@@ -486,17 +520,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     const finalRole: Role = role === "instructor" ? "instructor" : "member";
 
-    try {
-      await updateDoc(doc(db, "users", userId), {
-        status: "active" as Status,
-        role: finalRole,
-        level: roleToLevel(finalRole),
-        updatedAt: serverTimestamp(),
-      });
-    } catch (err: any) {
-      console.error("APPROVE USER ERROR:", err);
-      alert(`No s’ha pogut aprovar: ${err?.code || err?.message || "unknown"}`);
-    }
+    await updateDoc(doc(db, "users", userId), {
+      status: "active" as Status,
+      role: finalRole,
+      level: roleToLevel(finalRole),
+      updatedAt: serverTimestamp(),
+    });
   };
 
   const setUserRole: AppContextValue["setUserRole"] = async (userId, role) => {
@@ -504,17 +533,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       alert("Només administració pot canviar rols.");
       return;
     }
-    try {
-      await updateDoc(doc(db, "users", userId), {
-        role,
-        level: roleToLevel(role),
-        status: "active" as Status,
-        updatedAt: serverTimestamp(),
-      });
-    } catch (err: any) {
-      console.error("SET ROLE ERROR:", err);
-      alert(`No s’ha pogut canviar el rol: ${err?.code || err?.message || "unknown"}`);
-    }
+    await updateDoc(doc(db, "users", userId), {
+      role,
+      level: roleToLevel(role),
+      status: "active" as Status,
+      updatedAt: serverTimestamp(),
+    });
   };
 
   // ====== GUARDS ======
@@ -549,69 +573,61 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (!ensureCanManageTripsAndCourses()) return;
     assertAuthed(state.currentUser);
 
+    // ✅ convertim números i netegem undefined
+    const payload: any = {
+      ...baseDefaults(state.currentUser.id),
+      ...data,
+      maxSpots: toNumberOrUndefined((data as any).maxSpots),
+    };
+
     try {
-      await addDoc(collection(db, "trips"), {
-        ...baseDefaults(state.currentUser.id),
-        ...data,
-      });
+      await addDoc(collection(db, "trips"), cleanFirestoreData(payload));
     } catch (err: any) {
       console.error("CREATE TRIP ERROR:", err);
-      alert(
-        "No s’ha pogut crear la sortida.\n" +
-          "Normalment és per permisos (Firestore rules) o dades.\n" +
-          `Detall: ${err?.code || err?.message || "unknown"}`
-      );
+      alert(`No s’ha pogut crear la sortida.\nDetall: ${err?.code || err?.message || "unknown"}`);
     }
   };
 
   const updateTrip: AppContextValue["updateTrip"] = async (tripId, data) => {
     if (!ensureCanManageTripsAndCourses()) return;
 
+    const payload: any = {
+      ...data,
+      maxSpots: data.maxSpots !== undefined ? toNumberOrUndefined((data as any).maxSpots) : undefined,
+      updatedAt: serverTimestamp(),
+    };
+
     try {
-      await updateDoc(doc(db, "trips", tripId), { ...data, updatedAt: serverTimestamp() });
+      await updateDoc(doc(db, "trips", tripId), cleanFirestoreData(payload));
     } catch (err: any) {
       console.error("UPDATE TRIP ERROR:", err);
-      alert(`No s’ha pogut actualitzar la sortida: ${err?.code || err?.message || "unknown"}`);
+      alert(`No s’ha pogut guardar la sortida.\nDetall: ${err?.code || err?.message || "unknown"}`);
     }
   };
 
   const deleteTrip: AppContextValue["deleteTrip"] = async (tripId) => {
-    // ✅ Admin: pot eliminar qualsevol sortida
-    if (!canManageSystem()) return alert("Només administració pot eliminar sortides.");
-
+    if (!canManageSystem()) return alert("Només administració pot esborrar definitivament.");
     try {
       await deleteDoc(doc(db, "trips", tripId));
     } catch (err: any) {
       console.error("DELETE TRIP ERROR:", err);
-      alert(`No s’ha pogut eliminar la sortida: ${err?.code || err?.message || "unknown"}`);
+      alert(`No s’ha pogut eliminar la sortida.\nDetall: ${err?.code || err?.message || "unknown"}`);
     }
   };
 
   const setTripPublished: AppContextValue["setTripPublished"] = async (tripId, published) => {
     if (!ensureCanManageTripsAndCourses()) return;
-
-    try {
-      await updateDoc(doc(db, "trips", tripId), { published, updatedAt: serverTimestamp() });
-    } catch (err: any) {
-      console.error("PUBLISH TRIP ERROR:", err);
-      alert(`No s’ha pogut publicar: ${err?.code || err?.message || "unknown"}`);
-    }
+    await updateDoc(doc(db, "trips", tripId), { published, updatedAt: serverTimestamp() });
   };
 
   const cancelTrip: AppContextValue["cancelTrip"] = async (tripId, reason) => {
     if (!ensureCanManageTripsAndCourses()) return;
-
-    try {
-      await updateDoc(doc(db, "trips", tripId), {
-        status: "cancelled",
-        cancelledAt: serverTimestamp(),
-        cancelledReason: reason || "",
-        updatedAt: serverTimestamp(),
-      });
-    } catch (err: any) {
-      console.error("CANCEL TRIP ERROR:", err);
-      alert(`No s’ha pogut cancel·lar: ${err?.code || err?.message || "unknown"}`);
-    }
+    await updateDoc(doc(db, "trips", tripId), {
+      status: "cancelled",
+      cancelledAt: serverTimestamp(),
+      cancelledReason: reason || "",
+      updatedAt: serverTimestamp(),
+    });
   };
 
   // ====== COURSES ======
@@ -619,69 +635,60 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (!ensureCanManageTripsAndCourses()) return;
     assertAuthed(state.currentUser);
 
+    const payload: any = {
+      ...baseDefaults(state.currentUser.id),
+      ...data,
+      maxSpots: toNumberOrUndefined((data as any).maxSpots),
+    };
+
     try {
-      await addDoc(collection(db, "courses"), {
-        ...baseDefaults(state.currentUser.id),
-        ...data,
-      });
+      await addDoc(collection(db, "courses"), cleanFirestoreData(payload));
     } catch (err: any) {
       console.error("CREATE COURSE ERROR:", err);
-      alert(
-        "No s’ha pogut crear el curs.\n" +
-          "Normalment és per permisos (Firestore rules) o dades.\n" +
-          `Detall: ${err?.code || err?.message || "unknown"}`
-      );
+      alert(`No s’ha pogut crear el curs.\nDetall: ${err?.code || err?.message || "unknown"}`);
     }
   };
 
   const updateCourse: AppContextValue["updateCourse"] = async (courseId, data) => {
     if (!ensureCanManageTripsAndCourses()) return;
 
+    const payload: any = {
+      ...data,
+      maxSpots: data.maxSpots !== undefined ? toNumberOrUndefined((data as any).maxSpots) : undefined,
+      updatedAt: serverTimestamp(),
+    };
+
     try {
-      await updateDoc(doc(db, "courses", courseId), { ...data, updatedAt: serverTimestamp() });
+      await updateDoc(doc(db, "courses", courseId), cleanFirestoreData(payload));
     } catch (err: any) {
       console.error("UPDATE COURSE ERROR:", err);
-      alert(`No s’ha pogut actualitzar el curs: ${err?.code || err?.message || "unknown"}`);
+      alert(`No s’ha pogut guardar el curs.\nDetall: ${err?.code || err?.message || "unknown"}`);
     }
   };
 
   const deleteCourse: AppContextValue["deleteCourse"] = async (courseId) => {
-    // ✅ Admin: pot eliminar qualsevol curs
-    if (!canManageSystem()) return alert("Només administració pot eliminar cursos.");
-
+    if (!canManageSystem()) return alert("Només administració pot esborrar definitivament.");
     try {
       await deleteDoc(doc(db, "courses", courseId));
     } catch (err: any) {
       console.error("DELETE COURSE ERROR:", err);
-      alert(`No s’ha pogut eliminar el curs: ${err?.code || err?.message || "unknown"}`);
+      alert(`No s’ha pogut eliminar el curs.\nDetall: ${err?.code || err?.message || "unknown"}`);
     }
   };
 
   const setCoursePublished: AppContextValue["setCoursePublished"] = async (courseId, published) => {
     if (!ensureCanManageTripsAndCourses()) return;
-
-    try {
-      await updateDoc(doc(db, "courses", courseId), { published, updatedAt: serverTimestamp() });
-    } catch (err: any) {
-      console.error("PUBLISH COURSE ERROR:", err);
-      alert(`No s’ha pogut publicar: ${err?.code || err?.message || "unknown"}`);
-    }
+    await updateDoc(doc(db, "courses", courseId), { published, updatedAt: serverTimestamp() });
   };
 
   const cancelCourse: AppContextValue["cancelCourse"] = async (courseId, reason) => {
     if (!ensureCanManageTripsAndCourses()) return;
-
-    try {
-      await updateDoc(doc(db, "courses", courseId), {
-        status: "cancelled",
-        cancelledAt: serverTimestamp(),
-        cancelledReason: reason || "",
-        updatedAt: serverTimestamp(),
-      });
-    } catch (err: any) {
-      console.error("CANCEL COURSE ERROR:", err);
-      alert(`No s’ha pogut cancel·lar: ${err?.code || err?.message || "unknown"}`);
-    }
+    await updateDoc(doc(db, "courses", courseId), {
+      status: "cancelled",
+      cancelledAt: serverTimestamp(),
+      cancelledReason: reason || "",
+      updatedAt: serverTimestamp(),
+    });
   };
 
   // ====== SOCIAL EVENTS (NOMÉS ADMIN) ======
@@ -689,65 +696,62 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (!ensureCanManageSocialEvents()) return;
     assertAuthed(state.currentUser);
 
+    const payload: any = {
+      ...baseDefaults(state.currentUser.id),
+      ...data,
+      maxSpots: toNumberOrUndefined((data as any).maxSpots),
+    };
+
     try {
-      await addDoc(collection(db, "socialEvents"), {
-        ...baseDefaults(state.currentUser.id),
-        ...data,
-      });
+      await addDoc(collection(db, "socialEvents"), cleanFirestoreData(payload));
     } catch (err: any) {
       console.error("CREATE EVENT ERROR:", err);
-      alert(`No s’ha pogut crear l’esdeveniment: ${err?.code || err?.message || "unknown"}`);
+      alert(`No s’ha pogut crear l’esdeveniment.\nDetall: ${err?.code || err?.message || "unknown"}`);
     }
   };
 
   const updateSocialEvent: AppContextValue["updateSocialEvent"] = async (eventId, data) => {
     if (!ensureCanManageSocialEvents()) return;
 
+    const payload: any = {
+      ...data,
+      maxSpots: data.maxSpots !== undefined ? toNumberOrUndefined((data as any).maxSpots) : undefined,
+      updatedAt: serverTimestamp(),
+    };
+
     try {
-      await updateDoc(doc(db, "socialEvents", eventId), { ...data, updatedAt: serverTimestamp() });
+      await updateDoc(doc(db, "socialEvents", eventId), cleanFirestoreData(payload));
     } catch (err: any) {
       console.error("UPDATE EVENT ERROR:", err);
-      alert(`No s’ha pogut actualitzar l’esdeveniment: ${err?.code || err?.message || "unknown"}`);
+      alert(`No s’ha pogut guardar l’esdeveniment.\nDetall: ${err?.code || err?.message || "unknown"}`);
     }
   };
 
   const deleteSocialEvent: AppContextValue["deleteSocialEvent"] = async (eventId) => {
     // ✅ Admin: pot eliminar qualsevol event
-    if (!ensureCanManageSocialEvents()) return;
+    if (!canManageSystem()) return alert("Només administració pot eliminar esdeveniments.");
 
     try {
       await deleteDoc(doc(db, "socialEvents", eventId));
     } catch (err: any) {
       console.error("DELETE EVENT ERROR:", err);
-      alert(`No s’ha pogut eliminar l’esdeveniment: ${err?.code || err?.message || "unknown"}`);
+      alert(`No s’ha pogut eliminar l’esdeveniment.\nDetall: ${err?.code || err?.message || "unknown"}`);
     }
   };
 
   const setSocialEventPublished: AppContextValue["setSocialEventPublished"] = async (eventId, published) => {
     if (!ensureCanManageSocialEvents()) return;
-
-    try {
-      await updateDoc(doc(db, "socialEvents", eventId), { published, updatedAt: serverTimestamp() });
-    } catch (err: any) {
-      console.error("PUBLISH EVENT ERROR:", err);
-      alert(`No s’ha pogut publicar: ${err?.code || err?.message || "unknown"}`);
-    }
+    await updateDoc(doc(db, "socialEvents", eventId), { published, updatedAt: serverTimestamp() });
   };
 
   const cancelSocialEvent: AppContextValue["cancelSocialEvent"] = async (eventId, reason) => {
     if (!ensureCanManageSocialEvents()) return;
-
-    try {
-      await updateDoc(doc(db, "socialEvents", eventId), {
-        status: "cancelled",
-        cancelledAt: serverTimestamp(),
-        cancelledReason: reason || "",
-        updatedAt: serverTimestamp(),
-      });
-    } catch (err: any) {
-      console.error("CANCEL EVENT ERROR:", err);
-      alert(`No s’ha pogut cancel·lar: ${err?.code || err?.message || "unknown"}`);
-    }
+    await updateDoc(doc(db, "socialEvents", eventId), {
+      status: "cancelled",
+      cancelledAt: serverTimestamp(),
+      cancelledReason: reason || "",
+      updatedAt: serverTimestamp(),
+    });
   };
 
   // ====== JOIN/LEAVE ======
@@ -762,144 +766,84 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const joinTrip: AppContextValue["joinTrip"] = async (tripId) => {
     if (!ensureCanJoin()) return;
     assertAuthed(state.currentUser);
-
-    try {
-      await updateDoc(doc(db, "trips", tripId), {
-        participants: arrayUnion(state.currentUser.id),
-        updatedAt: serverTimestamp(),
-      });
-    } catch (err: any) {
-      console.error("JOIN TRIP ERROR:", err);
-      alert(`No t’has pogut apuntar: ${err?.code || err?.message || "unknown"}`);
-    }
+    await updateDoc(doc(db, "trips", tripId), {
+      participants: arrayUnion(state.currentUser.id),
+      updatedAt: serverTimestamp(),
+    });
   };
 
   const leaveTrip: AppContextValue["leaveTrip"] = async (tripId) => {
     if (!state.currentUser) return;
-
-    try {
-      await updateDoc(doc(db, "trips", tripId), {
-        participants: arrayRemove(state.currentUser.id),
-        updatedAt: serverTimestamp(),
-      });
-    } catch (err: any) {
-      console.error("LEAVE TRIP ERROR:", err);
-      alert(`No t’has pogut desapuntar: ${err?.code || err?.message || "unknown"}`);
-    }
+    await updateDoc(doc(db, "trips", tripId), {
+      participants: arrayRemove(state.currentUser.id),
+      updatedAt: serverTimestamp(),
+    });
   };
 
   const joinCourse: AppContextValue["joinCourse"] = async (courseId) => {
     if (!ensureCanJoin()) return;
     assertAuthed(state.currentUser);
-
-    try {
-      await updateDoc(doc(db, "courses", courseId), {
-        participants: arrayUnion(state.currentUser.id),
-        updatedAt: serverTimestamp(),
-      });
-    } catch (err: any) {
-      console.error("JOIN COURSE ERROR:", err);
-      alert(`No t’has pogut apuntar: ${err?.code || err?.message || "unknown"}`);
-    }
+    await updateDoc(doc(db, "courses", courseId), {
+      participants: arrayUnion(state.currentUser.id),
+      updatedAt: serverTimestamp(),
+    });
   };
 
   const leaveCourse: AppContextValue["leaveCourse"] = async (courseId) => {
     if (!state.currentUser) return;
-
-    try {
-      await updateDoc(doc(db, "courses", courseId), {
-        participants: arrayRemove(state.currentUser.id),
-        updatedAt: serverTimestamp(),
-      });
-    } catch (err: any) {
-      console.error("LEAVE COURSE ERROR:", err);
-      alert(`No t’has pogut desapuntar: ${err?.code || err?.message || "unknown"}`);
-    }
+    await updateDoc(doc(db, "courses", courseId), {
+      participants: arrayRemove(state.currentUser.id),
+      updatedAt: serverTimestamp(),
+    });
   };
 
   const joinSocialEvent: AppContextValue["joinSocialEvent"] = async (eventId) => {
     if (!ensureCanJoin()) return;
     assertAuthed(state.currentUser);
-
-    try {
-      await updateDoc(doc(db, "socialEvents", eventId), {
-        participants: arrayUnion(state.currentUser.id),
-        updatedAt: serverTimestamp(),
-      });
-    } catch (err: any) {
-      console.error("JOIN EVENT ERROR:", err);
-      alert(`No t’has pogut apuntar: ${err?.code || err?.message || "unknown"}`);
-    }
+    await updateDoc(doc(db, "socialEvents", eventId), {
+      participants: arrayUnion(state.currentUser.id),
+      updatedAt: serverTimestamp(),
+    });
   };
 
   const leaveSocialEvent: AppContextValue["leaveSocialEvent"] = async (eventId) => {
     if (!state.currentUser) return;
-
-    try {
-      await updateDoc(doc(db, "socialEvents", eventId), {
-        participants: arrayRemove(state.currentUser.id),
-        updatedAt: serverTimestamp(),
-      });
-    } catch (err: any) {
-      console.error("LEAVE EVENT ERROR:", err);
-      alert(`No t’has pogut desapuntar: ${err?.code || err?.message || "unknown"}`);
-    }
+    await updateDoc(doc(db, "socialEvents", eventId), {
+      participants: arrayRemove(state.currentUser.id),
+      updatedAt: serverTimestamp(),
+    });
   };
 
   // ====== SETTINGS ======
   const updateClubSettings: AppContextValue["updateClubSettings"] = async (data) => {
     if (!canManageSystem()) return alert("Només administració pot modificar la web/app.");
-
-    try {
-      await setDoc(
-        doc(db, "clubSettings", "main"),
-        { ...data, updatedAt: serverTimestamp() },
-        { merge: true }
-      );
-    } catch (err: any) {
-      console.error("UPDATE SETTINGS ERROR:", err);
-      alert(`No s’ha pogut guardar: ${err?.code || err?.message || "unknown"}`);
-    }
+    await setDoc(
+      doc(db, "clubSettings", "main"),
+      { ...cleanFirestoreData(data), updatedAt: serverTimestamp() },
+      { merge: true }
+    );
   };
 
   // ====== MATERIAL ======
   const createResource: AppContextValue["createResource"] = async (data) => {
     if (!ensureCanManageTripsAndCourses()) return;
     assertAuthed(state.currentUser);
-
-    try {
-      await addDoc(collection(db, "resources"), {
-        ...data,
-        createdBy: state.currentUser.id,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-    } catch (err: any) {
-      console.error("CREATE RESOURCE ERROR:", err);
-      alert(`No s’ha pogut crear el recurs: ${err?.code || err?.message || "unknown"}`);
-    }
+    await addDoc(collection(db, "resources"), cleanFirestoreData({
+      ...data,
+      createdBy: state.currentUser.id,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }));
   };
 
   const updateResource: AppContextValue["updateResource"] = async (resourceId, data) => {
     if (!ensureCanManageTripsAndCourses()) return;
-
-    try {
-      await updateDoc(doc(db, "resources", resourceId), { ...data, updatedAt: serverTimestamp() });
-    } catch (err: any) {
-      console.error("UPDATE RESOURCE ERROR:", err);
-      alert(`No s’ha pogut actualitzar: ${err?.code || err?.message || "unknown"}`);
-    }
+    await updateDoc(doc(db, "resources", resourceId), cleanFirestoreData({ ...data, updatedAt: serverTimestamp() }));
   };
 
   const deleteResource: AppContextValue["deleteResource"] = async (resourceId) => {
     if (!canManageTrips()) return alert("Només administració o instructors poden eliminar material.");
-
-    try {
-      await deleteDoc(doc(db, "resources", resourceId));
-    } catch (err: any) {
-      console.error("DELETE RESOURCE ERROR:", err);
-      alert(`No s’ha pogut eliminar: ${err?.code || err?.message || "unknown"}`);
-    }
+    await deleteDoc(doc(db, "resources", resourceId));
   };
 
   const swapResourceOrder: AppContextValue["swapResourceOrder"] = async (aId, bId) => {
@@ -911,25 +855,20 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const aRef = doc(db, "resources", aId);
     const bRef = doc(db, "resources", bId);
 
-    try {
-      await runTransaction(db, async (tx) => {
-        const aSnap = await tx.get(aRef);
-        const bSnap = await tx.get(bRef);
-        if (!aSnap.exists() || !bSnap.exists()) throw new Error("Resource missing");
+    await runTransaction(db, async (tx) => {
+      const aSnap = await tx.get(aRef);
+      const bSnap = await tx.get(bRef);
+      if (!aSnap.exists() || !bSnap.exists()) throw new Error("Resource missing");
 
-        const a = aSnap.data() as any;
-        const b = bSnap.data() as any;
+      const a = aSnap.data() as any;
+      const b = bSnap.data() as any;
 
-        const aOrder = typeof a.order === "number" ? a.order : 999999;
-        const bOrder = typeof b.order === "number" ? b.order : 999999;
+      const aOrder = typeof a.order === "number" ? a.order : 999999;
+      const bOrder = typeof b.order === "number" ? b.order : 999999;
 
-        tx.update(aRef, { order: bOrder, updatedAt: serverTimestamp() });
-        tx.update(bRef, { order: aOrder, updatedAt: serverTimestamp() });
-      });
-    } catch (err: any) {
-      console.error("SWAP RESOURCE ERROR:", err);
-      alert(`No s’ha pogut ordenar: ${err?.code || err?.message || "unknown"}`);
-    }
+      tx.update(aRef, { order: bOrder, updatedAt: serverTimestamp() });
+      tx.update(bRef, { order: aOrder, updatedAt: serverTimestamp() });
+    });
   };
 
   // ====== MUR SOCIAL ======
@@ -952,22 +891,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    try {
-      await addDoc(collection(db, "socialPosts"), {
-        text: t,
-        imageUrl: img || "",
-        createdBy: state.currentUser.id,
-        createdByName: state.currentUser.name,
-        createdByAvatarUrl: state.currentUser.avatarUrl || "",
-        likes: [],
-        comments: [],
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-    } catch (err: any) {
-      console.error("CREATE POST ERROR:", err);
-      alert(`No s’ha pogut publicar: ${err?.code || err?.message || "unknown"}`);
-    }
+    await addDoc(collection(db, "socialPosts"), cleanFirestoreData({
+      text: t,
+      imageUrl: img || "",
+      createdBy: state.currentUser.id,
+      createdByName: state.currentUser.name,
+      createdByAvatarUrl: state.currentUser.avatarUrl || "",
+      likes: [],
+      comments: [],
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }));
   };
 
   const togglePostLike: AppContextValue["togglePostLike"] = async (postId) => {
@@ -975,25 +909,19 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     assertAuthed(state.currentUser);
 
     const ref = doc(db, "socialPosts", postId);
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists()) throw new Error("Post missing");
+      const data = snap.data() as any;
+      const likes: string[] = Array.isArray(data.likes) ? data.likes : [];
+      const uid = state.currentUser.id;
 
-    try {
-      await runTransaction(db, async (tx) => {
-        const snap = await tx.get(ref);
-        if (!snap.exists()) throw new Error("Post missing");
-        const data = snap.data() as any;
-        const likes: string[] = Array.isArray(data.likes) ? data.likes : [];
-        const uid = state.currentUser.id;
-
-        const has = likes.includes(uid);
-        tx.update(ref, {
-          likes: has ? likes.filter((x) => x !== uid) : [...likes, uid],
-          updatedAt: serverTimestamp(),
-        });
+      const has = likes.includes(uid);
+      tx.update(ref, {
+        likes: has ? likes.filter((x) => x !== uid) : [...likes, uid],
+        updatedAt: serverTimestamp(),
       });
-    } catch (err: any) {
-      console.error("TOGGLE LIKE ERROR:", err);
-      alert(`No s’ha pogut fer like: ${err?.code || err?.message || "unknown"}`);
-    }
+    });
   };
 
   const addPostComment: AppContextValue["addPostComment"] = async (postId, text) => {
@@ -1012,15 +940,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       createdAt: serverTimestamp(),
     };
 
-    try {
-      await updateDoc(doc(db, "socialPosts", postId), {
-        comments: arrayUnion(comment as any),
-        updatedAt: serverTimestamp(),
-      });
-    } catch (err: any) {
-      console.error("ADD COMMENT ERROR:", err);
-      alert(`No s’ha pogut comentar: ${err?.code || err?.message || "unknown"}`);
-    }
+    await updateDoc(doc(db, "socialPosts", postId), {
+      comments: arrayUnion(comment as any),
+      updatedAt: serverTimestamp(),
+    });
   };
 
   const deleteSocialPost: AppContextValue["deleteSocialPost"] = async (postId) => {
@@ -1036,12 +959,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    try {
-      await deleteDoc(doc(db, "socialPosts", postId));
-    } catch (err: any) {
-      console.error("DELETE POST ERROR:", err);
-      alert(`No s’ha pogut eliminar: ${err?.code || err?.message || "unknown"}`);
-    }
+    await deleteDoc(doc(db, "socialPosts", postId));
   };
 
   const value: AppContextValue = {
