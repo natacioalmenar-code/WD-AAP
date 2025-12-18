@@ -1,244 +1,333 @@
 import React, { useMemo, useState } from "react";
 import { useApp } from "../context/AppContext";
-import { CalendarDays, MapPin, GraduationCap, Users } from "lucide-react";
+import { PageHero } from "../components/PageHero";
 
-type CalendarItem =
-  | {
-      kind: "trip";
-      id: string;
-      title: string;
-      date: string;
-      location?: string;
-      levelRequired?: string;
-      participants: string[];
-    }
-  | {
-      kind: "course";
-      id: string;
-      title: string;
-      date: string;
-      schedule?: string;
-      levelRequired?: string;
-      participants: string[];
-    };
+type ItemType = "trip" | "course" | "event";
 
-export const CalendarPage: React.FC = () => {
-  const { currentUser, trips, courses, users } = useApp();
-  const [filter, setFilter] = useState<"all" | "trips" | "courses">("all");
+type CalendarItem = {
+  id: string;
+  type: ItemType;
+  title: string;
+  date: string; // YYYY-MM-DD
+  time?: string; // HH:mm
+  location?: string;
+  subtitle?: string;
+  published: boolean;
+  status?: string; // active | cancelled
+};
 
-  if (!currentUser) return null;
+const TypePill: React.FC<{ type: ItemType }> = ({ type }) => {
+  const cfg =
+    type === "trip"
+      ? { label: "SORTIDA", cls: "bg-slate-900 text-yellow-300" }
+      : type === "course"
+      ? { label: "CURS", cls: "bg-indigo-900 text-indigo-100" }
+      : { label: "ESDEVENIMENT", cls: "bg-emerald-900 text-emerald-100" };
 
-  const nameFromId = (id: string) =>
-    users.find((u) => u.id === id)?.name || "Persona desconeguda";
+  return (
+    <span className={`inline-flex items-center text-[11px] font-black px-3 py-1 rounded-full ${cfg.cls}`}>
+      {cfg.label}
+    </span>
+  );
+};
+
+const StatusPill: React.FC<{ published: boolean; status?: string; canSeeDrafts: boolean }> = ({
+  published,
+  status,
+  canSeeDrafts,
+}) => {
+  if (status === "cancelled") {
+    return (
+      <span className="inline-flex items-center text-[11px] font-black px-3 py-1 rounded-full border bg-red-50 border-red-200 text-red-800">
+        CANCEL·LAT
+      </span>
+    );
+  }
+
+  if (!published && canSeeDrafts) {
+    return (
+      <span className="inline-flex items-center text-[11px] font-black px-3 py-1 rounded-full border bg-slate-50 border-slate-200 text-slate-700">
+        OCULT
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center text-[11px] font-black px-3 py-1 rounded-full border bg-emerald-50 border-emerald-200 text-emerald-900">
+      PUBLICAT
+    </span>
+  );
+};
+
+function formatDayLabel(isoDate: string) {
+  // isoDate: YYYY-MM-DD
+  if (!isoDate) return "";
+  const [y, m, d] = isoDate.split("-").map((x) => Number(x));
+  if (!y || !m || !d) return isoDate;
+  const dt = new Date(y, m - 1, d);
+  return dt.toLocaleDateString("ca-ES", {
+    weekday: "long",
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function safeDateKey(d: string) {
+  // Ensure we can sort even if empty
+  return typeof d === "string" && d.trim() ? d.trim() : "9999-12-31";
+}
+
+export const Calendar: React.FC = () => {
+  const { currentUser, trips, courses, socialEvents, canManageTrips, canManageSystem } = useApp();
+
+  const [q, setQ] = useState("");
+  const [showTrips, setShowTrips] = useState(true);
+  const [showCourses, setShowCourses] = useState(true);
+  const [showEvents, setShowEvents] = useState(true);
+  const [showPast, setShowPast] = useState(false);
+
+  const canSeeDrafts = useMemo(() => {
+    // Admin i instructor (canManageTrips) poden veure ocults
+    return (canManageSystem?.() ?? false) || (canManageTrips?.() ?? false);
+  }, [canManageSystem, canManageTrips]);
 
   const items = useMemo<CalendarItem[]>(() => {
-    const tripItems: CalendarItem[] = trips.map((t) => ({
-      kind: "trip",
-      id: t.id,
-      title: t.title,
-      date: t.date,
-      location: t.location,
-      levelRequired: t.levelRequired,
-      participants: t.participants ?? [],
-    }));
+    const list: CalendarItem[] = [];
 
-    const courseItems: CalendarItem[] = courses.map((c) => ({
-      kind: "course",
-      id: c.id,
-      title: c.title,
-      date: c.date,
-      schedule: c.schedule,
-      levelRequired: c.levelRequired,
-      participants: c.participants ?? [],
-    }));
-
-    const merged = [...tripItems, ...courseItems];
-
-    merged.sort((a, b) => {
-      const da = new Date(a.date).getTime();
-      const db = new Date(b.date).getTime();
-      return da - db;
+    (trips || []).forEach((t: any) => {
+      list.push({
+        id: t.id,
+        type: "trip",
+        title: t.title || "Sortida",
+        date: t.date || "",
+        location: t.location || "",
+        subtitle: t.levelRequired ? `Nivell: ${t.levelRequired}` : "",
+        published: !!t.published,
+        status: t.status || "active",
+      });
     });
 
-    return merged;
-  }, [trips, courses]);
+    (courses || []).forEach((c: any) => {
+      list.push({
+        id: c.id,
+        type: "course",
+        title: c.title || "Curs",
+        date: c.date || "",
+        location: "",
+        subtitle: [c.schedule ? `Horari: ${c.schedule}` : "", c.levelRequired ? `Nivell: ${c.levelRequired}` : ""]
+          .filter(Boolean)
+          .join(" · "),
+        published: !!c.published,
+        status: c.status || "active",
+      });
+    });
+
+    (socialEvents || []).forEach((e: any) => {
+      list.push({
+        id: e.id,
+        type: "event",
+        title: e.title || "Esdeveniment",
+        date: e.date || "",
+        time: e.time || "",
+        location: e.location || "",
+        subtitle: e.notes ? String(e.notes).slice(0, 140) : "",
+        published: !!e.published,
+        status: e.status || "active",
+      });
+    });
+
+    return list;
+  }, [trips, courses, socialEvents]);
 
   const filtered = useMemo(() => {
-    if (filter === "trips") return items.filter((i) => i.kind === "trip");
-    if (filter === "courses") return items.filter((i) => i.kind === "course");
-    return items;
-  }, [items, filter]);
+    const needle = q.trim().toLowerCase();
+
+    const nowKey = (() => {
+      const dt = new Date();
+      const y = dt.getFullYear();
+      const m = String(dt.getMonth() + 1).padStart(2, "0");
+      const d = String(dt.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    })();
+
+    return items
+      .filter((it) => {
+        if (!showTrips && it.type === "trip") return false;
+        if (!showCourses && it.type === "course") return false;
+        if (!showEvents && it.type === "event") return false;
+
+        // Socis/es: només publicats (i no cancel·lats si vols amagar-los; jo els mostre però marcats)
+        if (!canSeeDrafts && !it.published) return false;
+
+        // Past
+        if (!showPast && safeDateKey(it.date) < nowKey) return false;
+
+        if (!needle) return true;
+        const hay = `${it.title} ${it.location || ""} ${it.subtitle || ""} ${it.date || ""}`.toLowerCase();
+        return hay.includes(needle);
+      })
+      .sort((a, b) => safeDateKey(a.date).localeCompare(safeDateKey(b.date)));
+  }, [items, q, showTrips, showCourses, showEvents, showPast, canSeeDrafts]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, CalendarItem[]>();
-    for (const item of filtered) {
-      const key = item.date;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(item);
-    }
-    return Array.from(map.entries()).sort(
-      (a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime()
-    );
+    filtered.forEach((it) => {
+      const key = safeDateKey(it.date);
+      const arr = map.get(key) || [];
+      arr.push(it);
+      map.set(key, arr);
+    });
+
+    // Order keys
+    const keys = Array.from(map.keys()).sort((a, b) => a.localeCompare(b));
+    return keys.map((k) => ({
+      date: k,
+      label: formatDayLabel(k),
+      items: (map.get(k) || []).sort((a, b) => {
+        // sort within day: by type then title
+        const order = (x: ItemType) => (x === "trip" ? 1 : x === "course" ? 2 : 3);
+        const d = order(a.type) - order(b.type);
+        if (d !== 0) return d;
+        return (a.title || "").localeCompare(b.title || "");
+      }),
+    }));
   }, [filtered]);
 
-  const niceDate = (isoOrText: string) => {
-    // si ja tens dates en format text, no ho trenquem
-    const d = new Date(isoOrText);
-    if (Number.isNaN(d.getTime())) return isoOrText;
-    return d.toLocaleDateString("ca-ES", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  };
+  if (!currentUser) return null;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="mb-6 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-extrabold text-slate-900 uppercase tracking-tight">
-            Calendari
-          </h1>
-          <p className="text-gray-600 mt-2">
-            Agenda de sortides i cursos del club.
-          </p>
-        </div>
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-slate-50 to-slate-100">
+      <PageHero
+        compact
+        title="Calendari del Club"
+        subtitle="Sortides, cursos i esdeveniments — tot en un mateix lloc."
+        badge={
+          <span>
+            {canSeeDrafts ? (
+              <>
+                Mode gestió · Mostrant també <b>ocults</b>
+              </>
+            ) : (
+              <>
+                Mode soci/a · Mostrant <b>publicats</b>
+              </>
+            )}
+          </span>
+        }
+      />
 
-        <div className="flex gap-2">
-          <button
-            onClick={() => setFilter("all")}
-            className={`px-4 py-2 rounded-lg text-sm font-bold border transition-colors ${
-              filter === "all"
-                ? "bg-slate-900 text-yellow-400 border-slate-900"
-                : "bg-white text-slate-700 border-gray-200 hover:bg-gray-50"
-            }`}
-          >
-            Tot
-          </button>
-          <button
-            onClick={() => setFilter("trips")}
-            className={`px-4 py-2 rounded-lg text-sm font-bold border transition-colors ${
-              filter === "trips"
-                ? "bg-slate-900 text-yellow-400 border-slate-900"
-                : "bg-white text-slate-700 border-gray-200 hover:bg-gray-50"
-            }`}
-          >
-            Sortides
-          </button>
-          <button
-            onClick={() => setFilter("courses")}
-            className={`px-4 py-2 rounded-lg text-sm font-bold border transition-colors ${
-              filter === "courses"
-                ? "bg-slate-900 text-yellow-400 border-slate-900"
-                : "bg-white text-slate-700 border-gray-200 hover:bg-gray-50"
-            }`}
-          >
-            Cursos
-          </button>
-        </div>
-      </div>
+      <div className="max-w-6xl mx-auto px-4 py-10 space-y-6">
+        {/* Controls premium */}
+        <div className="rounded-3xl border bg-white/70 backdrop-blur shadow-sm p-6">
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
+            <div className="min-w-0">
+              <div className="text-xs font-black text-slate-500">FILTRES</div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  onClick={() => setShowTrips((v) => !v)}
+                  className={`px-4 py-2 rounded-2xl font-black text-sm border ${
+                    showTrips ? "bg-slate-900 text-yellow-300 border-slate-900" : "bg-white hover:bg-slate-50"
+                  }`}
+                >
+                  Sortides
+                </button>
+                <button
+                  onClick={() => setShowCourses((v) => !v)}
+                  className={`px-4 py-2 rounded-2xl font-black text-sm border ${
+                    showCourses ? "bg-indigo-900 text-indigo-100 border-indigo-900" : "bg-white hover:bg-slate-50"
+                  }`}
+                >
+                  Cursos
+                </button>
+                <button
+                  onClick={() => setShowEvents((v) => !v)}
+                  className={`px-4 py-2 rounded-2xl font-black text-sm border ${
+                    showEvents ? "bg-emerald-900 text-emerald-100 border-emerald-900" : "bg-white hover:bg-slate-50"
+                  }`}
+                >
+                  Esdeveniments
+                </button>
 
-      {filtered.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center text-gray-600">
-          Encara no hi ha cap activitat al calendari.
-        </div>
-      ) : (
-        <div className="space-y-8">
-          {grouped.map(([date, dayItems]) => (
-            <div key={date} className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-              <div className="px-6 py-4 bg-slate-900 text-yellow-400 flex items-center gap-2">
-                <CalendarDays size={18} />
-                <span className="font-extrabold capitalize">{niceDate(date)}</span>
-                <span className="ml-auto text-xs font-bold bg-yellow-400 text-black px-2 py-1 rounded-full">
-                  {dayItems.length} activitat(s)
-                </span>
-              </div>
-
-              <div className="p-6 space-y-4">
-                {dayItems.map((item) => {
-                  const isTrip = item.kind === "trip";
-                  const badge =
-                    item.kind === "trip"
-                      ? "SORTIDA"
-                      : "CURS";
-
-                  return (
-                    <div
-                      key={`${item.kind}-${item.id}`}
-                      className="border border-gray-200 rounded-xl p-4 hover:shadow-sm transition-shadow"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`text-xs font-extrabold px-2 py-1 rounded-full ${
-                                isTrip
-                                  ? "bg-yellow-100 text-yellow-900"
-                                  : "bg-orange-100 text-orange-900"
-                              }`}
-                            >
-                              {badge}
-                            </span>
-                            {item.levelRequired && (
-                              <span className="text-xs font-bold text-slate-500">
-                                Requisit: {item.levelRequired}
-                              </span>
-                            )}
-                          </div>
-
-                          <h3 className="text-lg font-extrabold text-slate-900 mt-2">
-                            {item.title}
-                          </h3>
-
-                          <div className="mt-2 text-sm text-gray-600 flex flex-col md:flex-row md:items-center gap-2">
-                            {isTrip ? (
-                              item.location ? (
-                                <span className="flex items-center gap-2">
-                                  <MapPin size={16} className="text-yellow-500" />
-                                  {item.location}
-                                </span>
-                              ) : null
-                            ) : (
-                              (item as any).schedule ? (
-                                <span className="flex items-center gap-2">
-                                  <GraduationCap size={16} className="text-orange-500" />
-                                  {(item as any).schedule}
-                                </span>
-                              ) : null
-                            )}
-
-                            <span className="flex items-center gap-2">
-                              <Users size={16} className="text-slate-500" />
-                              {item.participants.length} apuntats/des
-                            </span>
-                          </div>
-
-                          {/* Llista de noms (visible per tothom dins) */}
-                          {item.participants.length > 0 && (
-                            <div className="mt-3 bg-slate-50 border border-slate-200 rounded-lg p-3">
-                              <p className="text-xs font-extrabold text-slate-700 uppercase tracking-wide mb-2">
-                                Apuntats/des
-                              </p>
-                              <ul className="space-y-1">
-                                {item.participants.map((uid) => (
-                                  <li key={uid} className="text-sm text-gray-700">
-                                    • {nameFromId(uid)}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                <button
+                  onClick={() => setShowPast((v) => !v)}
+                  className={`px-4 py-2 rounded-2xl font-black text-sm border ${
+                    showPast ? "bg-yellow-400 text-black border-yellow-400" : "bg-white hover:bg-slate-50"
+                  }`}
+                >
+                  {showPast ? "Mostrant passats" : "Amagar passats"}
+                </button>
               </div>
             </div>
-          ))}
+
+            <div className="w-full lg:w-96">
+              <label className="text-sm font-black text-slate-900">Cerca</label>
+              <input
+                className="mt-2 w-full rounded-2xl border px-4 py-3 bg-white/80 focus:outline-none"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Títol, ubicació, nivell, data…"
+              />
+            </div>
+          </div>
         </div>
-      )}
+
+        {/* Calendari en “quadres per dia” */}
+        <div className="space-y-5">
+          {grouped.length === 0 ? (
+            <div className="rounded-3xl border bg-white/70 backdrop-blur shadow-sm p-10 text-center text-slate-600">
+              No hi ha elements per mostrar amb estos filtres.
+            </div>
+          ) : (
+            grouped.map((day) => (
+              <div key={day.date} className="rounded-3xl border bg-white/70 backdrop-blur shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b bg-white/40">
+                  <div className="text-xs font-black text-slate-500">DIA</div>
+                  <div className="mt-1 text-lg font-black text-slate-900 capitalize">{day.label}</div>
+                </div>
+
+                <div className="p-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {day.items.map((it) => (
+                    <div key={`${it.type}-${it.id}`} className="rounded-3xl border bg-white/60 p-5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <TypePill type={it.type} />
+                            <StatusPill published={it.published} status={it.status} canSeeDrafts={canSeeDrafts} />
+                          </div>
+
+                          <div className="mt-3 text-base font-black text-slate-900 break-words">
+                            {it.title}
+                          </div>
+
+                          <div className="mt-2 text-sm text-slate-600">
+                            {it.time ? <span className="font-bold">{it.time}</span> : null}
+                            {it.time && (it.location || it.subtitle) ? " · " : null}
+                            {it.location ? it.location : null}
+                            {it.location && it.subtitle ? " · " : null}
+                            {it.subtitle ? it.subtitle : null}
+                          </div>
+                        </div>
+                      </div>
+
+                      {it.status === "cancelled" ? (
+                        <div className="mt-4 text-xs font-black text-red-700 bg-red-50 border border-red-200 rounded-2xl px-3 py-2">
+                          Aquest element està cancel·lat.
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="text-xs text-slate-500">
+          Nota: els socis/es veuen el calendari amb elements <b>publicats</b>. L’administració i instructors veuen també
+          els <b>ocults</b> per revisar-los.
+        </div>
+      </div>
     </div>
   );
 };
