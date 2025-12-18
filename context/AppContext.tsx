@@ -87,11 +87,11 @@ interface AppContextValue extends AppState {
   approveUser: (userId: string, role?: Role) => Promise<void>;
   setUserRole: (userId: string, role: Role) => Promise<void>;
 
-  canManageTrips: () => boolean;
-  canManageSystem: () => boolean;
-  isActiveMember: () => boolean;
+  canManageTrips: () => boolean;      // admin o instructor actiu
+  canManageSystem: () => boolean;     // admin
+  isActiveMember: () => boolean;      // active i role != pending
 
-  // ✅ NOVETAT: aprovacions
+  // ✅ Aprovacions (admin)
   approveTrip: (tripId: string) => Promise<void>;
   approveCourse: (courseId: string) => Promise<void>;
 
@@ -108,6 +108,8 @@ interface AppContextValue extends AppState {
       | "approvalStatus"
       | "approvedAt"
       | "approvedBy"
+      | "createdAt"
+      | "updatedAt"
     >
   ) => Promise<void>;
   updateTrip: (tripId: string, data: Partial<Trip>) => Promise<void>;
@@ -128,6 +130,8 @@ interface AppContextValue extends AppState {
       | "approvalStatus"
       | "approvedAt"
       | "approvedBy"
+      | "createdAt"
+      | "updatedAt"
     >
   ) => Promise<void>;
   updateCourse: (courseId: string, data: Partial<Course>) => Promise<void>;
@@ -145,6 +149,8 @@ interface AppContextValue extends AppState {
       | "pendingParticipants"
       | "published"
       | "status"
+      | "createdAt"
+      | "updatedAt"
     >
   ) => Promise<void>;
   updateSocialEvent: (eventId: string, data: Partial<SocialEvent>) => Promise<void>;
@@ -201,6 +207,11 @@ function assertAuthed(currentUser: User | null): asserts currentUser is User {
   if (!currentUser) throw new Error("No autenticat/da.");
 }
 
+function normalizeApproval(x: any): ApprovalStatus {
+  const v = String(x || "").toLowerCase();
+  return v === "approved" ? "approved" : "pending";
+}
+
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [state, setState] = useState<AppState>({
     users: [],
@@ -229,7 +240,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const unsubTrips = onSnapshot(
       query(collection(db, "trips"), orderBy("date", "asc")),
       (snap) => {
-        const trips = snap.docs.map((d) => ({ ...(d.data() as any), id: d.id })) as Trip[];
+        const trips = snap.docs.map((d) => {
+          const data = d.data() as any;
+          return {
+            ...data,
+            id: d.id,
+            participants: Array.isArray(data.participants) ? data.participants : [],
+            pendingParticipants: Array.isArray(data.pendingParticipants) ? data.pendingParticipants : [],
+            published: !!data.published,
+            status: (data.status as any) || "active",
+            approvalStatus: normalizeApproval(data.approvalStatus),
+          } as Trip;
+        });
         setState((prev) => ({ ...prev, trips }));
       }
     );
@@ -237,7 +259,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const unsubCourses = onSnapshot(
       query(collection(db, "courses"), orderBy("date", "asc")),
       (snap) => {
-        const courses = snap.docs.map((d) => ({ ...(d.data() as any), id: d.id })) as Course[];
+        const courses = snap.docs.map((d) => {
+          const data = d.data() as any;
+          return {
+            ...data,
+            id: d.id,
+            participants: Array.isArray(data.participants) ? data.participants : [],
+            pendingParticipants: Array.isArray(data.pendingParticipants) ? data.pendingParticipants : [],
+            published: !!data.published,
+            status: (data.status as any) || "active",
+            approvalStatus: normalizeApproval(data.approvalStatus),
+          } as Course;
+        });
         setState((prev) => ({ ...prev, courses }));
       }
     );
@@ -245,7 +278,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const unsubEvents = onSnapshot(
       query(collection(db, "socialEvents"), orderBy("date", "asc")),
       (snap) => {
-        const socialEvents = snap.docs.map((d) => ({ ...(d.data() as any), id: d.id })) as SocialEvent[];
+        const socialEvents = snap.docs.map((d) => {
+          const data = d.data() as any;
+          return {
+            ...data,
+            id: d.id,
+            participants: Array.isArray(data.participants) ? data.participants : [],
+            pendingParticipants: Array.isArray(data.pendingParticipants) ? data.pendingParticipants : [],
+            published: !!data.published,
+            status: (data.status as any) || "active",
+          } as SocialEvent;
+        });
         setState((prev) => ({ ...prev, socialEvents }));
       }
     );
@@ -282,7 +325,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setState((prev) => ({ ...prev, clubSettings: defaultClubSettings }));
         return;
       }
-
       const data = snap.data() as any;
       const merged = { ...defaultClubSettings, ...data };
       setState((prev) => ({ ...prev, clubSettings: merged }));
@@ -345,9 +387,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
       const authName = (fbUser.displayName || "").trim();
       const currentName = (userDocData.name || "").trim();
-      if (authName && (!currentName || currentName === "Nou/va soci/a")) {
-        patched.name = authName;
-      }
+      if (authName && (!currentName || currentName === "Nou/va soci/a")) patched.name = authName;
 
       if (Object.keys(patched).length) {
         await updateDoc(doc(db, "users", uid), { ...patched, updatedAt: serverTimestamp() }).catch(() => {});
@@ -394,12 +434,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     } catch {}
   };
 
-  const registerUser: AppContextValue["registerUser"] = async ({
-    name,
-    email,
-    password,
-    certification,
-  }) => {
+  const registerUser: AppContextValue["registerUser"] = async ({ name, email, password, certification }) => {
     const trimmedEmail = email.trim().toLowerCase();
     const trimmedName = name.trim();
     const trimmedCert = certification.trim();
@@ -432,31 +467,27 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       await signOut(auth);
     } catch (err: any) {
       console.error("REGISTER ERROR:", err);
-
       try { await signOut(auth); } catch {}
 
       if (err?.code === "auth/email-already-in-use") {
         alert(
           "Aquest correu ja està registrat.\n" +
-            "Si ja tens un compte, inicia sessió.\n" +
-            "Si acabes de registrar-te, el compte pot estar pendent d’aprovació."
+          "Si ja tens un compte, inicia sessió.\n" +
+          "Si acabes de registrar-te, el compte pot estar pendent d’aprovació."
         );
         return;
       }
 
       alert(
         "No s’ha pogut completar el registre.\n" +
-          "Si el compte s’ha creat, quedarà pendent d’aprovació per l’administració."
+        "Si el compte s’ha creat, quedarà pendent d’aprovació per l’administració."
       );
     }
   };
 
   // ====== PERFIL PREMIUM ======
   const updateMyProfile: AppContextValue["updateMyProfile"] = async (data) => {
-    if (!state.currentUser) {
-      alert("No autenticat/da");
-      return;
-    }
+    if (!state.currentUser) return alert("No autenticat/da");
 
     const allowed: any = {};
     if (typeof data.name === "string") allowed.name = data.name.trim();
@@ -486,13 +517,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   // ====== USERS ADMIN ======
   const approveUser: AppContextValue["approveUser"] = async (userId, role) => {
-    if (!canManageSystem()) {
-      alert("Només administració pot aprovar persones sòcies.");
-      return;
-    }
+    if (!canManageSystem()) return alert("Només administració pot aprovar persones sòcies.");
 
     const finalRole: Role = role === "instructor" ? "instructor" : "member";
-
     await updateDoc(doc(db, "users", userId), {
       status: "active" as Status,
       role: finalRole,
@@ -502,10 +529,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const setUserRole: AppContextValue["setUserRole"] = async (userId, role) => {
-    if (!canManageSystem()) {
-      alert("Només administració pot canviar rols.");
-      return;
-    }
+    if (!canManageSystem()) return alert("Només administració pot canviar rols.");
+
     await updateDoc(doc(db, "users", userId), {
       role,
       level: roleToLevel(role),
@@ -514,6 +539,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
+  // ====== GUARDS ======
   const ensureCanManageTripsAndCourses = () => {
     if (!canManageTrips()) {
       alert("Només administració o instructors poden gestionar això.");
@@ -540,7 +566,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     updatedAt: serverTimestamp(),
   });
 
-  // ✅ decideix aprovació segons rol
+  // ✅ Admin crea ja aprovat. Instructor crea pendent.
   const approvalDefaults = (): {
     approvalStatus: ApprovalStatus;
     approvedBy?: string;
@@ -606,10 +632,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const setTripPublished: AppContextValue["setTripPublished"] = async (tripId, published) => {
     if (!ensureCanManageTripsAndCourses()) return;
 
-    const t = state.trips.find((x) => x.id === tripId);
-    const status = (t as any)?.approvalStatus || "pending";
-    if (published && status !== "approved") {
+    const t: any = state.trips.find((x) => x.id === tripId);
+    const aStatus = normalizeApproval(t?.approvalStatus);
+
+    if (published && aStatus !== "approved") {
       alert("Aquesta sortida està pendent d’aprovació. L’admin l’ha d’aprovar abans de publicar.");
+      return;
+    }
+    // ✅ extra: instructor no pot publicar (encara que estiga aprovat)
+    if (!canManageSystem() && published) {
+      alert("Només administració pot publicar al calendari.");
       return;
     }
 
@@ -651,10 +683,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const setCoursePublished: AppContextValue["setCoursePublished"] = async (courseId, published) => {
     if (!ensureCanManageTripsAndCourses()) return;
 
-    const c = state.courses.find((x) => x.id === courseId);
-    const status = (c as any)?.approvalStatus || "pending";
-    if (published && status !== "approved") {
+    const c: any = state.courses.find((x) => x.id === courseId);
+    const aStatus = normalizeApproval(c?.approvalStatus);
+
+    if (published && aStatus !== "approved") {
       alert("Aquest curs està pendent d’aprovació. L’admin l’ha d’aprovar abans de publicar.");
+      return;
+    }
+    // ✅ extra: instructor no pot publicar (encara que estiga aprovat)
+    if (!canManageSystem() && published) {
+      alert("Només administració pot publicar al calendari.");
       return;
     }
 
@@ -675,7 +713,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const createSocialEvent: AppContextValue["createSocialEvent"] = async (data) => {
     if (!ensureCanManageSocialEvents()) return;
     assertAuthed(state.currentUser);
-    await addDoc(collection(db, "socialEvents"), { ...baseDefaults(state.currentUser.id), ...data });
+
+    await addDoc(collection(db, "socialEvents"), {
+      ...baseDefaults(state.currentUser.id),
+      ...data,
+    });
   };
 
   const updateSocialEvent: AppContextValue["updateSocialEvent"] = async (eventId, data) => {
@@ -766,17 +808,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   // ====== SETTINGS ======
   const updateClubSettings: AppContextValue["updateClubSettings"] = async (data) => {
     if (!canManageSystem()) return alert("Només administració pot modificar la web/app.");
-    await setDoc(
-      doc(db, "clubSettings", "main"),
-      { ...data, updatedAt: serverTimestamp() },
-      { merge: true }
-    );
+    await setDoc(doc(db, "clubSettings", "main"), { ...data, updatedAt: serverTimestamp() }, { merge: true });
   };
 
   // ====== MATERIAL ======
   const createResource: AppContextValue["createResource"] = async (data) => {
     if (!ensureCanManageTripsAndCourses()) return;
     assertAuthed(state.currentUser);
+
     await addDoc(collection(db, "resources"), {
       ...data,
       createdBy: state.currentUser.id,
@@ -796,10 +835,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const swapResourceOrder: AppContextValue["swapResourceOrder"] = async (aId, bId) => {
-    if (!canManageTrips()) {
-      alert("Només administració o instructors poden ordenar material.");
-      return;
-    }
+    if (!canManageTrips()) return alert("Només administració o instructors poden ordenar material.");
 
     const aRef = doc(db, "resources", aId);
     const bRef = doc(db, "resources", bId);
@@ -822,19 +858,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   // ====== MUR SOCIAL ======
   const createSocialPost: AppContextValue["createSocialPost"] = async ({ text, imageUrl }) => {
-    if (!isActiveMember()) {
-      alert("Has d’estar aprovat/da per publicar.");
-      return;
-    }
+    if (!isActiveMember()) return alert("Has d’estar aprovat/da per publicar.");
     assertAuthed(state.currentUser);
 
     const t = text.trim();
     const img = (imageUrl || "").trim();
 
     if (!t) return alert("Escriu algun text per publicar.");
-    if (img && !/^https?:\/\//i.test(img)) {
-      return alert("La URL de la imatge ha de començar per http:// o https://");
-    }
+    if (img && !/^https?:\/\//i.test(img)) return alert("La URL de la imatge ha de començar per http:// o https://");
 
     await addDoc(collection(db, "socialPosts"), {
       text: t,
