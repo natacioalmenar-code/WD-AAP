@@ -79,10 +79,13 @@ export interface User {
 export interface Trip {
   id: string;
   title: string;
-  date: string;
+  date: string; // YYYY-MM-DD
   location: string;
   levelRequired: string;
-  maxSpots: number;
+
+  // ✅ alguns docs antics poden no tindre maxSpots → el fem tolerant
+  maxSpots?: number;
+
   price?: string;
   notes?: string;
 
@@ -108,7 +111,7 @@ export interface Trip {
 export interface Course {
   id: string;
   title: string;
-  date: string;
+  date: string; // YYYY-MM-DD
   schedule: string;
   levelRequired: string;
   maxSpots?: number;
@@ -137,7 +140,7 @@ export interface Course {
 export interface SocialEvent {
   id: string;
   title: string;
-  date: string;
+  date: string; // YYYY-MM-DD
   time?: string;
   location?: string;
   maxSpots?: number;
@@ -149,6 +152,7 @@ export interface SocialEvent {
 
   published: boolean;
   status: PublishableStatus;
+
   cancelledReason?: string;
   cancelledAt?: any;
 
@@ -234,3 +238,28 @@ export interface SocialPost {
   createdAt?: any;
   updatedAt?: any;
 }
+
+/**
+ * ✅ (Opcional però recomanat) Tipus per al calendari unificat
+ *    Cursos + Sortides + Esdeveniments en una sola vista.
+ */
+export type CalendarItemType = "trip" | "course" | "event";
+
+export type CalendarItem = {
+  id: string;
+  type: CalendarItemType;
+  title: string;
+  date: string; // YYYY-MM-DD
+  time?: string;
+
+  location?: string;
+  levelRequired?: string;
+  maxSpots?: number;
+
+  published: boolean;
+  status: PublishableStatus;
+
+  approvalStatus?: ApprovalStatus;
+
+  source: Trip | Course | SocialEvent;
+};
