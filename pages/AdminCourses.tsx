@@ -7,17 +7,20 @@ export const AdminCourses: React.FC = () => {
     courses,
     users,
     canManageSystem,
+    canManageTrips,
+    approveCourse,
     setCoursePublished,
     cancelCourse,
     deleteCourse,
   } = useApp();
 
-  const isAdmin = canManageSystem?.() ?? false;
   const [q, setQ] = useState("");
 
-  const list = useMemo(() => {
+  const userName = (uid: string) => users.find((u) => u.id === uid)?.name || uid;
+
+  const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return [...(courses || [])]
+    return [...courses]
       .filter((c) => {
         if (!needle) return true;
         return (
@@ -29,76 +32,145 @@ export const AdminCourses: React.FC = () => {
       .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
   }, [courses, q]);
 
-  const userName = (uid: string) =>
-    users.find((u) => u.id === uid)?.name || uid;
+  const pending = filtered.filter((c: any) => (c.approvalStatus || "pending") !== "approved");
+  const approved = filtered.filter((c: any) => (c.approvalStatus || "pending") === "approved");
+
+  if (!canManageTrips()) {
+    return (
+      <div className="max-w-6xl mx-auto px-4 py-10">
+        <div className="bg-white border rounded-2xl p-6 shadow-sm">
+          <h1 className="text-3xl font-extrabold text-slate-900">Cursos</h1>
+          <p className="text-gray-600 mt-2">No tens permisos per veure la gestió.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-slate-50 to-slate-100">
-      <div className="max-w-7xl mx-auto px-4 py-10">
-        {/* Header */}
-        <div className="rounded-3xl border bg-white/70 backdrop-blur shadow-sm p-7">
-          <div className="inline-flex items-center gap-2 text-xs font-black rounded-full bg-slate-900 text-yellow-300 px-3 py-1">
-            ADMIN · CURSOS
-          </div>
-          <h1 className="mt-4 text-3xl font-extrabold text-slate-900">
-            Gestió de Cursos
-          </h1>
-          <p className="text-slate-600 mt-1">
-            Publicar, cancel·lar i gestionar cursos del club.
+    <div className="max-w-7xl mx-auto px-4 py-10">
+      <div className="mb-6 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold text-slate-900">Gestió de Cursos</h1>
+          <p className="text-gray-600 mt-1">
+            Instructor crea → pendent · Admin aprova → després es pot publicar.
           </p>
+        </div>
 
-          <div className="mt-6 max-w-sm">
-            <label className="text-xs font-black text-slate-600">
-              Cerca
-            </label>
-            <input
-              className="mt-2 w-full rounded-2xl border px-4 py-3 bg-white/90 focus:outline-none"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Títol, nivell o data…"
-            />
+        <div className="w-full md:w-80">
+          <label className="text-sm font-bold text-slate-700">Cerca</label>
+          <input
+            className="mt-1 w-full rounded-xl border px-3 py-2"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Títol, nivell o data…"
+          />
+        </div>
+      </div>
+
+      {/* PENDENTS */}
+      {canManageSystem() && (
+        <div className="mb-8 bg-white border rounded-2xl shadow-sm p-6">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <div className="inline-flex items-center gap-2 text-xs font-black rounded-full bg-slate-900 text-yellow-300 px-3 py-1">
+                PENDENTS D’APROVACIÓ
+              </div>
+              <h2 className="mt-3 text-xl font-extrabold text-slate-900">
+                Cursos pendents ({pending.length})
+              </h2>
+              <p className="text-gray-600 mt-1 text-sm">
+                Aprova per permetre publicar-los al calendari i secció de formació.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 space-y-3">
+            {pending.length === 0 ? (
+              <div className="text-sm text-gray-500">Cap pendent.</div>
+            ) : (
+              pending.map((c) => (
+                <CourseRow
+                  key={c.id}
+                  course={c}
+                  userName={userName}
+                  isPending
+                  onApprove={() => approveCourse(c.id)}
+                />
+              ))
+            )}
           </div>
         </div>
+      )}
 
-        {/* Llista */}
-        <div className="mt-8 space-y-4">
-          {list.length === 0 ? (
-            <div className="rounded-3xl border bg-white/70 backdrop-blur shadow-sm p-10 text-center text-slate-500">
-              No hi ha cursos.
-            </div>
-          ) : (
-            list.map((course) => (
-              <CourseCard
-                key={course.id}
-                course={course}
-                userName={userName}
-                isAdmin={isAdmin}
-                onPublish={(v) => setCoursePublished(course.id, v)}
-                onCancel={() =>
-                  cancelCourse(course.id, prompt("Motiu (opcional):") || "")
-                }
-                onDelete={() => deleteCourse(course.id)}
-              />
-            ))
-          )}
-        </div>
+      {/* APROVATS */}
+      <div className="space-y-4">
+        {approved.length === 0 ? (
+          <div className="bg-white border rounded-2xl shadow-sm p-8 text-center text-gray-500">
+            No hi ha cursos aprovats.
+          </div>
+        ) : (
+          approved.map((c) => (
+            <CourseCard
+              key={c.id}
+              course={c}
+              userName={userName}
+              canDelete={canManageSystem()}
+              onPublish={() => setCoursePublished(c.id, !c.published)}
+              onCancel={() => cancelCourse(c.id, prompt("Motiu (opcional):") || "")}
+              onDelete={() => deleteCourse(c.id)}
+            />
+          ))
+        )}
       </div>
     </div>
   );
 };
 
+function CourseRow({
+  course,
+  userName,
+  isPending,
+  onApprove,
+}: {
+  course: Course;
+  userName: (uid: string) => string;
+  isPending?: boolean;
+  onApprove: () => void;
+}) {
+  return (
+    <div className="border rounded-2xl p-4 flex items-center justify-between gap-3 flex-wrap">
+      <div className="min-w-0">
+        <div className="font-extrabold text-slate-900 truncate">{course.title}</div>
+        <div className="text-sm text-slate-600">
+          {course.date} · {course.schedule} · Nivell: {course.levelRequired} · Creat per:{" "}
+          <b>{userName(course.createdBy)}</b>
+        </div>
+      </div>
+
+      {isPending ? (
+        <button
+          onClick={onApprove}
+          className="px-4 py-2 rounded-xl bg-slate-900 text-yellow-300 font-black hover:opacity-90"
+        >
+          Aprovar
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 function CourseCard({
   course,
   userName,
-  isAdmin,
+  canDelete,
   onPublish,
   onCancel,
   onDelete,
 }: {
   course: Course;
   userName: (uid: string) => string;
-  isAdmin: boolean;
-  onPublish: (published: boolean) => void;
+  canDelete: boolean;
+  onPublish: () => void;
   onCancel: () => void;
   onDelete: () => void;
 }) {
@@ -106,106 +178,76 @@ function CourseCard({
   const isCancelled = course.status === "cancelled";
 
   return (
-    <div className="rounded-3xl border bg-white/70 backdrop-blur shadow-sm p-6">
+    <div className="bg-white border rounded-2xl shadow-sm p-5">
       <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4">
         <div className="min-w-0">
           <div className="flex items-center gap-3 flex-wrap">
-            <h2 className="text-lg font-extrabold text-slate-900">
-              {course.title}
-            </h2>
+            <h2 className="text-lg font-extrabold text-slate-900">{course.title}</h2>
 
             <span
-              className={`text-xs font-black px-3 py-1 rounded-full border ${
+              className={`text-xs font-bold px-2 py-1 rounded-full ${
                 isCancelled
-                  ? "bg-red-50 border-red-200 text-red-700"
+                  ? "bg-red-100 text-red-700"
                   : course.published
-                  ? "bg-emerald-50 border-emerald-200 text-emerald-700"
-                  : "bg-slate-50 border-slate-200 text-slate-700"
+                  ? "bg-green-100 text-green-700"
+                  : "bg-gray-100 text-gray-700"
               }`}
             >
-              {isCancelled
-                ? "CANCEL·LAT"
-                : course.published
-                ? "PUBLICAT"
-                : "OCULT"}
+              {isCancelled ? "CANCEL·LAT" : course.published ? "PUBLICAT" : "OCULT"}
+            </span>
+
+            <span className="text-xs font-bold px-2 py-1 rounded-full bg-slate-900 text-yellow-300">
+              APROVAT
             </span>
           </div>
 
-          <div className="text-sm text-slate-600 mt-1">
-            {course.date || "—"} ·{" "}
-            {course.schedule || "Horari no indicat"} · Nivell:{" "}
-            {course.levelRequired || "—"} · Places:{" "}
-            {approved.length}/{course.maxSpots ?? "—"} · Preu:{" "}
-            {course.price || "—"}
+          <div className="text-sm text-gray-600 mt-1">
+            {course.date} · Horari: {course.schedule} · Nivell: {course.levelRequired} · Places:{" "}
+            {approved.length}/{course.maxSpots ?? "—"} · Preu: {course.price || "—"} · Creat per:{" "}
+            <b>{userName(course.createdBy)}</b>
           </div>
 
-          {isCancelled && course.cancelledReason && (
+          {isCancelled && course.cancelledReason ? (
             <div className="mt-2 text-sm text-red-700">
-              <span className="font-black">Motiu:</span>{" "}
-              {course.cancelledReason}
+              <span className="font-bold">Motiu:</span> {course.cancelledReason}
             </div>
-          )}
+          ) : null}
         </div>
 
-        {/* ACCIONS — NOMÉS ADMIN */}
-        {isAdmin && (
-          <div className="flex flex-wrap gap-2">
-            {!isCancelled && (
-              <button
-                onClick={() => onPublish(!course.published)}
-                className={`px-4 py-2 rounded-2xl font-black text-sm ${
-                  course.published
-                    ? "bg-white border hover:bg-slate-50"
-                    : "bg-yellow-400 hover:bg-yellow-500"
-                }`}
-              >
-                {course.published ? "Ocultar" : "Publicar"}
-              </button>
-            )}
+        <div className="flex flex-wrap gap-2">
+          {!isCancelled && (
+            <button
+              onClick={onPublish}
+              className={`px-4 py-2 rounded-xl font-extrabold text-sm ${
+                course.published
+                  ? "bg-gray-100 hover:bg-gray-200"
+                  : "bg-yellow-400 hover:bg-yellow-300"
+              }`}
+            >
+              {course.published ? "Ocultar" : "Publicar"}
+            </button>
+          )}
 
-            {!isCancelled && (
-              <button
-                onClick={onCancel}
-                className="px-4 py-2 rounded-2xl font-black text-sm border bg-white hover:bg-slate-50"
-              >
-                Cancel·lar
-              </button>
-            )}
+          {!isCancelled && (
+            <button
+              onClick={onCancel}
+              className="px-4 py-2 rounded-xl font-extrabold text-sm border hover:bg-gray-50"
+            >
+              Cancel·lar
+            </button>
+          )}
 
+          {canDelete && (
             <button
               onClick={() => {
-                if (
-                  confirm("Segur que vols ESBORRAR definitivament este curs?")
-                )
-                  onDelete();
+                if (confirm("Segur que vols ESBORRAR definitivament este curs?")) onDelete();
               }}
-              className="px-4 py-2 rounded-2xl font-black text-sm bg-red-600 text-white hover:bg-red-700"
+              className="px-4 py-2 rounded-xl font-extrabold text-sm bg-red-600 text-white hover:bg-red-700"
             >
               Esborrar
             </button>
-          </div>
-        )}
-      </div>
-
-      <div className="mt-5 rounded-2xl border bg-white/60 p-4">
-        <div className="font-extrabold text-slate-900 mb-2">
-          Participants ({approved.length})
+          )}
         </div>
-
-        {approved.length === 0 ? (
-          <div className="text-sm text-slate-500">Encara ningú.</div>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {approved.map((uid) => (
-              <span
-                key={uid}
-                className="text-xs font-black px-3 py-1 rounded-full bg-slate-900 text-yellow-300"
-              >
-                {userName(uid)}
-              </span>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
