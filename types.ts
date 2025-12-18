@@ -204,6 +204,23 @@ export interface PostComment {
   createdAt?: any;
 }
 
+export interface Chat {
+  id: string;
+  memberIds: string[]; // 2 usuaris
+  lastMessageText?: string;
+  lastMessageAt?: any;
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+export interface ChatMessage {
+  id: string;
+  chatId: string;
+  senderId: string;
+  text: string;
+  createdAt?: any;
+}
+
 export interface SocialPost {
   id: string;
   text: string;
