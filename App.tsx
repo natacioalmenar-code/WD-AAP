@@ -7,6 +7,8 @@ import { Footer } from "./components/Footer";
 
 import { VirtualDiveMaster } from "./pages/VirtualDiveMaster";
 
+import { ChatPage } from "./pages/ChatPage";
+
 import { Home } from "./pages/Home";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
@@ -106,6 +108,8 @@ const AppContent = () => {
           {/* ✅ Alias /admin -> admin-users */}
           <Route path="/admin" element={<Navigate to="/admin-users" replace />} />
 
+          <Route path="/chat" element={<ChatPage />} />
+          
           {/* FALLBACK */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
