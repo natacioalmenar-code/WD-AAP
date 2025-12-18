@@ -1,271 +1,358 @@
 import React, { useMemo, useState } from "react";
+import { Plus, X, Trash2, Eye, EyeOff, Ban } from "lucide-react";
 import { useApp } from "../context/AppContext";
-import { Plus, X, Calendar, Clock, MapPin, Users } from "lucide-react";
 import { PageHero } from "../components/PageHero";
+import type { SocialEvent } from "../types";
 
 export const SocialEvents: React.FC = () => {
   const {
-    socialEvents,
-    users,
     currentUser,
-    joinSocialEvent,
-    leaveSocialEvent,
+    socialEvents,
     canManageSystem,
     createSocialEvent,
+    setSocialEventPublished,
+    cancelSocialEvent,
+    deleteSocialEvent,
   } = useApp();
 
-  const isAdmin = canManageSystem();
-  const uid = currentUser?.id;
+  const isAdmin = canManageSystem?.() ?? false;
 
   const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
 
-  // Form crear esdeveniment (només admin)
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [location, setLocation] = useState("");
-  const [maxSpots, setMaxSpots] = useState<number>(30);
+  const [maxSpots, setMaxSpots] = useState<number>(0);
   const [notes, setNotes] = useState("");
 
-  const list = useMemo(() => {
-    return [...socialEvents]
-      .filter((e) => isAdmin || e.published)
-      .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-  }, [socialEvents, isAdmin]);
+  const [msg, setMsg] = useState<string>("");
+  const [busy, setBusy] = useState<string>("");
 
-  const nameFromId = (id: string) =>
-    users.find((u) => u.id === id)?.name || "Persona desconeguda";
+  const list = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return [...(socialEvents || [])]
+      .filter((e) => {
+        if (!needle) return true;
+        return (
+          (e.title || "").toLowerCase().includes(needle) ||
+          (e.location || "").toLowerCase().includes(needle) ||
+          (e.date || "").includes(needle)
+        );
+      })
+      .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  }, [socialEvents, q]);
 
   const resetForm = () => {
     setTitle("");
     setDate("");
     setTime("");
     setLocation("");
-    setMaxSpots(30);
+    setMaxSpots(0);
     setNotes("");
+  };
+
+  const safeAlert = (text: string) => {
+    setMsg(text);
+    window.setTimeout(() => setMsg(""), 4500);
   };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!isAdmin) {
-      alert("Només administració pot crear esdeveniments.");
-      return;
-    }
+    if (!isAdmin) return;
 
     if (!title.trim() || !date.trim()) {
-      alert("Omple com a mínim: títol i data.");
+      safeAlert("Ompli mínim: títol i data.");
       return;
     }
 
-    const ms = Number(maxSpots);
-    if (Number.isNaN(ms) || ms < 0) {
-      alert("Les places màximes han de ser un número (0 o més).");
-      return;
+    try {
+      setBusy("create");
+      await createSocialEvent({
+        title: title.trim(),
+        date: date.trim(),
+        time: time.trim() || undefined,
+        location: location.trim() || undefined,
+        maxSpots: maxSpots ? Number(maxSpots) : undefined,
+        notes: notes.trim() || undefined,
+      } as any);
+
+      resetForm();
+      setOpen(false);
+      safeAlert("Esdeveniment creat ✅ (ara el pots publicar)");
+    } catch (err: any) {
+      console.error("CREATE SOCIAL EVENT ERROR:", err);
+      safeAlert(`Error creant: ${err?.code || err?.message || "desconegut"}`);
+    } finally {
+      setBusy("");
     }
-
-    await createSocialEvent({
-      title: title.trim(),
-      date: date.trim(),
-      time: time.trim() || "",
-      location: location.trim() || "",
-      maxSpots: ms || 0,
-      notes: notes.trim() || "",
-    });
-
-    resetForm();
-    setOpen(false);
   };
 
+  const togglePublish = async (eventId: string, next: boolean) => {
+    try {
+      setBusy(`pub:${eventId}`);
+      await setSocialEventPublished(eventId, next);
+      safeAlert(next ? "Publicat ✅" : "Ocultat ✅");
+    } catch (err: any) {
+      console.error("PUBLISH SOCIAL EVENT ERROR:", err);
+      safeAlert(`Error publicant: ${err?.code || err?.message || "desconegut"}`);
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const doCancel = async (eventId: string) => {
+    try {
+      const reason = prompt("Motiu de cancel·lació (opcional):") || "";
+      setBusy(`cancel:${eventId}`);
+      await cancelSocialEvent(eventId, reason);
+      safeAlert("Cancel·lat ✅");
+    } catch (err: any) {
+      console.error("CANCEL SOCIAL EVENT ERROR:", err);
+      safeAlert(`Error cancel·lant: ${err?.code || err?.message || "desconegut"}`);
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const doDelete = async (eventId: string) => {
+    if (!isAdmin) return;
+
+    const ok = confirm("Segur que vols ESBORRAR definitivament este esdeveniment?");
+    if (!ok) return;
+
+    try {
+      setBusy(`del:${eventId}`);
+      await deleteSocialEvent(eventId);
+      safeAlert("Esborrat ✅");
+    } catch (err: any) {
+      console.error("DELETE SOCIAL EVENT ERROR:", err);
+      safeAlert(`Error esborrant: ${err?.code || err?.message || "desconegut"}`);
+    } finally {
+      setBusy("");
+    }
+  };
+
+  if (!currentUser) return null;
+
   return (
-    <div className="bg-slate-50">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-slate-50 to-slate-100">
       <PageHero
-        title="Esdeveniments"
-        subtitle="Quedades i activitats socials del club. Apunta’t i participa!"
-        badge="Club / Esdeveniments"
+        compact
+        title={isAdmin ? "Esdeveniments (Admin)" : "Esdeveniments"}
+        subtitle={
+          isAdmin
+            ? "Crea, publica, cancel·la i esborra esdeveniments socials."
+            : "Consulta les properes activitats del club."
+        }
+        badge={
+          <span>
+            Rol: <b>{currentUser.role}</b> · Estat: <b>{currentUser.status}</b>
+          </span>
+        }
         right={
           isAdmin ? (
             <button
               onClick={() => setOpen(true)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl font-black bg-yellow-400 text-black hover:bg-yellow-500 transition shadow"
+              className="px-5 py-2.5 rounded-2xl bg-yellow-400 text-black font-black hover:bg-yellow-500 shadow"
             >
-              <Plus size={18} />
-              Crear esdeveniment
+              <span className="inline-flex items-center gap-2">
+                <Plus size={18} /> Crear
+              </span>
             </button>
-          ) : null
+          ) : undefined
         }
       />
 
-      <div className="max-w-6xl mx-auto px-4 py-10">
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        {msg ? (
+          <div className="mb-5 rounded-2xl border bg-slate-900 text-yellow-300 px-4 py-3 text-sm font-black">
+            {msg}
+          </div>
+        ) : null}
 
-      <div className="grid gap-4">
-        {list.length === 0 && <div>No hi ha esdeveniments.</div>}
-
-        {list.map((event) => {
-          const participants = event.participants || [];
-          const isJoined = uid ? participants.includes(uid) : false;
-
-          const hasMax = typeof event.maxSpots === "number" && event.maxSpots > 0;
-          const isFull = hasMax ? participants.length >= (event.maxSpots as number) : false;
-
-          const isCancelled = event.status === "cancelled";
-
-          return (
-            <div key={event.id} className="bg-white border rounded-2xl p-5 shadow-sm">
-              <div className="flex justify-between gap-4 flex-wrap">
-                <div className="min-w-0">
-                  <h2 className="font-extrabold text-lg">{event.title}</h2>
-
-                  <div className="mt-1 text-sm text-gray-700 flex flex-wrap gap-x-4 gap-y-1">
-                    <span className="inline-flex items-center gap-2">
-                      <Calendar size={16} />
-                      {event.date}
-                    </span>
-
-                    {event.time ? (
-                      <span className="inline-flex items-center gap-2">
-                        <Clock size={16} />
-                        {event.time}
-                      </span>
-                    ) : null}
-
-                    {event.location ? (
-                      <span className="inline-flex items-center gap-2">
-                        <MapPin size={16} />
-                        {event.location}
-                      </span>
-                    ) : null}
-
-                    <span className="inline-flex items-center gap-2">
-                      <Users size={16} />
-                      {participants.length}/{event.maxSpots ?? "—"}
-                    </span>
-                  </div>
-
-                  {event.notes ? (
-                    <div className="mt-2 text-sm text-gray-600">
-                      <span className="font-bold">Notes:</span> {event.notes}
-                    </div>
-                  ) : null}
-
-                  {isCancelled && (
-                    <div className="text-red-600 font-bold text-sm mt-3">
-                      ❌ Cancel·lat {event.cancelledReason ? `— ${event.cancelledReason}` : ""}
-                    </div>
-                  )}
-
-                  {isAdmin && participants.length > 0 && (
-                    <div className="mt-4">
-                      <div className="text-xs font-extrabold text-slate-900 uppercase tracking-wide mb-2">
-                        Participants
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {participants.map((pid) => (
-                          <span
-                            key={pid}
-                            className="text-xs font-bold px-2 py-1 rounded-full bg-slate-900 text-yellow-300"
-                          >
-                            {nameFromId(pid)}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex items-center">
-                  {!uid || isCancelled ? null : isJoined ? (
-                    <button
-                      onClick={() => leaveSocialEvent(event.id)}
-                      className="px-4 py-2 rounded-xl bg-gray-100 font-bold"
-                    >
-                      Desapuntar-me
-                    </button>
-                  ) : isFull ? (
-                    <span className="px-4 py-2 rounded-xl bg-gray-200 font-bold">Complet</span>
-                  ) : (
-                    <button
-                      onClick={() => joinSocialEvent(event.id)}
-                      className="px-4 py-2 rounded-xl bg-yellow-400 font-bold hover:bg-yellow-300"
-                    >
-                      Apuntar-me
-                    </button>
-                  )}
-                </div>
+        <div className="rounded-3xl border bg-white/70 backdrop-blur shadow-sm p-6">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+            <div>
+              <div className="text-xs font-black text-slate-500">LLISTA</div>
+              <div className="text-2xl font-black text-slate-900">Esdeveniments</div>
+              <div className="text-sm text-slate-600 mt-1">
+                {isAdmin ? "Gestiona visibilitat i control total." : "Només veus els publicats."}
               </div>
             </div>
-          );
-        })}
+
+            <div className="w-full md:w-80">
+              <label className="text-sm font-black text-slate-900">Cerca</label>
+              <input
+                className="mt-2 w-full rounded-2xl border px-4 py-3 bg-white/80 focus:outline-none"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Títol, ubicació o data…"
+              />
+            </div>
+          </div>
+
+          <div className="mt-6 space-y-4">
+            {list.length === 0 ? (
+              <div className="rounded-2xl border bg-white/60 p-8 text-center text-slate-600">
+                No hi ha esdeveniments.
+              </div>
+            ) : (
+              list
+                .filter((e) => (isAdmin ? true : !!e.published))
+                .map((e) => {
+                  const isCancelled = e.status === "cancelled";
+                  const tag =
+                    isCancelled ? "CANCEL·LAT" : e.published ? "PUBLICAT" : "OCULT";
+
+                  return (
+                    <div key={e.id} className="rounded-3xl border bg-white/60 p-6">
+                      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <div className="text-lg font-black text-slate-900">{e.title}</div>
+                            <span
+                              className={`text-xs font-black px-3 py-1 rounded-full border ${
+                                isCancelled
+                                  ? "bg-red-50 border-red-200 text-red-800"
+                                  : e.published
+                                  ? "bg-emerald-50 border-emerald-200 text-emerald-900"
+                                  : "bg-slate-50 border-slate-200 text-slate-700"
+                              }`}
+                            >
+                              {tag}
+                            </span>
+                          </div>
+
+                          <div className="text-sm text-slate-600 mt-2">
+                            <b>{e.date}</b>
+                            {e.time ? ` · ${e.time}` : ""}
+                            {e.location ? ` · ${e.location}` : ""}
+                            {typeof e.maxSpots === "number" && e.maxSpots > 0
+                              ? ` · Places: ${e.maxSpots}`
+                              : ""}
+                          </div>
+
+                          {isCancelled && (e as any).cancelledReason ? (
+                            <div className="mt-3 text-sm text-red-700">
+                              <b>Motiu:</b> {(e as any).cancelledReason}
+                            </div>
+                          ) : null}
+
+                          {e.notes ? (
+                            <div className="mt-3 text-sm text-slate-700 whitespace-pre-wrap">
+                              {e.notes}
+                            </div>
+                          ) : null}
+                        </div>
+
+                        {isAdmin ? (
+                          <div className="flex flex-wrap gap-2">
+                            {!isCancelled && (
+                              <button
+                                disabled={busy === `pub:${e.id}`}
+                                onClick={() => togglePublish(e.id, !e.published)}
+                                className={`px-4 py-2 rounded-2xl font-black text-sm shadow-sm ${
+                                  e.published
+                                    ? "bg-white border hover:bg-slate-50"
+                                    : "bg-yellow-400 text-black hover:bg-yellow-500"
+                                }`}
+                              >
+                                <span className="inline-flex items-center gap-2">
+                                  {e.published ? <EyeOff size={16} /> : <Eye size={16} />}
+                                  {e.published ? "Ocultar" : "Publicar"}
+                                </span>
+                              </button>
+                            )}
+
+                            {!isCancelled && (
+                              <button
+                                disabled={busy === `cancel:${e.id}`}
+                                onClick={() => doCancel(e.id)}
+                                className="px-4 py-2 rounded-2xl font-black text-sm border bg-white hover:bg-slate-50"
+                              >
+                                <span className="inline-flex items-center gap-2">
+                                  <Ban size={16} /> Cancel·lar
+                                </span>
+                              </button>
+                            )}
+
+                            <button
+                              disabled={busy === `del:${e.id}`}
+                              onClick={() => doDelete(e.id)}
+                              className="px-4 py-2 rounded-2xl font-black text-sm bg-red-600 text-white hover:bg-red-700"
+                            >
+                              <span className="inline-flex items-center gap-2">
+                                <Trash2 size={16} /> Esborrar
+                              </span>
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })
+            )}
+          </div>
+        </div>
       </div>
 
-      </div>
-
-      {/* MODAL CREAR ESDEVENIMENT */}
-      {open && (
+      {open && isAdmin ? (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="w-full max-w-xl bg-white rounded-2xl shadow-xl border">
+          <div className="w-full max-w-2xl rounded-3xl border bg-white shadow-xl overflow-hidden">
             <div className="flex items-center justify-between p-5 border-b">
-              <h3 className="text-lg font-extrabold text-slate-900">Crear nou esdeveniment</h3>
+              <div>
+                <div className="text-xs font-black text-slate-500">NOU</div>
+                <div className="text-lg font-black text-slate-900">Crear esdeveniment</div>
+              </div>
               <button
                 onClick={() => setOpen(false)}
-                className="p-2 rounded-lg hover:bg-gray-100"
+                className="p-2 rounded-xl hover:bg-slate-100"
                 aria-label="Tancar"
               >
                 <X />
               </button>
             </div>
 
-            <form onSubmit={submit} className="p-5 space-y-4">
+            <form onSubmit={submit} className="p-6 space-y-4">
               <div>
-                <label className="text-sm font-bold text-slate-700">Títol</label>
+                <label className="text-sm font-black text-slate-900">Títol</label>
                 <input
-                  className="mt-1 w-full rounded-xl border px-3 py-2"
+                  className="mt-2 w-full rounded-2xl border px-4 py-3 bg-white/80 focus:outline-none"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Ex: Sopar de club / Xarrada de seguretat…"
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="text-sm font-bold text-slate-700">Data</label>
+                  <label className="text-sm font-black text-slate-900">Data</label>
                   <input
                     type="date"
-                    className="mt-1 w-full rounded-xl border px-3 py-2"
+                    className="mt-2 w-full rounded-2xl border px-4 py-3 bg-white/80 focus:outline-none"
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
                   />
                 </div>
 
                 <div>
-                  <label className="text-sm font-bold text-slate-700">Hora (opcional)</label>
+                  <label className="text-sm font-black text-slate-900">Hora (opcional)</label>
                   <input
-                    type="time"
-                    className="mt-1 w-full rounded-xl border px-3 py-2"
+                    className="mt-2 w-full rounded-2xl border px-4 py-3 bg-white/80 focus:outline-none"
                     value={time}
                     onChange={(e) => setTime(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-bold text-slate-700">Ubicació (opcional)</label>
-                  <input
-                    className="mt-1 w-full rounded-xl border px-3 py-2"
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    placeholder="Ex: Local social"
+                    placeholder="20:00"
                   />
                 </div>
 
                 <div>
-                  <label className="text-sm font-bold text-slate-700">
-                    Places màximes (0 = il·limitat)
-                  </label>
+                  <label className="text-sm font-black text-slate-900">Places (opcional)</label>
                   <input
                     type="number"
                     min={0}
-                    className="mt-1 w-full rounded-xl border px-3 py-2"
+                    className="mt-2 w-full rounded-2xl border px-4 py-3 bg-white/80 focus:outline-none"
                     value={maxSpots}
                     onChange={(e) => setMaxSpots(Number(e.target.value))}
                   />
@@ -273,37 +360,53 @@ export const SocialEvents: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-sm font-bold text-slate-700">Notes (opcional)</label>
-                <textarea
-                  className="mt-1 w-full rounded-xl border px-3 py-2 min-h-[90px]"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Detalls, què cal portar, etc."
+                <label className="text-sm font-black text-slate-900">Ubicació (opcional)</label>
+                <input
+                  className="mt-2 w-full rounded-2xl border px-4 py-3 bg-white/80 focus:outline-none"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder="Ex: Local del club / Restaurant…"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div>
+                <label className="text-sm font-black text-slate-900">Notes (opcional)</label>
+                <textarea
+                  className="mt-2 w-full rounded-2xl border px-4 py-3 bg-white/80 focus:outline-none min-h-[120px]"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Detalls, preu, què portar, etc."
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => {
                     resetForm();
                     setOpen(false);
                   }}
-                  className="px-4 py-2 rounded-xl font-bold bg-gray-100 hover:bg-gray-200"
+                  className="px-5 py-2 rounded-2xl border font-black bg-white hover:bg-slate-50"
                 >
                   Cancel·lar
                 </button>
+
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl font-extrabold bg-slate-900 text-yellow-300 hover:bg-slate-800"
+                  disabled={busy === "create"}
+                  className={`px-5 py-2 rounded-2xl font-black shadow ${
+                    busy === "create"
+                      ? "bg-slate-200 text-slate-500 cursor-not-allowed"
+                      : "bg-slate-900 text-yellow-300 hover:bg-slate-800"
+                  }`}
                 >
-                  Crear esdeveniment
+                  {busy === "create" ? "Creant..." : "Crear"}
                 </button>
               </div>
             </form>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 };
