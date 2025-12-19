@@ -6,7 +6,6 @@ import { Navbar } from "./components/Navbar";
 import { Footer } from "./components/Footer";
 
 import { VirtualDiveMaster } from "./pages/VirtualDiveMaster";
-
 import { ChatPage } from "./pages/ChatPage";
 
 import { Home } from "./pages/Home";
@@ -73,43 +72,173 @@ const AppContent = () => {
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/cookies" element={<Cookies />} />
-          <Route path="/chat" element={<VirtualDiveMaster />} />
 
           {/* Cursos públics */}
           <Route path="/courses-public" element={<CoursesPublic />} />
-          {/* ✅ Alias perquè si algú va a /courses també funcioni */}
-          <Route path="/courses" element={<CoursesPublic />} />
 
-          {/* PRIVATE (SOCIS) */}
-          <Route path="/pending" element={<PrivateRoute><PendingApproval /></PrivateRoute>} />
-          <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-          <Route path="/trips" element={<PrivateRoute><Trips /></PrivateRoute>} />
-          <Route path="/calendar" element={<PrivateRoute><CalendarPage /></PrivateRoute>} />
-          <Route path="/resources" element={<PrivateRoute><ResourcesPage /></PrivateRoute>} />
-          <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
-          <Route path="/social-wall" element={<PrivateRoute><SocialWall /></PrivateRoute>} />
-          <Route path="/social-events" element={<PrivateRoute><SocialEvents /></PrivateRoute>} />
+          {/* PRIVAT */}
+          <Route
+            path="/dashboard"
+            element={
+              <PrivateRoute>
+                <Dashboard />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/calendar"
+            element={
+              <PrivateRoute>
+                <CalendarPage />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/trips"
+            element={
+              <PrivateRoute>
+                <Trips />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/resources"
+            element={
+              <PrivateRoute>
+                <ResourcesPage />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/social-wall"
+            element={
+              <PrivateRoute>
+                <SocialWall />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <PrivateRoute>
+                <Profile />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/pending"
+            element={
+              <PrivateRoute>
+                <PendingApproval />
+              </PrivateRoute>
+            }
+          />
+
+          {/* Social Events (privat) */}
+          <Route
+            path="/social-events"
+            element={
+              <PrivateRoute>
+                <SocialEvents />
+              </PrivateRoute>
+            }
+          />
 
           {/* ✅ Alias perquè /events també funcioni */}
-          <Route path="/events" element={<PrivateRoute><SocialEvents /></PrivateRoute>} />
+          <Route
+            path="/events"
+            element={
+              <PrivateRoute>
+                <SocialEvents />
+              </PrivateRoute>
+            }
+          />
 
           {/* Formació (privada) */}
-          <Route path="/courses-private" element={<PrivateRoute><PrivateCourses /></PrivateRoute>} />
+          <Route
+            path="/courses-private"
+            element={
+              <PrivateRoute>
+                <PrivateCourses />
+              </PrivateRoute>
+            }
+          />
+
           {/* ✅ Alias perquè /my-courses també funcioni si el tenies */}
-          <Route path="/my-courses" element={<PrivateRoute><PrivateCourses /></PrivateRoute>} />
+          <Route
+            path="/my-courses"
+            element={
+              <PrivateRoute>
+                <PrivateCourses />
+              </PrivateRoute>
+            }
+          />
+
+          {/* ✅ XAT: ara és privat (evita que usuaris pending puguin veure'l) */}
+          <Route
+            path="/chat"
+            element={
+              <PrivateRoute>
+                <ChatPage />
+              </PrivateRoute>
+            }
+          />
+
+          {/* ✅ Dive Master: nova ruta (evita el conflicte amb /chat) */}
+          <Route
+            path="/dive-master"
+            element={
+              <PrivateRoute>
+                <VirtualDiveMaster />
+              </PrivateRoute>
+            }
+          />
 
           {/* ADMIN */}
-          <Route path="/admin-users" element={<AdminOnlyRoute><AdminUsers /></AdminOnlyRoute>} />
-          <Route path="/admin-trips" element={<AdminOnlyRoute><AdminTrips /></AdminOnlyRoute>} />
-          <Route path="/admin-courses" element={<AdminOnlyRoute><AdminCourses /></AdminOnlyRoute>} />
-          <Route path="/admin-events" element={<AdminOnlyRoute><AdminEvents /></AdminOnlyRoute>} />
-          <Route path="/admin-settings" element={<AdminOnlyRoute><AdminSettings /></AdminOnlyRoute>} />
+          <Route
+            path="/admin-users"
+            element={
+              <AdminOnlyRoute>
+                <AdminUsers />
+              </AdminOnlyRoute>
+            }
+          />
+          <Route
+            path="/admin-trips"
+            element={
+              <AdminOnlyRoute>
+                <AdminTrips />
+              </AdminOnlyRoute>
+            }
+          />
+          <Route
+            path="/admin-courses"
+            element={
+              <AdminOnlyRoute>
+                <AdminCourses />
+              </AdminOnlyRoute>
+            }
+          />
+          <Route
+            path="/admin-events"
+            element={
+              <AdminOnlyRoute>
+                <AdminEvents />
+              </AdminOnlyRoute>
+            }
+          />
+          <Route
+            path="/admin-settings"
+            element={
+              <AdminOnlyRoute>
+                <AdminSettings />
+              </AdminOnlyRoute>
+            }
+          />
 
           {/* ✅ Alias /admin -> admin-users */}
           <Route path="/admin" element={<Navigate to="/admin-users" replace />} />
 
-          <Route path="/chat" element={<ChatPage />} />
-          
           {/* FALLBACK */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
