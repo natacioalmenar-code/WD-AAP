@@ -16,19 +16,55 @@ type CalendarItem = {
   status?: string; // active | cancelled
 };
 
+function safeDateKey(d: string) {
+  return typeof d === "string" && d.trim() ? d.trim() : "9999-12-31";
+}
+
+function todayKey() {
+  const dt = new Date();
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, "0");
+  const d = String(dt.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function addMonths(base: Date, delta: number) {
+  return new Date(base.getFullYear(), base.getMonth() + delta, 1);
+}
+
+function formatMonthTitle(dt: Date) {
+  return dt.toLocaleDateString("ca-ES", { month: "long", year: "numeric" });
+}
+
+function formatDayHeaderLabel(dt: Date) {
+  return dt.toLocaleDateString("ca-ES", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
+}
+
+function isoFromYMD(y: number, m: number, d: number) {
+  const mm = String(m).padStart(2, "0");
+  const dd = String(d).padStart(2, "0");
+  return `${y}-${mm}-${dd}`;
+}
+
+const TypeDot: React.FC<{ type: ItemType }> = ({ type }) => {
+  const cls =
+    type === "trip"
+      ? "bg-yellow-400"
+      : type === "course"
+      ? "bg-indigo-500"
+      : "bg-emerald-500";
+  return <span className={`inline-block w-2 h-2 rounded-full ${cls}`} />;
+};
+
 const TypePill: React.FC<{ type: ItemType }> = ({ type }) => {
   const cfg =
     type === "trip"
       ? { label: "SORTIDA", cls: "bg-slate-900 text-yellow-300" }
       : type === "course"
       ? { label: "CURS", cls: "bg-indigo-900 text-indigo-100" }
-      : { label: "ESDEVENIMENT", cls: "bg-emerald-900 text-emerald-100" };
+      : { label: "ESDEV.", cls: "bg-emerald-900 text-emerald-100" };
 
-  return (
-    <span className={`inline-flex items-center text-[11px] font-black px-3 py-1 rounded-full ${cfg.cls}`}>
-      {cfg.label}
-    </span>
-  );
+  return <span className={`inline-flex items-center text-[11px] font-black px-3 py-1 rounded-full ${cfg.cls}`}>{cfg.label}</span>;
 };
 
 const StatusPill: React.FC<{ published: boolean; status?: string; canSeeDrafts: boolean }> = ({
@@ -43,7 +79,6 @@ const StatusPill: React.FC<{ published: boolean; status?: string; canSeeDrafts: 
       </span>
     );
   }
-
   if (!published && canSeeDrafts) {
     return (
       <span className="inline-flex items-center text-[11px] font-black px-3 py-1 rounded-full border bg-slate-50 border-slate-200 text-slate-700">
@@ -51,30 +86,12 @@ const StatusPill: React.FC<{ published: boolean; status?: string; canSeeDrafts: 
       </span>
     );
   }
-
   return (
     <span className="inline-flex items-center text-[11px] font-black px-3 py-1 rounded-full border bg-emerald-50 border-emerald-200 text-emerald-900">
       PUBLICAT
     </span>
   );
 };
-
-function formatDayLabel(isoDate: string) {
-  if (!isoDate) return "";
-  const [y, m, d] = isoDate.split("-").map((x) => Number(x));
-  if (!y || !m || !d) return isoDate;
-  const dt = new Date(y, m - 1, d);
-  return dt.toLocaleDateString("ca-ES", {
-    weekday: "long",
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  });
-}
-
-function safeDateKey(d: string) {
-  return typeof d === "string" && d.trim() ? d.trim() : "9999-12-31";
-}
 
 export const CalendarPage: React.FC = () => {
   const { currentUser, trips, courses, socialEvents, canManageTrips, canManageSystem } = useApp();
@@ -84,6 +101,9 @@ export const CalendarPage: React.FC = () => {
   const [showCourses, setShowCourses] = useState(true);
   const [showEvents, setShowEvents] = useState(true);
   const [showPast, setShowPast] = useState(false);
+
+  const [monthOffset, setMonthOffset] = useState(0);
+  const [selectedDate, setSelectedDate] = useState<string>(todayKey());
 
   const canSeeDrafts = useMemo(() => {
     return (canManageSystem?.() ?? false) || (canManageTrips?.() ?? false);
@@ -139,33 +159,24 @@ export const CalendarPage: React.FC = () => {
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
+    const nowKey = todayKey();
 
-    const nowKey = (() => {
-      const dt = new Date();
-      const y = dt.getFullYear();
-      const m = String(dt.getMonth() + 1).padStart(2, "0");
-      const d = String(dt.getDate()).padStart(2, "0");
-      return `${y}-${m}-${d}`;
-    })();
+    return items.filter((it) => {
+      if (!showTrips && it.type === "trip") return false;
+      if (!showCourses && it.type === "course") return false;
+      if (!showEvents && it.type === "event") return false;
 
-    return items
-      .filter((it) => {
-        if (!showTrips && it.type === "trip") return false;
-        if (!showCourses && it.type === "course") return false;
-        if (!showEvents && it.type === "event") return false;
+      if (!canSeeDrafts && !it.published) return false;
 
-        if (!canSeeDrafts && !it.published) return false;
+      if (!showPast && safeDateKey(it.date) < nowKey) return false;
 
-        if (!showPast && safeDateKey(it.date) < nowKey) return false;
-
-        if (!needle) return true;
-        const hay = `${it.title} ${it.location || ""} ${it.subtitle || ""} ${it.date || ""}`.toLowerCase();
-        return hay.includes(needle);
-      })
-      .sort((a, b) => safeDateKey(a.date).localeCompare(safeDateKey(b.date)));
+      if (!needle) return true;
+      const hay = `${it.title} ${it.location || ""} ${it.subtitle || ""} ${it.date || ""}`.toLowerCase();
+      return hay.includes(needle);
+    });
   }, [items, q, showTrips, showCourses, showEvents, showPast, canSeeDrafts]);
 
-  const grouped = useMemo(() => {
+  const byDate = useMemo(() => {
     const map = new Map<string, CalendarItem[]>();
     filtered.forEach((it) => {
       const key = safeDateKey(it.date);
@@ -174,27 +185,62 @@ export const CalendarPage: React.FC = () => {
       map.set(key, arr);
     });
 
-    const keys = Array.from(map.keys()).sort((a, b) => a.localeCompare(b));
-    return keys.map((k) => ({
-      date: k,
-      label: formatDayLabel(k),
-      items: (map.get(k) || []).sort((a, b) => {
+    // ordena dins del mateix dia
+    map.forEach((arr, key) => {
+      arr.sort((a, b) => {
         const order = (x: ItemType) => (x === "trip" ? 1 : x === "course" ? 2 : 3);
         const d = order(a.type) - order(b.type);
         if (d !== 0) return d;
         return (a.title || "").localeCompare(b.title || "");
-      }),
-    }));
+      });
+      map.set(key, arr);
+    });
+
+    return map;
   }, [filtered]);
 
+  // Mes actual (segons offset)
+  const monthDate = useMemo(() => addMonths(new Date(new Date().getFullYear(), new Date().getMonth(), 1), monthOffset), [monthOffset]);
+
+  // Graella del mes (6 setmanes x 7 dies)
+  const calendarCells = useMemo(() => {
+    const y = monthDate.getFullYear();
+    const m = monthDate.getMonth(); // 0-11
+    const firstOfMonth = new Date(y, m, 1);
+
+    // A Catalunya volem que la setmana comenci Dilluns:
+    // JS: getDay() = 0 diumenge ... 6 dissabte
+    // Volem index dilluns=0 ... diumenge=6
+    const jsDay = firstOfMonth.getDay();
+    const mondayIndex = (jsDay + 6) % 7;
+
+    const start = new Date(y, m, 1 - mondayIndex); // dilluns de la primera setmana visible
+    const cells: { date: Date; iso: string; inMonth: boolean }[] = [];
+
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+      const iso = isoFromYMD(d.getFullYear(), d.getMonth() + 1, d.getDate());
+      cells.push({ date: d, iso, inMonth: d.getMonth() === m });
+    }
+    return cells;
+  }, [monthDate]);
+
+  const selectedItems = useMemo(() => {
+    return (byDate.get(selectedDate) || []).slice();
+  }, [byDate, selectedDate]);
+
+  // Si no hi ha usuari -> res
   if (!currentUser) return null;
+
+  const monthTitle = formatMonthTitle(monthDate);
+  const today = todayKey();
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 via-slate-50 to-slate-100">
       <PageHero
         compact
         title="Calendari del Club"
-        subtitle="Sortides, cursos i esdeveniments — tot en un mateix lloc."
+        subtitle="Vista mensual — ràpid i visual."
         badge={
           <span>
             {canSeeDrafts ? (
@@ -210,7 +256,8 @@ export const CalendarPage: React.FC = () => {
         }
       />
 
-      <div className="max-w-6xl mx-auto px-4 py-10 space-y-6">
+      <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
+        {/* FILTRES */}
         <div className="rounded-3xl border bg-white/70 backdrop-blur shadow-sm p-6">
           <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
             <div className="min-w-0">
@@ -264,57 +311,162 @@ export const CalendarPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="space-y-5">
-          {grouped.length === 0 ? (
-            <div className="rounded-3xl border bg-white/70 backdrop-blur shadow-sm p-10 text-center text-slate-600">
-              No hi ha elements per mostrar amb estos filtres.
+        {/* CALENDARI + DETALL */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* GRAELLA */}
+          <div className="lg:col-span-2 rounded-3xl border bg-white/70 backdrop-blur shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b bg-white/40 flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <div className="text-xs font-black text-slate-500">MES</div>
+                <div className="mt-1 text-lg font-black text-slate-900 capitalize">{monthTitle}</div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setMonthOffset((v) => v - 1)}
+                  className="px-4 py-2 rounded-2xl font-black border bg-white hover:bg-slate-50"
+                >
+                  ←
+                </button>
+                <button
+                  onClick={() => {
+                    setMonthOffset(0);
+                    setSelectedDate(todayKey());
+                  }}
+                  className="px-4 py-2 rounded-2xl font-black border bg-yellow-400 text-black hover:bg-yellow-500"
+                >
+                  Avui
+                </button>
+                <button
+                  onClick={() => setMonthOffset((v) => v + 1)}
+                  className="px-4 py-2 rounded-2xl font-black border bg-white hover:bg-slate-50"
+                >
+                  →
+                </button>
+              </div>
             </div>
-          ) : (
-            grouped.map((day) => (
-              <div key={day.date} className="rounded-3xl border bg-white/70 backdrop-blur shadow-sm overflow-hidden">
-                <div className="px-6 py-4 border-b bg-white/40">
-                  <div className="text-xs font-black text-slate-500">DIA</div>
-                  <div className="mt-1 text-lg font-black text-slate-900 capitalize">{day.label}</div>
+
+            {/* Headers setmana */}
+            <div className="grid grid-cols-7 gap-px bg-slate-200">
+              {["Dl", "Dt", "Dc", "Dj", "Dv", "Ds", "Dg"].map((w) => (
+                <div key={w} className="bg-white/60 px-3 py-2 text-xs font-black text-slate-600">
+                  {w}
                 </div>
+              ))}
+            </div>
 
-                <div className="p-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {day.items.map((it) => (
-                    <div key={`${it.type}-${it.id}`} className="rounded-3xl border bg-white/60 p-5">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <TypePill type={it.type} />
-                            <StatusPill published={it.published} status={it.status} canSeeDrafts={canSeeDrafts} />
-                          </div>
+            {/* Cells */}
+            <div className="grid grid-cols-7 gap-px bg-slate-200">
+              {calendarCells.map((cell) => {
+                const dayItems = byDate.get(cell.iso) || [];
+                const isSelected = cell.iso === selectedDate;
+                const isToday = cell.iso === today;
 
-                          <div className="mt-3 text-base font-black text-slate-900 break-words">{it.title}</div>
+                const inMonthCls = cell.inMonth ? "bg-white/70" : "bg-slate-50/70";
+                const selectedCls = isSelected ? "ring-2 ring-yellow-400" : "";
+                const todayCls = isToday ? "border-yellow-400" : "border-transparent";
 
-                          <div className="mt-2 text-sm text-slate-600">
-                            {it.time ? <span className="font-bold">{it.time}</span> : null}
-                            {it.time && (it.location || it.subtitle) ? " · " : null}
-                            {it.location ? it.location : null}
-                            {it.location && it.subtitle ? " · " : null}
-                            {it.subtitle ? it.subtitle : null}
-                          </div>
-                        </div>
+                // compta per tipus (per mostrar punts)
+                const hasTrip = dayItems.some((x) => x.type === "trip");
+                const hasCourse = dayItems.some((x) => x.type === "course");
+                const hasEvent = dayItems.some((x) => x.type === "event");
+
+                return (
+                  <button
+                    key={cell.iso}
+                    onClick={() => setSelectedDate(cell.iso)}
+                    className={`text-left p-3 min-h-[92px] border ${todayCls} ${inMonthCls} hover:bg-white transition ${selectedCls}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className={`text-sm font-black ${cell.inMonth ? "text-slate-900" : "text-slate-400"}`}>
+                        {cell.date.getDate()}
                       </div>
 
-                      {it.status === "cancelled" ? (
-                        <div className="mt-4 text-xs font-black text-red-700 bg-red-50 border border-red-200 rounded-2xl px-3 py-2">
-                          Aquest element està cancel·lat.
-                        </div>
+                      {dayItems.length > 0 ? (
+                        <span className="text-xs font-black px-2 py-1 rounded-full bg-slate-900 text-white">
+                          {dayItems.length}
+                        </span>
                       ) : null}
                     </div>
-                  ))}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
 
-        <div className="text-xs text-slate-500">
-          Nota: els socis/es veuen el calendari amb elements <b>publicats</b>. L’administració i instructors veuen també
-          els <b>ocults</b> per revisar-los.
+                    <div className="mt-2 flex items-center gap-2">
+                      {hasTrip ? <TypeDot type="trip" /> : null}
+                      {hasCourse ? <TypeDot type="course" /> : null}
+                      {hasEvent ? <TypeDot type="event" /> : null}
+                      {dayItems.length === 0 ? <span className="text-xs text-slate-400">—</span> : null}
+                    </div>
+
+                    {/* preview 1 item */}
+                    {dayItems.length > 0 ? (
+                      <div className="mt-2 text-xs font-bold text-slate-700 line-clamp-2">
+                        {dayItems[0].title}
+                        {dayItems.length > 1 ? "…" : ""}
+                      </div>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="px-6 py-4 border-t bg-white/40 text-xs text-slate-600 flex flex-wrap gap-4 items-center">
+              <div className="flex items-center gap-2">
+                <TypeDot type="trip" /> <span className="font-bold">Sortides</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <TypeDot type="course" /> <span className="font-bold">Cursos</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <TypeDot type="event" /> <span className="font-bold">Esdeveniments</span>
+              </div>
+            </div>
+          </div>
+
+          {/* DETALL DIA */}
+          <div className="rounded-3xl border bg-white/70 backdrop-blur shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b bg-white/40">
+              <div className="text-xs font-black text-slate-500">DIA SELECCIONAT</div>
+              <div className="mt-1 text-lg font-black text-slate-900 capitalize">
+                {formatDayHeaderLabel(new Date(Number(selectedDate.slice(0, 4)), Number(selectedDate.slice(5, 7)) - 1, Number(selectedDate.slice(8, 10))))}
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {selectedItems.length === 0 ? (
+                <div className="rounded-2xl border bg-white/60 p-5 text-slate-600 text-center">
+                  No hi ha elements aquest dia amb els filtres actuals.
+                </div>
+              ) : (
+                selectedItems.map((it) => (
+                  <div key={`${it.type}-${it.id}`} className="rounded-3xl border bg-white/60 p-5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <TypePill type={it.type} />
+                      <StatusPill published={it.published} status={it.status} canSeeDrafts={canSeeDrafts} />
+                    </div>
+
+                    <div className="mt-3 text-base font-black text-slate-900 break-words">{it.title}</div>
+
+                    <div className="mt-2 text-sm text-slate-600">
+                      {it.time ? <span className="font-bold">{it.time}</span> : null}
+                      {it.time && (it.location || it.subtitle) ? " · " : null}
+                      {it.location ? it.location : null}
+                      {it.location && it.subtitle ? " · " : null}
+                      {it.subtitle ? it.subtitle : null}
+                    </div>
+
+                    {it.status === "cancelled" ? (
+                      <div className="mt-4 text-xs font-black text-red-700 bg-red-50 border border-red-200 rounded-2xl px-3 py-2">
+                        Aquest element està cancel·lat.
+                      </div>
+                    ) : null}
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t bg-white/40 text-xs text-slate-500">
+              Nota: els socis/es veuen només <b>publicats</b>. Admin/instructors poden veure també <b>ocults</b> per revisar-los.
+            </div>
+          </div>
         </div>
       </div>
     </div>
