@@ -16,16 +16,11 @@ export const Navbar: React.FC = () => {
     }`;
 
   return (
-    <div className="bg-black">
-      <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+    <div className="w-full bg-slate-900">
+      <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-3">
-          <img
-            src={clubSettings?.logoUrl || "/westdivers-logo.png"}
-            alt="Logo"
-            className="h-10 w-10 rounded-full bg-white"
-          />
           <div className="leading-tight">
-            <div className="text-[11px] font-black text-white/70 tracking-wide">
+            <div className="text-xs font-black text-white/80 uppercase tracking-wider">
               {clubSettings?.navbarPreTitle || "CLUB DE BUSSEIG"}
             </div>
             <div className="text-sm font-black text-white">
@@ -52,6 +47,12 @@ export const Navbar: React.FC = () => {
           {currentUser && (
             <Link to="/chat" className={linkClass("/chat")}>
               Xat
+            </Link>
+          )}
+
+          {currentUser && (
+            <Link to="/dive-master" className={linkClass("/dive-master")}>
+              Dive Master
             </Link>
           )}
 
