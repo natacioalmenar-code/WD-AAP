@@ -29,41 +29,70 @@ export const Navbar: React.FC = () => {
           </div>
         </Link>
 
-        <div className="flex items-center gap-2">
+        {/* MENU */}
+        <div className="flex items-center gap-2 flex-wrap justify-center">
           <Link to="/" className={linkClass("/")}>
             Inici
           </Link>
 
-          <Link to="/dashboard" className={linkClass("/dashboard")}>
-            Panell
-          </Link>
+          {currentUser ? (
+            <>
+              <Link to="/dashboard" className={linkClass("/dashboard")}>
+                Panell
+              </Link>
 
-          {currentUser && (
-            <Link to="/calendar" className={linkClass("/calendar")}>
-              Calendari
-            </Link>
-          )}
+              <Link to="/calendar" className={linkClass("/calendar")}>
+                Calendari
+              </Link>
 
-          {currentUser && (
-            <Link to="/chat" className={linkClass("/chat")}>
-              Xat
-            </Link>
-          )}
+              {/* ✅ ARA sí: sortides i cursos visibles (i admin/instructor poden crear dins) */}
+              <Link to="/trips" className={linkClass("/trips")}>
+                Sortides
+              </Link>
 
-          {currentUser && (
-            <Link to="/dive-master" className={linkClass("/dive-master")}>
-              Dive Master
-            </Link>
-          )}
+              <Link to="/courses-private" className={linkClass("/courses-private")}>
+                Cursos
+              </Link>
 
-          {/* Perfil només si NO és admin */}
-          {currentUser && !isAdmin && (
-            <Link to="/profile" className={linkClass("/profile")}>
-              Perfil
-            </Link>
+              <Link to="/social-events" className={linkClass("/social-events")}>
+                Esdeveniments
+              </Link>
+
+              <Link to="/chat" className={linkClass("/chat")}>
+                Xat
+              </Link>
+
+              <Link to="/dive-master" className={linkClass("/dive-master")}>
+                Dive Master
+              </Link>
+
+              {/* ✅ Accés a administració només per admin */}
+              {isAdmin && (
+                <Link to="/admin" className={linkClass("/admin")}>
+                  Administració
+                </Link>
+              )}
+
+              {/* Perfil només si NO és admin (tal com ho teníem) */}
+              {!isAdmin && (
+                <Link to="/profile" className={linkClass("/profile")}>
+                  Perfil
+                </Link>
+              )}
+            </>
+          ) : (
+            <>
+              <Link to="/courses-public" className={linkClass("/courses-public")}>
+                Cursos públics
+              </Link>
+              <Link to="/help" className={linkClass("/help")}>
+                Ajuda
+              </Link>
+            </>
           )}
         </div>
 
+        {/* DRETA */}
         <div className="flex items-center gap-2">
           {isAdmin && (
             <span className="px-3 py-1 rounded-full text-xs font-black bg-yellow-400 text-black">
