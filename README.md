@@ -1,4 +1,4 @@
-<# WEST DIVERS - App Web (V1)
+# WEST DIVERS - App Web (V1)
 
 Aplicació web per a gestió del club:
 - Usuaris (admin / instructor / soci)
