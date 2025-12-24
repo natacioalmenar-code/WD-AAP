@@ -1,0 +1,37 @@
+services:
+  webapp:
+    build: .
+    image: ${IMAGE_URL}/webapp:${IMAGE_TAG}
+    container_name: webapp
+    restart: unless-stopped
+    tty: true
+    ports:
+      - "443:8443"
+    # Si activo el pid surt un altra vulnerabilitat, per tant, no l'activo
+    # pid: "host"
+    security_opt:
+      - no-new-privileges:true
+    # chown, dac_override, fowner, fsetid, kill, setgid, setuid, setpcap,
+    # net_bind_service, net_raw, sys_chroot, mknod, audit_write, setfcap
+    # cap_add:
+    #  - ALL
+    cap_drop:
+      - NET_ADMIN
+      - SYS_ADMIN
+      - NET_BIND_SERVICE
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 1m30s
+      timeout: 10s
+      retries: 3
+      start_period: 2m
+    deploy:
+      resources:
+        limits:
+          cpus: '0.80'
+          memory: 1000M
+        reservations:
+          cpus: '0.60'
+          memory: 700M
+    volumes:
+      - /opt/certs:/certs:ro

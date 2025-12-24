@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta http-equiv="Content-Style-Type" content="text/css">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title><!--# echo var="status" default="400" --> <!--# echo var="status_text" default="Bad request" --></title>
+    <style type="text/css">
+        html, body { margin: 0; padding: 0; }
+        body { font-family: Helvetica, Sans-serif; color: #4a4a4a; font-size: 100%; }
+        #wrapper { width: 650px; margin: 100px auto 0; }
+        h1 { font-size: 4rem; font-weight: bold; color: #333; margin-bottom: .5rem; }
+        h1 span { font-size: 2.25rem; text-transform: uppercase; color: #595959; }
+        p { font-size: 1rem; margin-top: 0; }
+    </style>
+    <!--# if expr="$status = 502" -->
+    <meta http-equiv="refresh" content="15">
+    <!--# endif -->
+</head>
+<body>
+    <div id="wrapper">
+        <!--# if expr="$status = 502" -->
+            <h1>We are updating our website </h1>
+            <p>This is only for a few seconds, you will be redirected.</p>
+        <!--# else -->
+            <h1><!--# echo var="status" default="400" --> <span><!--# echo var="status_text" default="Bad request" --></span></h1>
+            <p></p>
+        <!--# endif -->
+    </div>
+</body>
+</html>

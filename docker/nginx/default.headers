@@ -1,0 +1,43 @@
+# https://serverfault.com/questions/418709/nginx-add-header-for-a-50-page
+# Se debe añadir "always" en los add_header para las paginas de error
+# Se pueden añadir tantos header como sean necesarios
+
+#https://www.cyberciti.biz/tips/linux-unix-bsd-nginx-webserver-security.html #23
+add_header X-Content-Type-Options "nosniff" always;
+
+# NGINX-Cookbook-2nd-ed-2022 [pag 81]
+# HSTS - HTTP Strict Transport Security
+add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload;" always;
+
+# https://geekflare.com/add-x-frame-options-nginx/
+# https://www.upguard.com/blog/10-tips-for-securing-your-nginx-deployment#toc-6
+add_header X-Frame-Options "SAMEORIGIN" always;
+
+# https://www.upguard.com/blog/10-tips-for-securing-your-nginx-deployment#toc-8
+add_header X-XSS-Protection "1; mode=block" always;
+
+# https://securityheaders.com/
+add_header Referrer-Policy "no-referrer" always;
+add_header Permissions-Policy "geolocation=*,display-capture=*,camera=*,encrypted-media=*" always;
+
+# OWASP recomienda una cache de una semana para recursos públicos
+add_header Cache-Control "public, max-age=604800" always;
+
+# CSP https://content-security-policy.com/
+# add_header Content-Security-Policy "default-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' data:; connect-src 'self' *.lleida.net; script-src 'self' *.lleida.net; worker-src 'self' blob:; upgrade-insecure-requests" always;
+
+# En localStorage se guardan datos durante la sessión y si se sale o se recarga se debe volver a hacer login
+# Recomendación OWASP https://owasp.org/www-project-secure-headers/#clear-site-data
+# add_header Clear-Site-Data "\"cookies\", \"cache\", \"storage\"" always;
+
+# Recomendación OWASP https://owasp.org/www-project-secure-headers/#cross-origin-embedder-policy
+add_header Cross-Origin-Embedder-Policy "credentialless" always;
+
+# Recomendación OWASP https://owasp.org/www-project-secure-headers/#cross-origin-opener-policy
+add_header Cross-Origin-Opener-Policy "same-origin-allow-popus" always;
+
+# Recomendación OWASP https://owasp.org/www-project-secure-headers/#cross-origin-resource-policy
+add_header Cross-Origin-Resource-Policy "same-origin" always;
+
+# Recomendación OWASP https://owasp.org/www-project-secure-headers/index.html#x-permitted-cross-domain-policies
+add_header X-Permitted-Cross-Domain-Policies "none" always;
