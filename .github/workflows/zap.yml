@@ -1,0 +1,19 @@
+name: ZAP Baseline WebApp
+
+on:
+  pull_request:
+
+jobs:
+  zap_scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: main
+      - name: ZAP Scan
+        uses: zaproxy/action-baseline@v0.15.0
+        with:
+          target: 'https://app.west-divers.com'
+          
